@@ -604,7 +604,19 @@
 
       <div class="form-group">
         <label for="remitenteInput">📱 Teléfono del Paciente (remitente)</label>
-        <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678" onchange="resetChatForNewUser()">
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678" onchange="resetChatForNewUser()" style="flex: 1;">
+          <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.78rem; background: rgba(59,130,246,0.2); color: #60a5fa; border-color: rgba(59,130,246,0.4);" onclick="pickRandomPatient()" title="Cargar paciente aleatorio de las 70 consultas">
+            🎲 Aleatorio
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="patientDropdown">👤 Seleccionar Paciente de Pruebas (70 chats)</label>
+        <select id="patientDropdown" onchange="onSelectPatientDropdown(this.value)">
+          <option value="">-- Buscar o Seleccionar Paciente --</option>
+        </select>
       </div>
 
       <div class="form-group">
@@ -973,30 +985,88 @@
       pollSessionAndMessages();
     }
 
+    let allPatientsList = [];
+
     async function fetchConsultas() {
       try {
         const res = await fetch('/api/consultas');
         if (!res.ok) return;
         const data = await res.json();
         const list = document.getElementById('consultasList');
+        const consultas = data.consultas || [];
 
-        if (!data.consultas || data.consultas.length === 0) {
+        // Poblar lista de pacientes para el selector desplegable
+        populatePatientDropdown(consultas);
+
+        if (consultas.length === 0) {
           list.innerHTML = `<div class="consulta-item" style="color: var(--text-muted);">Sin consultas registradas aún.</div>`;
           return;
         }
 
-        list.innerHTML = data.consultas.map(c => `
+        list.innerHTML = consultas.map(c => `
           <div class="consulta-item">
             <div class="consulta-header">
               <span>${c.opcion || 'Consulta'}</span>
               <span>${c.estado || 'pendiente'}</span>
             </div>
-            <div><strong>Remitente:</strong> ${c.remitente}</div>
+            <div><strong>Remitente:</strong> <span style="color:#60a5fa; cursor:pointer;" onclick="loadPatientDirect('${c.remitente}')">${c.remitente}</span></div>
             ${c.datos && c.datos.imagenUrl ? `<div class="badge-drive">📷 <a href="${c.datos.imagenUrl}" target="_blank" style="color:inherit;">Ver Imagen (${c.datos.proveedorAlmacenamiento || 'Drive'})</a></div>` : ''}
             <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">${new Date(c.timestamp).toLocaleString()}</div>
           </div>
         `).reverse().join('');
       } catch (e) {}
+    }
+
+    function populatePatientDropdown(consultas) {
+      const dropdown = document.getElementById('patientDropdown');
+      if (!dropdown) return;
+
+      const currentVal = dropdown.value;
+      
+      // Obtener lista única de pacientes con nombre parseado si existe
+      const patientsMap = new Map();
+      consultas.forEach(c => {
+        if (c.remitente && !patientsMap.has(c.remitente)) {
+          let nombre = c.remitente;
+          if (c.datos && c.datos.contenidoMensaje) {
+            const matchNombre = c.datos.contenidoMensaje.match(/(?:Nombre|1\.):\s*([^\n]+)/i);
+            if (matchNombre) nombre = `${matchNombre[1].trim()} (${c.remitente})`;
+          }
+          patientsMap.set(c.remitente, { phone: c.remitente, label: nombre, opcion: c.opcion });
+        }
+      });
+
+      allPatientsList = Array.from(patientsMap.values());
+
+      let html = `<option value="">-- Seleccionar Paciente (${allPatientsList.length} disponibles) --</option>`;
+      allPatientsList.forEach(p => {
+        html += `<option value="${p.phone}">${p.label} - [${p.opcion || 'Consulta'}]</option>`;
+      });
+
+      dropdown.innerHTML = html;
+      if (currentVal) dropdown.value = currentVal;
+    }
+
+    function onSelectPatientDropdown(phone) {
+      if (!phone) return;
+      loadPatientDirect(phone);
+    }
+
+    function pickRandomPatient() {
+      if (allPatientsList.length === 0) {
+        alert('No hay pacientes cargados. Presioná primero "Generar 70 Consultas de Prueba" en el panel de secretarias.');
+        return;
+      }
+      const randomPatient = allPatientsList[Math.floor(Math.random() * allPatientsList.length)];
+      loadPatientDirect(randomPatient.phone);
+    }
+
+    function loadPatientDirect(phone) {
+      const input = document.getElementById('remitenteInput');
+      input.value = phone;
+      const dropdown = document.getElementById('patientDropdown');
+      if (dropdown) dropdown.value = phone;
+      resetChatForNewUser();
     }
   </script>
 </body>
