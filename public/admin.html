@@ -493,7 +493,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchConsultas();
-      setInterval(fetchConsultas, 5000); // Polling suave cada 5s
+      setInterval(fetchConsultas, 5000);
     });
 
     function saveDraft(cardId, value) {
@@ -537,7 +537,7 @@
         const res = await fetch('/api/seed-consultas', { method: 'POST' });
         const data = await res.json();
         alert(`✅ ${data.mensaje || '70 consultas generadas exitosamente'}`);
-        fetchConsultas();
+        fetchConsultas(true);
       } catch (e) {
         alert('Error al generar datos de prueba.');
       } finally {
@@ -556,7 +556,7 @@
         const data = await res.json();
         draftResponses = {};
         alert('🗑️ ' + (data.mensaje || 'Consultas eliminadas correctamente.'));
-        fetchConsultas();
+        fetchConsultas(true);
       } catch (e) {
         alert('Error al vaciar consultas.');
       }
@@ -589,22 +589,18 @@
     function renderConsultas(forceRedraw = false) {
       const container = document.getElementById('consultasGrid');
 
-      // Guardar lo que la secretaria esté escribiendo actualmente
       document.querySelectorAll('.reply-box textarea').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
         draftResponses[cardId] = ta.value;
       });
 
-      // Detectar si el usuario está tipeando activamente en algún textarea
       const activeEl = document.activeElement;
       const activeId = (activeEl && activeEl.id && activeEl.id.startsWith('replyText_')) ? activeEl.id : null;
       const selStart = activeId ? activeEl.selectionStart : null;
       const selEnd = activeId ? activeEl.selectionEnd : null;
 
-      // Calcular firma única de los datos cargados para evitar re-renders innecesarios si no hay cambios
-      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp]));
+      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp, (c.datos && c.datos.respuestasPaciente ? c.datos.respuestasPaciente.length : 0)]));
 
-      // Si los datos no cambiaron y no se forzó el redibujado, NO tocar el DOM para cero interrupciones al tipear
       if (!forceRedraw && currentSignature === lastRenderedSignature && container.children.length > 0) {
         return;
       }
@@ -628,6 +624,7 @@
         const proveedor = datos.proveedorAlmacenamiento || 'Drive';
         const currentDraft = draftResponses[c.id] || '';
 
+        const displayImg = imgBase64 || (imgUrl && !imgUrl.includes('drive.google.com/file/d/demo_drive_') ? imgUrl : null);
         const respuestasPaciente = datos.respuestasPaciente || [];
 
         return `
@@ -699,7 +696,6 @@
         `;
       }).reverse().join('');
 
-      // Restaurar foco y posición exacta del cursor si el usuario estaba tipeando
       if (activeId) {
         const restoredEl = document.getElementById(activeId);
         if (restoredEl) {
@@ -732,7 +728,7 @@
       }
 
       delete draftResponses[cardId];
-      fetchConsultas();
+      fetchConsultas(true);
     }
 
     async function responderViaApi(remitente, cardId) {
@@ -759,7 +755,7 @@
         if (data.success) {
           delete draftResponses[cardId];
           alert(`✅ Respuesta enviada a ${remitente}`);
-          fetchConsultas();
+          fetchConsultas(true);
         } else {
           alert(`❌ Error: ${data.error || 'No se pudo enviar'}`);
         }
@@ -776,7 +772,7 @@
           body: JSON.stringify({ estado: 'atendido' })
         });
         if (res.ok) {
-          fetchConsultas();
+          fetchConsultas(true);
         }
       } catch (err) {
         console.error('Error al actualizar estado:', err);
