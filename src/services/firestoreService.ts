@@ -61,10 +61,8 @@ export class FirestoreService {
    * Obtener sesión del usuario desde Firestore (colección 'sesiones').
    */
   public async getSesion(remitente: string): Promise<UserSession> {
-    // Normalizar ID de documento sanitizando caracteres no permitidos en IDs de Firestore
     const docId = encodeURIComponent(remitente.trim());
 
-    // Si estamos en modo demo sin API Key real o ID por defecto, usar memoria
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
       const sesionMem = FirestoreService.inMemorySessions.get(docId);
       if (sesionMem) return sesionMem;
@@ -90,7 +88,6 @@ export class FirestoreService {
       }
 
       if (!res.ok) {
-        console.warn(`Firestore GET error (${res.status}): Usando fallback en memoria`);
         return FirestoreService.inMemorySessions.get(docId) || {
           remitente,
           estado: 'inicio',
@@ -109,7 +106,6 @@ export class FirestoreService {
         updatedAt: fields.updatedAt || new Date().toISOString()
       };
     } catch (err) {
-      console.error('Error al conectar con Firestore GET:', err);
       return FirestoreService.inMemorySessions.get(docId) || {
         remitente,
         estado: 'inicio',
@@ -132,7 +128,6 @@ export class FirestoreService {
       updatedAt
     };
 
-    // Actualizar siempre en memoria como respaldo instantáneo
     FirestoreService.inMemorySessions.set(docId, sesionData);
 
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
@@ -176,11 +171,9 @@ export class FirestoreService {
       createdAt: timestamp
     };
 
-    // Guardar en memoria
     FirestoreService.inMemoryConsultas.push(payload);
 
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      console.log(`[Firestore Demo] Consulta guardada en colección 'consultas':`, payload);
       return consultaId;
     }
 
@@ -190,16 +183,11 @@ export class FirestoreService {
         fields: this.toFirestoreFields(payload)
       };
 
-      const res = await fetch(url, {
+      await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(firestoreBody)
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.warn(`Firestore POST error (${res.status}): ${errorText}`);
-      }
     } catch (err) {
       console.error('Error al crear consulta en Firestore:', err);
     }
@@ -208,8 +196,57 @@ export class FirestoreService {
   }
 
   /**
-   * Método de utilidad para el panel de pruebas: listar consultas guardadas (memoria / cloud)
+   * Obtener todas las consultas para el panel de secretarias
    */
+  public async getConsultas(): Promise<Array<Record<string, any>>> {
+    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
+      return [...FirestoreService.inMemoryConsultas];
+    }
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (!res.ok) return [...FirestoreService.inMemoryConsultas];
+
+      const json: any = await res.json();
+      if (!json.documents) return [...FirestoreService.inMemoryConsultas];
+
+      return json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
+    } catch (e) {
+      return [...FirestoreService.inMemoryConsultas];
+    }
+  }
+
+  /**
+   * Actualizar estado de consulta (ej: de "pendiente" a "atendido")
+   */
+  public async actualizarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
+    const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === id);
+    if (itemMem) {
+      itemMem.estado = nuevoEstado;
+    }
+
+    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
+      return true;
+    }
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${id}?updateMask.fieldPaths=estado${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+      const firestoreBody = {
+        fields: { estado: { stringValue: nuevoEstado } }
+      };
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(firestoreBody)
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   public static getConsultasGuardadasMemoria(): Array<Record<string, any>> {
     return [...this.inMemoryConsultas];
   }

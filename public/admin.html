@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Secretarias - Clínica Médica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #00a884;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #0b141a;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #00a884, #059669);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 24px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-title {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .stat-num {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .filters-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 14px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .consultas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 20px;
+    }
+
+    .card-consulta {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card-consulta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .opcion-tag {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .status-tag {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .status-pendiente {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
+
+    .status-atendido {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .patient-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.9rem;
+    }
+
+    .phone-link {
+      color: #34d399;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .raw-msg {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-action {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .btn-action:hover {
+      background: #008f70;
+    }
+
+    .drive-link-btn {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">📋</div>
+      <div>
+        <h1 style="font-size: 1.2rem;">Panel de Recepción / Secretarias</h1>
+        <div style="font-size: 0.8rem; color: var(--muted);">Gestión de Consultas y Turnos por WhatsApp</div>
+      </div>
+    </div>
+
+    <button onclick="fetchConsultas()" class="tab-btn" style="background: rgba(255,255,255,0.05);">🔄 Actualizar Ahora</button>
+  </header>
+
+  <div class="container">
+
+    <!-- Tarjetas de Estadísticas -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-title">Consultas Pendientes</div>
+        <div class="stat-num" id="numPendientes">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Atendidas / Agendadas</div>
+        <div class="stat-num" id="numAtendidas" style="color: #60a5fa;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Total Recibidas</div>
+        <div class="stat-num" id="numTotal" style="color: #a78bfa;">0</div>
+      </div>
+    </div>
+
+    <!-- Barra de Filtros -->
+    <div class="filters-bar">
+      <span style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Filtrar por Estado:</span>
+      <button class="tab-btn active" onclick="setFilter('todos', this)">Todas</button>
+      <button class="tab-btn" onclick="setFilter('pendiente', this)">Pendientes</button>
+      <button class="tab-btn" onclick="setFilter('atendido', this)">Atendidas</button>
+    </div>
+
+    <!-- Listado Grid de Consultas -->
+    <div class="consultas-grid" id="consultasGrid">
+      <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando consultas...</div>
+    </div>
+
+  </div>
+
+  <script>
+    let allConsultas = [];
+    let currentFilter = 'todos';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchConsultas();
+      setInterval(fetchConsultas, 10000); // Auto-refresco cada 10 segundos
+    });
+
+    async function fetchConsultas() {
+      try {
+        const res = await fetch('/api/consultas');
+        const data = await res.json();
+        allConsultas = data.consultas || [];
+        updateStats();
+        renderConsultas();
+      } catch (err) {
+        console.error('Error al cargar consultas:', err);
+      }
+    }
+
+    function updateStats() {
+      const pendientes = allConsultas.filter(c => (c.estado || 'pendiente') === 'pendiente').length;
+      const atendidas = allConsultas.filter(c => c.estado === 'atendido').length;
+      
+      document.getElementById('numPendientes').innerText = pendientes;
+      document.getElementById('numAtendidas').innerText = atendidas;
+      document.getElementById('numTotal').innerText = allConsultas.length;
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filters-bar .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderConsultas();
+    }
+
+    function renderConsultas() {
+      const container = document.getElementById('consultasGrid');
+      
+      let filtered = allConsultas;
+      if (currentFilter === 'pendiente') {
+        filtered = allConsultas.filter(c => (c.estado || 'pendiente') === 'pendiente');
+      } else if (currentFilter === 'atendido') {
+        filtered = allConsultas.filter(c => c.estado === 'atendido');
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 60px; text-align: center; background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border);">No hay consultas en esta categoría.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => {
+        const isPendiente = (c.estado || 'pendiente') === 'pendiente';
+        const cleanPhone = (c.remitente || '').replace(/\D/g, '');
+        const waLink = `https://wa.me/${cleanPhone}`;
+        const fecha = new Date(c.timestamp || c.createdAt || Date.now()).toLocaleString('es-AR');
+
+        const datos = c.datos || {};
+        const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '';
+        const imgUrl = datos.imagenUrl;
+        const proveedor = datos.proveedorAlmacenamiento || 'Drive';
+
+        return `
+          <div class="card-consulta">
+            <div class="card-header">
+              <span class="opcion-tag">${c.opcion || 'Consulta'}</span>
+              <span class="status-tag ${isPendiente ? 'status-pendiente' : 'status-atendido'}">${isPendiente ? '⏳ Pendiente' : '✅ Atendido'}</span>
+            </div>
+
+            <div class="patient-info">
+              <div><strong>Paciente:</strong> <a href="${waLink}" target="_blank" class="phone-link">📱 ${c.remitente}</a></div>
+              <div style="font-size: 0.78rem; color: var(--muted);">📅 Fecha: ${fecha}</div>
+            </div>
+
+            <div class="raw-msg">${contenidoMsg}</div>
+
+            ${imgUrl ? `
+              <a href="${imgUrl}" target="_blank" class="drive-link-btn">
+                📷 Ver Foto Pedido / Carnet (${proveedor})
+              </a>
+            ` : ''}
+
+            ${isPendiente ? `
+              <button class="btn-action" onclick="marcarAtendido('${c.id}')">
+                ✅ Marcar como Atendido / Agendado
+              </button>
+            ` : `
+              <div style="text-align: center; color: #34d399; font-size: 0.82rem; font-weight: 600; padding: 8px;">
+                ✔ Atendido por Secretaría
+              </div>
+            `}
+          </div>
+        `;
+      }).reverse().join('');
+    }
+
+    async function marcarAtendido(id) {
+      try {
+        const res = await fetch(`/api/consultas/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estado: 'atendido' })
+        });
+        if (res.ok) {
+          fetchConsultas();
+        }
+      } catch (err) {
+        console.error('Error al actualizar estado:', err);
+      }
+    }
+  </script>
+</body>
+</html>

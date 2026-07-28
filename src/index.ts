@@ -7,7 +7,7 @@ import { FirestoreService } from './services/firestoreService';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Habilitar CORS para permitir pruebas desde cualquier navegador o dominio
+// Habilitar CORS para permitir acceso desde cualquier navegador
 app.use('*', cors());
 
 // Endpoint de prueba de salud
@@ -23,7 +23,7 @@ app.get('/api/status', (c) => {
 
 /**
  * ENDPOINT PRINCIPAL POST /webhook
- * Recibe: { remitente: string, mensaje: string, simulatedTime?: string }
+ * Recibe: { remitente: string, mensaje: string, simulatedTime?: string, imagenBase64?: string }
  */
 app.post('/webhook', async (c) => {
   try {
@@ -44,7 +44,9 @@ app.post('/webhook', async (c) => {
     const payload: WebhookPayload = {
       remitente,
       mensaje,
-      simulatedTime: body.simulatedTime
+      simulatedTime: body.simulatedTime,
+      imagenBase64: body.imagenBase64,
+      imagenNombre: body.imagenNombre
     };
 
     const result = await StateEngine.processMessage(payload, c.env);
@@ -57,7 +59,6 @@ app.post('/webhook', async (c) => {
 
 /**
  * ENDPOINT GET /api/session/:remitente
- * Permite consultar el estado actual de la sesión en Firestore desde la página de pruebas
  */
 app.get('/api/session/:remitente', async (c) => {
   const remitente = c.req.param('remitente');
@@ -68,14 +69,34 @@ app.get('/api/session/:remitente', async (c) => {
 
 /**
  * ENDPOINT GET /api/consultas
- * Permite consultar la lista de consultas registradas (para verificación en el simulador)
+ * Permite listar todas las consultas recibidas para el Panel de Secretarias
  */
-app.get('/api/consultas', (c) => {
-  const consultas = FirestoreService.getConsultasGuardadasMemoria();
+app.get('/api/consultas', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const consultas = await firestore.getConsultas();
   return c.json({
     total: consultas.length,
     consultas
   });
+});
+
+/**
+ * ENDPOINT PATCH /api/consultas/:id
+ * Permite a las secretarias cambiar el estado de la consulta (ej: "pendiente" -> "atendido")
+ */
+app.patch('/api/consultas/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const nuevoEstado = body.estado || 'atendido';
+
+  const firestore = new FirestoreService(c.env);
+  const ok = await firestore.actualizarEstadoConsulta(id, nuevoEstado);
+
+  if (ok) {
+    return c.json({ success: true, id, estado: nuevoEstado });
+  } else {
+    return c.json({ error: 'No se pudo actualizar el estado de la consulta' }, 500);
+  }
 });
 
 export default app;
