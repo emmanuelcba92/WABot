@@ -5,11 +5,11 @@ import {
 } from '../types';
 
 // ─────────────────────────────────────────────────────────────────
-// Menú Principal: Lista (5 opciones → ideal para WhatsApp listas)
+// Menú Principal: Lista (5 opciones)
 // ─────────────────────────────────────────────────────────────────
 export const MENU_PRINCIPAL: InteractiveListMessage = {
   type: 'list',
-  bodyText: '🏥 *¡Bienvenido/a a la Clínica Médica!*\nPor favor seleccioná la opción que necesitás:',
+  bodyText: '🏥 *¡Bienvenido/a a la Clínica Médica!*\nPor favor respondé con la letra (A, B, C, D o E) de la opción que necesitás:',
   buttonLabel: '📋 Ver Opciones',
   sections: [
     {
@@ -26,11 +26,11 @@ export const MENU_PRINCIPAL: InteractiveListMessage = {
 };
 
 // ─────────────────────────────────────────────────────────────────
-// Submenú Opción A: Botones (3 opciones → ideal para WA buttons)
+// Submenú Opción A: Botones (3 opciones)
 // ─────────────────────────────────────────────────────────────────
 export const SUBMENU_TURNOS: InteractiveButtonMessage = {
   type: 'button',
-  bodyText: '📅 *SOLICITUD DE TURNOS*\nSeleccioná el tipo de consulta:',
+  bodyText: '📅 *SOLICITUD DE TURNOS*\nRespondé con el número (1, 2 o 3) de la opción que necesitás:',
   buttons: [
     { id: '1', title: 'Médico ORL', emoji: '👂' },
     { id: '2', title: 'Estudios Médicos', emoji: '🔬' },
@@ -39,7 +39,7 @@ export const SUBMENU_TURNOS: InteractiveButtonMessage = {
 };
 
 // ─────────────────────────────────────────────────────────────────
-// Helpers para texto plano (fallback SMS/sin soporte interactivo)
+// Helpers para texto plano
 // ─────────────────────────────────────────────────────────────────
 export function interactiveToPlainText(msg: InteractiveMessage): string {
   if (msg.type === 'button') {
