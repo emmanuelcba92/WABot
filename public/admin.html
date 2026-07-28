@@ -126,6 +126,22 @@
       border-color: var(--accent);
     }
 
+    .btn-seed {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-seed:hover {
+      opacity: 0.9;
+    }
+
     .consultas-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -327,7 +343,10 @@
       </div>
     </div>
 
-    <button onclick="fetchConsultas()" class="tab-btn" style="background: rgba(255,255,255,0.05);">🔄 Actualizar Ahora</button>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button onclick="generar70Pruebas()" class="btn-seed">⚡ Generar 70 Consultas de Prueba</button>
+      <button onclick="fetchConsultas()" class="tab-btn" style="background: rgba(255,255,255,0.05);">🔄 Actualizar</button>
+    </div>
   </header>
 
   <div class="container">
@@ -363,11 +382,11 @@
   <script>
     let allConsultas = [];
     let currentFilter = 'todos';
-    let draftResponses = {}; // Almacenar borradores de texto de secretarias para que no se borren con el auto-refresco
+    let draftResponses = {};
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchConsultas();
-      setInterval(fetchConsultas, 8000); // Auto-refresco cada 8 segundos
+      setInterval(fetchConsultas, 8000);
     });
 
     function saveDraft(cardId, value) {
@@ -383,6 +402,24 @@
         renderConsultas();
       } catch (err) {
         console.error('Error al cargar consultas:', err);
+      }
+    }
+
+    async function generar70Pruebas() {
+      const btn = event.target;
+      btn.innerText = '⏳ Generando 70 solicitudes...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const data = await res.json();
+        alert(`✅ ${data.mensaje || '70 consultas generadas exitosamente'}`);
+        fetchConsultas();
+      } catch (e) {
+        alert('Error al generar datos de prueba.');
+      } finally {
+        btn.innerText = '⚡ Generar 70 Consultas de Prueba';
+        btn.disabled = false;
       }
     }
 
@@ -413,7 +450,6 @@
     function renderConsultas() {
       const container = document.getElementById('consultasGrid');
 
-      // Guardar lo que se esté escribiendo actualmente antes de re-renderizar
       document.querySelectorAll('.reply-box textarea').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
         draftResponses[cardId] = ta.value;
@@ -462,11 +498,9 @@
               </a>
             ` : ''}
 
-            <!-- CAJA DE RESPUESTA DIRECTA -->
             <div class="reply-box">
               <label>💬 Escribir Respuesta al Paciente:</label>
 
-              <!-- Plantillas rápidas -->
               <div class="quick-reply-chips">
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu turno ha sido agendado exitosamente para el día [Fecha] a las [Hora] hs. Te esperamos.')">✅ Confirmar Turno</span>
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Por favor envíanos una foto más legible de tu pedido médico u orden para procesar tu solicitud.')">📷 Pedir Foto Legible</span>

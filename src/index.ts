@@ -4,6 +4,7 @@ import { Env, WebhookPayload } from './types';
 import { StateEngine } from './stateMachine/engine';
 import { ScheduleService } from './services/scheduleService';
 import { FirestoreService } from './services/firestoreService';
+import { SeedService } from './services/seedService';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -44,8 +45,7 @@ app.post('/webhook', async (c) => {
     };
 
     const firestore = new FirestoreService(c.env);
-    
-    // Registrar mensaje del paciente en historial
+
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
       sender: 'paciente',
@@ -56,7 +56,6 @@ app.post('/webhook', async (c) => {
 
     const result = await StateEngine.processMessage(payload, c.env);
 
-    // Registrar respuesta del bot en historial
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_bot`,
       sender: 'bot',
@@ -113,12 +112,11 @@ app.post('/api/send-message', async (c) => {
     }
 
     const firestore = new FirestoreService(c.env);
-    
+
     if (idConsulta) {
       await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
     }
 
-    // Guardar el mensaje enviado por la secretaria en el historial de chat del paciente
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_sec`,
       sender: 'secretaria',
@@ -134,6 +132,23 @@ app.post('/api/send-message', async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: 'Error al enviar respuesta', details: err?.message }, 500);
+  }
+});
+
+/**
+ * ENDPOINT POST /api/seed-consultas
+ * Genera 70 consultas sintetizadas de prueba para medir estabilidad y rendimiento
+ */
+app.post('/api/seed-consultas', async (c) => {
+  try {
+    const totalGeneradas = await SeedService.generate70TestConsultas(c.env);
+    return c.json({
+      success: true,
+      totalGeneradas,
+      mensaje: 'Se han generado 70 consultas de prueba en Firestore exitosamente.'
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Error al generar datos de prueba', details: err?.message }, 500);
   }
 });
 
