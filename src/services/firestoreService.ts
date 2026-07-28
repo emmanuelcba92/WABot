@@ -160,6 +160,35 @@ export class FirestoreService {
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
   }
 
+  public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string): Promise<void> {
+    const consultas = await this.getConsultas('pendiente');
+    const consultaPaciente = consultas.find(c => c.remitente === remitente);
+
+    if (consultaPaciente) {
+      const datos = consultaPaciente.datos || {};
+      const respAnteriores = datos.respuestasPaciente || [];
+      const nuevaResp = {
+        texto: textoMensaje,
+        timestamp: new Date().toISOString()
+      };
+      datos.respuestasPaciente = [...respAnteriores, nuevaResp];
+
+      // Actualizar objeto en memoria
+      consultaPaciente.datos = datos;
+
+      if (this.projectId) {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${consultaPaciente.id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+          });
+        } catch (e) {}
+      }
+    }
+  }
+
   public async addPendingOutgoing(remitente: string, text: string): Promise<void> {
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -195,7 +224,6 @@ export class FirestoreService {
           if (json.documents) {
             const fetched = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
             result = [...result, ...fetched];
-            // Borrar de Firestore tras leer
             for (const doc of json.documents) {
               await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
             }
@@ -204,7 +232,6 @@ export class FirestoreService {
       } catch (e) {}
     }
 
-    // Filtrar duplicados por ID
     const uniqueMap = new Map();
     result.forEach(item => uniqueMap.set(item.id || item.timestamp, item));
     return Array.from(uniqueMap.values());

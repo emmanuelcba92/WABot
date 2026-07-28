@@ -27,12 +27,38 @@ export class StateEngine {
     const sesion = await firestore.getSesion(remitente);
     const msgClean = mensaje.trim().toLowerCase();
 
-    // Palabras clave de saludo o reinicio explicito
+    // Palabras clave de saludo o reinicio explícito
     const saludos = ['hola', 'buen dia', 'buenas', 'buenos dias', 'buenas tardes',
       'buenas noches', 'iniciar', 'menu', 'inicio', 'recomenzar', 'bot', 'ayuda', 'start'];
-    const esSaludoExplicit = saludos.some(s => msgClean === s || msgClean.startsWith(s + ' '));
+    const esSaludoExplicit = saludos.some(s => msgClean === s || msgClean === s + ' ');
 
-    // 3. Mostrar Menú Principal si es un saludo explícito o si la sesión está en inicio
+    // 3. Manejo de estado esperando_atencion_humana (Bot Silenciado para Atención de Secretaría)
+    if (sesion.estado === 'esperando_atencion_humana') {
+      if (esSaludoExplicit || msgClean === 'menu' || msgClean === 'inicio') {
+        await firestore.saveSesion(remitente, 'esperando_opcion_principal');
+        return {
+          remitente,
+          respuesta: interactiveToPlainText(MENU_PRINCIPAL),
+          interactive: MENU_PRINCIPAL,
+          estadoActual: 'esperando_opcion_principal',
+          enHorario: true,
+          timestamp
+        };
+      }
+
+      // Si el bot está en silencio, actualizar la consulta con el nuevo mensaje del paciente (ej: "Si, perfecto!")
+      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje);
+
+      return {
+        remitente,
+        respuesta: '', // Cadena vacía = Bot en silencio
+        estadoActual: 'esperando_atencion_humana',
+        enHorario: true,
+        timestamp
+      };
+    }
+
+    // 4. Mostrar Menú Principal si es un saludo explícito o si la sesión está en inicio
     if (esSaludoExplicit || sesion.estado === 'inicio') {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
@@ -45,7 +71,7 @@ export class StateEngine {
       };
     }
 
-    // 4. Máquina de estados
+    // 5. Máquina de estados
     switch (sesion.estado) {
 
       case 'esperando_opcion_principal': {
@@ -98,7 +124,6 @@ export class StateEngine {
             timestamp
           };
         } else {
-          // Si el texto ingresado es largo (ej. datos del paciente enviando directo), capturarlo como consulta de turno ORL por defecto
           if (mensaje.length > 15) {
             return await this.guardarConsultaFinal(remitente, 'A1_Turno_ORL_9Datos', mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
           }
@@ -203,11 +228,14 @@ export class StateEngine {
       lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
       imagenUrl: imagenSubidaUrl || null,
       imagenBase64: imagenBase64 || null,
-      proveedorAlmacenamiento: proveedorAlmacenamiento || null
+      proveedorAlmacenamiento: proveedorAlmacenamiento || null,
+      respuestasPaciente: [] // Historial de mensajes posteriores del paciente
     };
 
     await firestore.crearConsulta(remitente, opcionElegida, datosEstructurados);
-    await firestore.saveSesion(remitente, 'inicio');
+    
+    // Cambiar estado a 'esperando_atencion_humana' para SILENCIAR al bot mientras la secretaría atiende
+    await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
     let confirmacionMsg = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
     if (imagenSubidaUrl) {
@@ -219,7 +247,7 @@ export class StateEngine {
     return {
       remitente,
       respuesta: confirmacionMsg,
-      estadoActual: 'inicio',
+      estadoActual: 'esperando_atencion_humana',
       enHorario: true,
       timestamp,
       imagenSubidaUrl

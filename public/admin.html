@@ -628,13 +628,13 @@
         const proveedor = datos.proveedorAlmacenamiento || 'Drive';
         const currentDraft = draftResponses[c.id] || '';
 
-        const displayImg = imgBase64 || (imgUrl && !imgUrl.includes('drive.google.com/file/d/demo_drive_') ? imgUrl : null);
+        const respuestasPaciente = datos.respuestasPaciente || [];
 
         return `
           <div class="card-consulta">
             <div class="card-header">
               <span class="opcion-tag">${c.opcion || 'Consulta'}</span>
-              <span class="status-tag ${isPendiente ? 'status-pendiente' : 'status-atendido'}">${isPendiente ? '⏳ Pendiente' : '✅ Atendido'}</span>
+              <span class="status-tag ${isPendiente ? 'status-pendiente' : 'status-atendido'}">${isPendiente ? '⏳ En Atención' : '✅ Finalizado'}</span>
             </div>
 
             <div class="patient-info">
@@ -643,6 +643,17 @@
             </div>
 
             <div class="raw-msg">${contenidoMsg}</div>
+
+            ${respuestasPaciente.length > 0 ? `
+              <div style="background: rgba(0, 168, 132, 0.12); border: 1px solid rgba(0, 168, 132, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
+                <strong style="color: #34d399;">💬 Respuesta del Paciente en Vivo:</strong>
+                ${respuestasPaciente.map(r => `
+                  <div style="margin-top: 4px; color: #f8fafc;">
+                    🟢 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
 
             ${displayImg ? `
               <div class="card-img-container" onclick="openLightbox('${displayImg}')" title="Clic para ampliar orden médica">
@@ -674,9 +685,15 @@
                   🟢 Abrir en WhatsApp Web
                 </button>
                 <button type="button" class="btn-api-send" onclick="responderViaApi('${c.remitente}', '${c.id}')">
-                  📤 Enviar Automático (API)
+                  📤 Enviar Automático
                 </button>
               </div>
+
+              ${isPendiente ? `
+                <button type="button" onclick="marcarAtendido('${c.id}')" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 8px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; margin-top: 4px;">
+                  ✅ Marcar Atendido / Finalizar Chat
+                </button>
+              ` : ''}
             </div>
           </div>
         `;
