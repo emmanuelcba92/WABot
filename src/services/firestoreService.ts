@@ -72,7 +72,7 @@ export class FirestoreService {
     if (!this.projectId) return FirestoreService.globalScheduleMode;
 
     try {
-      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/global_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
       const res = await fetch(url);
       if (res.ok) {
         const data: any = await res.json();
@@ -92,27 +92,14 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      // 1. Intentar POST para crear el documento de horario
-      const postUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion?documentId=horario${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-      let res = await fetch(postUrl, {
-        method: 'POST',
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/global_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fields: this.toFirestoreFields({ mode, updatedAt: new Date().toISOString() })
         })
       });
-
-      // 2. Si ya existía el documento, realizar PATCH para sobreescribir el modo
-      if (!res.ok) {
-        const patchUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-        await fetch(patchUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: this.toFirestoreFields({ mode, updatedAt: new Date().toISOString() })
-          })
-        });
-      }
     } catch (e) {
       console.error('Error al guardar scheduleMode en Firestore:', e);
     }
@@ -194,7 +181,7 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${docId}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${docId}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
       const firestoreBody = {
         fields: this.toFirestoreFields(sesionData)
       };
