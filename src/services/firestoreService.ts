@@ -162,6 +162,7 @@ export class FirestoreService {
 
   public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string): Promise<void> {
     const consultas = await this.getConsultas();
+    // Buscar la consulta activa del paciente
     const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
 
     if (consultaPaciente) {
@@ -172,18 +173,30 @@ export class FirestoreService {
         timestamp: new Date().toISOString()
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
-
       consultaPaciente.datos = datos;
+
+      // REABRIR AUTOMÁTICAMENTE LA CONSULTA A ESTADO 'pendiente'
+      // para que vuelva inmediatamente a la Bandeja de Entrada de Secretarías
+      consultaPaciente.estado = 'pendiente';
+      consultaPaciente.timestamp = new Date().toISOString(); // Actualizar fecha para poner arriba
 
       if (this.projectId) {
         try {
-          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${consultaPaciente.id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${consultaPaciente.id}?updateMask.fieldPaths=datos&updateMask.fieldPaths=estado&updateMask.fieldPaths=timestamp${this.apiKey ? `&key=${this.apiKey}` : ''}`;
           await fetch(url, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+            body: JSON.stringify({
+              fields: {
+                datos: { mapValue: { fields: this.toFirestoreFields(datos) } },
+                estado: { stringValue: 'pendiente' },
+                timestamp: { stringValue: consultaPaciente.timestamp }
+              }
+            })
           });
-        } catch (e) {}
+        } catch (e) {
+          console.error('Error al reabrir consulta en Firestore:', e);
+        }
       }
     }
   }
@@ -198,7 +211,6 @@ export class FirestoreService {
 
     FirestoreService.pendingOutgoingMemory.push(item);
 
-    // Guardar también dentro de la colección consultas que sabemos que funciona 100% en Firestore
     if (this.projectId && idConsulta) {
       try {
         const consultas = await this.getConsultas();
@@ -234,7 +246,6 @@ export class FirestoreService {
           const pendientes: PendingOutgoingMsg[] = datos.pendientesSalida || [];
           if (pendientes.length > 0) {
             result.push(...pendientes);
-            // Limpiar pendientesSalida en Firestore tras extraerlos
             datos.pendientesSalida = [];
             c.datos = datos;
 

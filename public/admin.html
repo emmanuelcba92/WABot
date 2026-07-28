@@ -210,6 +210,12 @@
       color: #34d399;
     }
 
+    .status-novedad {
+      background: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.5);
+    }
+
     .patient-info {
       display: flex;
       flex-direction: column;
@@ -631,7 +637,7 @@
           <div class="card-consulta">
             <div class="card-header">
               <span class="opcion-tag">${c.opcion || 'Consulta'}</span>
-              <span class="status-tag ${isPendiente ? 'status-pendiente' : 'status-atendido'}">${isPendiente ? '⏳ En Atención' : '✅ Finalizado'}</span>
+              <span class="status-tag ${isPendiente ? (respuestasPaciente.length > 0 ? 'status-novedad' : 'status-pendiente') : 'status-atendido'}">${isPendiente ? (respuestasPaciente.length > 0 ? '🔔 Novedad / Paciente Respondió' : '⏳ Pendiente') : '✅ Finalizado'}</span>
             </div>
 
             <div class="patient-info">
