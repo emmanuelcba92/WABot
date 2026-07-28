@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wa-bot-clinica",
+  "name": "coatwa",
   "main": "src/index.ts",
   "compatibility_date": "2025-02-04",
   "assets": {
