@@ -6,6 +6,9 @@ export interface PendingOutgoingMsg {
   remitente: string;
   text: string;
   timestamp: string;
+  pdfUrl?: string;
+  pdfNombre?: string;
+  pdfBase64?: string;
 }
 
 export class FirestoreService {
@@ -223,11 +226,21 @@ export class FirestoreService {
     }
   }
 
-  public async addPendingOutgoing(remitente: string, text: string, idConsulta?: string): Promise<void> {
+  public async addPendingOutgoing(
+    remitente: string,
+    text: string,
+    idConsulta?: string,
+    pdfUrl?: string,
+    pdfNombre?: string,
+    pdfBase64?: string
+  ): Promise<void> {
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       remitente,
       text,
+      pdfUrl,
+      pdfNombre,
+      pdfBase64,
       timestamp: new Date().toISOString()
     };
 
@@ -373,7 +386,7 @@ export class FirestoreService {
       const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(firestoreBody)
+        body: JSON.stringify({ fields: { estado: { stringValue: nuevoEstado } } })
       });
       return res.ok;
     } catch (e) {

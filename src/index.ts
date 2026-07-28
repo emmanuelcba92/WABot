@@ -117,20 +117,21 @@ app.patch('/api/consultas/:id', async (c) => {
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
-    const { remitente, respuesta, idConsulta } = body;
+    const { remitente, respuesta, idConsulta, pdfUrl, pdfNombre, pdfBase64 } = body;
 
-    if (!remitente || !respuesta) {
-      return c.json({ error: 'Faltan parámetros (remitente o respuesta)' }, 400);
+    if (!remitente || (!respuesta && !pdfUrl && !pdfBase64)) {
+      return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF)' }, 400);
     }
 
     const firestore = new FirestoreService(c.env);
 
     if (idConsulta) {
       await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
-      await firestore.registrarRespuestaSecretaria(idConsulta, respuesta);
+      const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
+      await firestore.registrarRespuestaSecretaria(idConsulta, textoReg);
     }
 
-    const textoFinal = `👩‍⚕️ *[Secretaría]* ${respuesta}`;
+    const textoFinal = respuesta ? `👩‍⚕️ *[Secretaría]* ${respuesta}` : `👩‍⚕️ *[Secretaría]* Te enviamos el documento adjunto con las indicaciones.`;
 
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_sec`,
@@ -139,7 +140,7 @@ app.post('/api/send-message', async (c) => {
       timestamp: new Date().toISOString()
     });
 
-    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta);
+    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64);
 
     return c.json({
       success: true,

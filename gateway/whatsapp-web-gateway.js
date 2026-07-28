@@ -2,10 +2,10 @@
  * CONECTOR WHATSAPP WEB PARA EL BOT DE LA CLÍNICA
  * 
  * Este script reenvía los mensajes entrantes de WhatsApp al Cloudflare Worker
- * y entrega las respuestas de la secretaría y del bot al paciente de forma 100% automática.
+ * y entrega las respuestas de la secretaría (texto y documentos PDF) al paciente de forma 100% automática.
  */
 
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const WORKER_BASE_URL = process.env.WORKER_URL ? process.env.WORKER_URL.replace('/webhook', '') : 'https://coatwa.emmanuel-ag92.workers.dev';
@@ -44,7 +44,7 @@ client.on('authenticated', () => {
 
 client.on('ready', () => {
   console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir y enviar mensajes!');
-  console.log('📡 Servicio de entrega automática de respuestas de secretaría ACTIVADO (Polling 3s)\n');
+  console.log('📡 Servicio de entrega automática de respuestas de secretaría y adjuntos PDF ACTIVADO (Polling 3s)\n');
   
   // Iniciar polling de respuestas emitidas por las secretarias desde el Panel Web
   setInterval(pollSecretaryOutgoingMessages, 3000);
@@ -60,19 +60,34 @@ async function pollSecretaryOutgoingMessages() {
     const messages = data.messages || [];
 
     if (messages.length > 0) {
-      console.log(`📬 [Secretaría] Encontrados ${messages.length} mensajes pendientes de entregar...`);
+      console.log(`📬 [Secretaría] Encontrados ${messages.length} mensajes/documentos pendientes de entregar...`);
     }
 
     for (const item of messages) {
-      if (item.remitente && item.text) {
+      if (item.remitente && (item.text || item.pdfBase64 || item.pdfUrl)) {
         try {
+          let media = null;
+          if (item.pdfBase64) {
+            const cleanBase64 = item.pdfBase64.includes(',') ? item.pdfBase64.split(',')[1] : item.pdfBase64;
+            media = new MessageMedia('application/pdf', cleanBase64, item.pdfNombre || 'Indicaciones.pdf');
+          } else if (item.pdfUrl) {
+            media = await MessageMedia.fromUrl(item.pdfUrl);
+          }
+
           const chat = await client.getChatById(item.remitente);
-          await chat.sendMessage(item.text);
-          console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}: "${item.text.substring(0, 45)}..."`);
+
+          if (media) {
+            await chat.sendMessage(media, { caption: item.text });
+            console.log(`📄 [Secretaría] Documento PDF (${item.pdfNombre || 'Indicaciones.pdf'}) + Mensaje entregado a ${item.remitente}`);
+          } else {
+            await chat.sendMessage(item.text);
+            console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}: "${item.text.substring(0, 40)}..."`);
+          }
         } catch (sendErr) {
           try {
-            await client.sendMessage(item.remitente, item.text);
-            console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}`);
+            if (item.text) {
+              await client.sendMessage(item.remitente, item.text);
+            }
           } catch (err2) {
             console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, err2?.message || err2);
           }

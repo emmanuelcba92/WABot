@@ -379,47 +379,49 @@
       color: #34d399;
     }
 
-    .reply-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .btn-wa-direct {
-      background: #25D366;
+    .btn-submit-main {
+      background: linear-gradient(135deg, #00a884, #059669);
       color: white;
       border: none;
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
       font-weight: 700;
-      font-size: 0.82rem;
+      font-size: 0.95rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      text-decoration: none;
-      transition: opacity 0.2s;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+      width: 100%;
     }
 
-    .btn-wa-direct:hover {
-      opacity: 0.9;
+    .btn-submit-main:hover {
+      opacity: 0.95;
     }
 
-    .btn-api-send {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 10px;
+    .btn-submit-main:active {
+      transform: scale(0.99);
+    }
+
+    .pdf-select-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.82rem;
-      cursor: pointer;
-      transition: background 0.2s;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    .btn-api-send:hover {
-      background: #008f70;
+    .pdf-select-box select {
+      background: #0f172a;
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      outline: none;
     }
 
     .drive-link-btn {
@@ -495,7 +497,17 @@
     let allConsultas = [];
     let currentFilter = 'pendiente';
     let draftResponses = {};
+    let selectedPdfs = {};
+    let customPdfBase64 = {};
+    let customPdfNames = {};
     let lastRenderedSignature = '';
+
+    const PREDEFINED_PDFS = {
+      'sangre': { name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf', title: '📄 Preparación Análisis de Sangre / Laboratorio' },
+      'ecografia': { name: 'Indicaciones_Ecografia_Tomografia_Ayuno.pdf', title: '📄 Preparación Ecografía / Tomografía (Ayuno 8hs)' },
+      'cirugia': { name: 'Indicaciones_Post_Cirugia_Cuidados.pdf', title: '📄 Cuidados Post-Cirugía y Reposo' },
+      'orl': { name: 'Instructivo_Estudios_ORL.pdf', title: '📄 Instructivo Preparación Estudios ORL' }
+    };
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchConsultas();
@@ -589,6 +601,24 @@
       if (textarea) {
         textarea.value = templateText;
         draftResponses[cardId] = templateText;
+      }
+    }
+
+    function handlePdfSelect(cardId, val) {
+      selectedPdfs[cardId] = val;
+    }
+
+    function handleCustomPdfUpload(cardId, fileInput) {
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          customPdfBase64[cardId] = e.target.result;
+          customPdfNames[cardId] = file.name;
+          selectedPdfs[cardId] = 'custom';
+          alert(`📎 Documento "${file.name}" cargado para enviar.`);
+        };
+        reader.readAsDataURL(file);
       }
     }
 
@@ -690,7 +720,7 @@
             ` : '')}
 
             <div class="reply-box">
-              <label>💬 Escribir Nueva Respuesta al Paciente:</label>
+              <label>💬 Escribir Respuesta al Paciente (Presioná Enter para Enviar):</label>
 
               <div class="quick-reply-chips">
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu turno ha sido agendado exitosamente para el día [Fecha] a las [Hora] hs. Te esperamos.')">✅ Confirmar Turno</span>
@@ -698,15 +728,33 @@
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu solicitud PAMI fue ingresada correctamente. Nos comunicaremos cuando la orden esté emitida.')">🩺 Estado PAMI</span>
               </div>
 
-              <textarea id="replyText_${c.id}" oninput="saveDraft('${c.id}', this.value)" placeholder="Escribe tu respuesta personalizada aquí...">${currentDraft}</textarea>
+              <textarea id="replyText_${c.id}" oninput="saveDraft('${c.id}', this.value)" onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); responderViaApi('${c.remitente}', '${c.id}'); }" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${currentDraft}</textarea>
 
-              <div class="reply-actions">
-                <button type="button" class="btn-wa-direct" onclick="responderPorWhatsAppWeb('${c.remitente}', '${c.id}')">
-                  🟢 Abrir en WhatsApp Web
-                </button>
-                <button type="button" class="btn-api-send" onclick="responderViaApi('${c.remitente}', '${c.id}')">
-                  📤 Enviar Automático
-                </button>
+              <!-- 📄 ADJUNTAR INDICACIONES PDF -->
+              <div class="pdf-select-box">
+                <label>📄 Adjuntar Indicaciones de Estudio (PDF):</label>
+                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)">
+                  <option value="">-- Sin Archivo Adjunto --</option>
+                  <option value="sangre">📄 Indicaciones Análisis de Sangre / Laboratorio</option>
+                  <option value="ecografia">📄 Indicaciones Ecografía / Tomografía (Ayuno 8hs)</option>
+                  <option value="cirugia">📄 Cuidados Post-Cirugía y Reposo</option>
+                  <option value="orl">📄 Instructivo Preparación Estudios ORL</option>
+                </select>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                  <span style="font-size: 0.72rem; color: var(--muted);">O subir PDF personalizado:</span>
+                  <input type="file" accept="application/pdf" style="font-size: 0.7rem; color: #94a3b8;" onchange="handleCustomPdfUpload('${c.id}', this)">
+                </div>
+              </div>
+
+              <!-- BOTÓN PRINCIPAL ÚNICO "ENVIAR" -->
+              <button type="button" class="btn-submit-main" onclick="responderViaApi('${c.remitente}', '${c.id}')">
+                📤 Enviar Respuesta
+              </button>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--muted);">
+                <a href="#" onclick="responderPorWhatsAppWeb('${c.remitente}', '${c.id}'); return false;" style="color: #60a5fa; text-decoration: underline;">🌐 Abrir conversación en WhatsApp Web</a>
+                <span>Presioná <strong>Enter</strong> para enviar</span>
               </div>
 
               ${isPendiente ? `
@@ -759,8 +807,21 @@
       const textarea = document.getElementById(`replyText_${cardId}`);
       const respuesta = textarea ? textarea.value.trim() : (draftResponses[cardId] || '');
 
-      if (!respuesta) {
-        alert('Por favor escribe un mensaje de respuesta antes de enviar.');
+      const pdfKey = selectedPdfs[cardId];
+      let pdfBase64 = null;
+      let pdfNombre = null;
+
+      if (pdfKey && pdfKey !== 'custom' && PREDEFINED_PDFS[pdfKey]) {
+        pdfNombre = PREDEFINED_PDFS[pdfKey].name;
+        // Generar PDF base64 demostrativo predefinido
+        pdfBase64 = 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjEgMCBvYmoKPDwvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iaiA8PC9UeXBlIC9QYWdlcyAvQ291bnQgMSAvS2lkcyBbMyAwIFI+PgplbmRvYmoKMyAwIG9iaiA8PC9UeXBlIC9QYWdlIC9QYXJlbnQgMiAwIFIgL01lZGlhQm94IFswIDAgNjEyIDc5Ml0gL0NvbnRlbnRzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDU1Pj4Kc3RyZWFtCkJUMyAwIDAgMyAxMDAgNzAwIFRtIC9GMTEyIFRmIChJbmRpY2FjaW9uZXMgTWVkaWNhcyBDbGluaWNhKSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxOSAwMDAwMCBuIAowMDAwMDAwMDY4IDA0MDAwIG4gCjAwMDAwMDAxMjUgMDAwMDAgbiAKMDAwMDAwMDIxMSAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNSAvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgozMTYKJCVFT0YK';
+      } else if (pdfKey === 'custom' && customPdfBase64[cardId]) {
+        pdfBase64 = customPdfBase64[cardId];
+        pdfNombre = customPdfNames[cardId] || 'Indicaciones.pdf';
+      }
+
+      if (!respuesta && !pdfBase64) {
+        alert('Por favor escribe un mensaje o adjunta un documento PDF antes de enviar.');
         return;
       }
 
@@ -771,15 +832,19 @@
           body: JSON.stringify({
             remitente,
             respuesta,
-            idConsulta: cardId
+            idConsulta: cardId,
+            pdfNombre,
+            pdfBase64
           })
         });
 
         const data = await res.json();
         if (data.success) {
           delete draftResponses[cardId];
+          delete selectedPdfs[cardId];
+          delete customPdfBase64[cardId];
+          delete customPdfNames[cardId];
           if (textarea) textarea.value = '';
-          alert(`✅ Respuesta enviada a ${remitente}`);
           fetchConsultas(true);
         } else {
           alert(`❌ Error: ${data.error || 'No se pudo enviar'}`);
