@@ -62,7 +62,7 @@ app.post('/webhook', async (c) => {
       text: result.respuesta,
       timestamp: new Date().toISOString(),
       imageUrl: result.imagenSubidaUrl,
-      interactive: result.interactive  // Guardar menú interactivo para re-renderizar en el simulador
+      interactive: result.interactive
     });
 
     return c.json(result, 200);
@@ -136,10 +136,6 @@ app.post('/api/send-message', async (c) => {
   }
 });
 
-/**
- * ENDPOINT POST /api/seed-consultas
- * Genera 70 consultas sintetizadas de prueba para medir estabilidad y rendimiento
- */
 app.post('/api/seed-consultas', async (c) => {
   try {
     const totalGeneradas = await SeedService.generate70TestConsultas(c.env);
@@ -151,6 +147,22 @@ app.post('/api/seed-consultas', async (c) => {
   } catch (err: any) {
     return c.json({ error: 'Error al generar datos de prueba', details: err?.message }, 500);
   }
+});
+
+/**
+ * ENDPOINT DELETE /api/consultas (y POST /api/clear-consultas)
+ * Vacía todas las consultas y sesiones de prueba
+ */
+app.post('/api/clear-consultas', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  await firestore.clearAllConsultas();
+  return c.json({ success: true, mensaje: 'Todas las consultas y chats de prueba han sido limpiados.' });
+});
+
+app.delete('/api/consultas', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  await firestore.clearAllConsultas();
+  return c.json({ success: true, mensaje: 'Todas las consultas y chats de prueba han sido limpiados.' });
 });
 
 export default app;

@@ -142,6 +142,22 @@
       opacity: 0.9;
     }
 
+    .btn-clear {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-clear:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
     .consultas-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -344,7 +360,8 @@
     </div>
 
     <div style="display: flex; gap: 10px; align-items: center;">
-      <button onclick="generar70Pruebas()" class="btn-seed">⚡ Generar 70 Consultas de Prueba</button>
+      <button onclick="generar70Pruebas(event)" class="btn-seed">⚡ Generar 70 Consultas de Prueba</button>
+      <button onclick="limpiarTodasPruebas()" class="btn-clear" title="Vaciar todas las consultas y chats de prueba">🗑️ Limpiar Todo</button>
       <button onclick="fetchConsultas()" class="tab-btn" style="background: rgba(255,255,255,0.05);">🔄 Actualizar</button>
     </div>
   </header>
@@ -405,9 +422,9 @@
       }
     }
 
-    async function generar70Pruebas() {
-      const btn = event.target;
-      btn.innerText = '⏳ Generando 70 solicitudes...';
+    async function generar70Pruebas(evt) {
+      const btn = evt ? evt.target : document.querySelector('.btn-seed');
+      btn.innerText = '⏳ Generando...';
       btn.disabled = true;
 
       try {
@@ -420,6 +437,22 @@
       } finally {
         btn.innerText = '⚡ Generar 70 Consultas de Prueba';
         btn.disabled = false;
+      }
+    }
+
+    async function limpiarTodasPruebas() {
+      if (!confirm('⚠️ ¿Estás seguro de que deseas vaciar y eliminar todas las consultas y chats de prueba?')) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/clear-consultas', { method: 'POST' });
+        const data = await res.json();
+        draftResponses = {};
+        alert('🗑️ ' + (data.mensaje || 'Consultas eliminadas correctamente.'));
+        fetchConsultas();
+      } catch (e) {
+        alert('Error al vaciar consultas.');
       }
     }
 

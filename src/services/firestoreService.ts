@@ -247,6 +247,31 @@ export class FirestoreService {
     }
   }
 
+  public async clearAllConsultas(): Promise<void> {
+    FirestoreService.inMemoryConsultas = [];
+    FirestoreService.inMemorySessions.clear();
+
+    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
+      return;
+    }
+
+    try {
+      // Borrar colección consultas en Firestore
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json: any = await res.json();
+        if (json.documents) {
+          for (const doc of json.documents) {
+            await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error al vaciar consultas en Firestore:', e);
+    }
+  }
+
   public static getConsultasGuardadasMemoria(): Array<Record<string, any>> {
     return [...this.inMemoryConsultas];
   }
