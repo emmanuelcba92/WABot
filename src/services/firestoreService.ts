@@ -162,7 +162,6 @@ export class FirestoreService {
 
   public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string): Promise<void> {
     const consultas = await this.getConsultas();
-    // Buscar la consulta activa del paciente
     const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
 
     if (consultaPaciente) {
@@ -175,10 +174,8 @@ export class FirestoreService {
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
       consultaPaciente.datos = datos;
 
-      // REABRIR AUTOMÁTICAMENTE LA CONSULTA A ESTADO 'pendiente'
-      // para que vuelva inmediatamente a la Bandeja de Entrada de Secretarías
       consultaPaciente.estado = 'pendiente';
-      consultaPaciente.timestamp = new Date().toISOString(); // Actualizar fecha para poner arriba
+      consultaPaciente.timestamp = new Date().toISOString();
 
       if (this.projectId) {
         try {
@@ -197,6 +194,31 @@ export class FirestoreService {
         } catch (e) {
           console.error('Error al reabrir consulta en Firestore:', e);
         }
+      }
+    }
+  }
+
+  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string): Promise<void> {
+    const consultas = await this.getConsultas();
+    const target = consultas.find(c => c.id === idConsulta);
+    if (target) {
+      const datos = target.datos || {};
+      const respuestasSec = datos.respuestasSecretaria || [];
+      datos.respuestasSecretaria = [...respuestasSec, {
+        texto: respuestaTexto,
+        timestamp: new Date().toISOString()
+      }];
+      target.datos = datos;
+
+      if (this.projectId) {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+          });
+        } catch (e) {}
       }
     }
   }

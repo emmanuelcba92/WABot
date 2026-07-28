@@ -117,6 +117,7 @@ app.post('/api/send-message', async (c) => {
 
     if (idConsulta) {
       await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
+      await firestore.registrarRespuestaSecretaria(idConsulta, respuesta);
     }
 
     const textoFinal = `👩‍⚕️ *[Secretaría]* ${respuesta}`;

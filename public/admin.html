@@ -211,9 +211,9 @@
     }
 
     .status-novedad {
-      background: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.35);
       color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.5);
+      border: 1px solid rgba(52, 211, 153, 0.6);
     }
 
     .patient-info {
@@ -597,7 +597,9 @@
 
       document.querySelectorAll('.reply-box textarea').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
-        draftResponses[cardId] = ta.value;
+        if (ta.value.trim().length > 0) {
+          draftResponses[cardId] = ta.value;
+        }
       });
 
       const activeEl = document.activeElement;
@@ -605,7 +607,7 @@
       const selStart = activeId ? activeEl.selectionStart : null;
       const selEnd = activeId ? activeEl.selectionEnd : null;
 
-      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp, (c.datos && c.datos.respuestasPaciente ? c.datos.respuestasPaciente.length : 0)]));
+      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp, (c.datos && c.datos.respuestasPaciente ? c.datos.respuestasPaciente.length : 0), (c.datos && c.datos.respuestasSecretaria ? c.datos.respuestasSecretaria.length : 0)]));
 
       if (!forceRedraw && currentSignature === lastRenderedSignature && container.children.length > 0) {
         return;
@@ -632,6 +634,7 @@
 
         const displayImg = imgBase64 || (imgUrl && !imgUrl.includes('drive.google.com/file/d/demo_drive_') ? imgUrl : null);
         const respuestasPaciente = datos.respuestasPaciente || [];
+        const respuestasSecretaria = datos.respuestasSecretaria || [];
 
         return `
           <div class="card-consulta">
@@ -645,14 +648,28 @@
               <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
             </div>
 
-            <div class="raw-msg">${contenidoMsg}</div>
+            <!-- 📥 Solicitud Inicial del Paciente -->
+            <div class="raw-msg" title="Datos enviados por el paciente">${contenidoMsg}</div>
 
+            <!-- 👩‍⚕️ Historial de Ofertas / Respuestas de Secretaría -->
+            ${respuestasSecretaria.length > 0 ? `
+              <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
+                <strong style="color: #60a5fa;">👩‍⚕️ Ofrecido Anteriormente por Secretaría:</strong>
+                ${respuestasSecretaria.map(r => `
+                  <div style="margin-top: 4px; color: #e2e8f0;">
+                    💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE (ALTA VISIBILIDAD) -->
             ${respuestasPaciente.length > 0 ? `
-              <div style="background: rgba(0, 168, 132, 0.12); border: 1px solid rgba(0, 168, 132, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
-                <strong style="color: #34d399;">💬 Respuesta del Paciente en Vivo:</strong>
+              <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem; box-shadow: 0 4px 15px rgba(0, 230, 153, 0.2);">
+                <strong style="color: #00e699; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">💬 Respuesta del Paciente en Vivo:</strong>
                 ${respuestasPaciente.map(r => `
-                  <div style="margin-top: 4px; color: #f8fafc;">
-                    🟢 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                  <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
+                    🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
                   </div>
                 `).join('')}
               </div>
@@ -673,7 +690,7 @@
             ` : '')}
 
             <div class="reply-box">
-              <label>💬 Escribir Respuesta al Paciente:</label>
+              <label>💬 Escribir Nueva Respuesta al Paciente:</label>
 
               <div class="quick-reply-chips">
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu turno ha sido agendado exitosamente para el día [Fecha] a las [Hora] hs. Te esperamos.')">✅ Confirmar Turno</span>
@@ -734,6 +751,7 @@
       }
 
       delete draftResponses[cardId];
+      if (textarea) textarea.value = '';
       fetchConsultas(true);
     }
 
@@ -760,6 +778,7 @@
         const data = await res.json();
         if (data.success) {
           delete draftResponses[cardId];
+          if (textarea) textarea.value = '';
           alert(`✅ Respuesta enviada a ${remitente}`);
           fetchConsultas(true);
         } else {
@@ -778,6 +797,7 @@
           body: JSON.stringify({ estado: 'atendido' })
         });
         if (res.ok) {
+          delete draftResponses[id];
           fetchConsultas(true);
         }
       } catch (err) {
