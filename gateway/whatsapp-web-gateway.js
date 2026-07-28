@@ -1,9 +1,11 @@
 /**
  * CONECTOR WHATSAPP WEB PARA EL BOT DE LA CLÍNICA
- * Con soporte para Menús Interactivos Nativos (Listas y Botones)
+ * 
+ * Este script reenvía los mensajes entrantes de WhatsApp al Cloudflare Worker
+ * y entrega las respuestas formateadas al paciente de forma 100% confiable.
  */
 
-const { Client, LocalAuth, List, Buttons } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const WORKER_WEBHOOK_URL = process.env.WORKER_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
@@ -42,50 +44,6 @@ client.on('authenticated', () => {
 client.on('ready', () => {
   console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir mensajes!\n');
 });
-
-// Helper para convertir el payload interactivo de Cloudflare Worker a objetos nativos de whatsapp-web.js
-function createWWebJSInteractive(interactive) {
-  if (!interactive) return null;
-
-  try {
-    if (interactive.type === 'list') {
-      const sections = (interactive.sections || []).map(sec => ({
-        title: sec.title || 'Opciones',
-        rows: (sec.rows || []).map(r => ({
-          id: r.id,
-          title: r.title.substring(0, 24), // Límite de 24 caracteres en WA
-          description: (r.description || '').substring(0, 72)
-        }))
-      }));
-
-      return new List(
-        interactive.bodyText || 'Seleccioná una opción:',
-        interactive.buttonLabel || '📋 Ver Opciones',
-        sections,
-        '🏥 Clínica Médica',
-        'Tocá para desplegar el menú'
-      );
-    }
-
-    if (interactive.type === 'button') {
-      const formattedButtons = (interactive.buttons || []).map(b => ({
-        id: b.id,
-        body: `${b.emoji || ''} ${b.title}`.trim().substring(0, 20) // Límite de 20 caracteres en botones WA
-      }));
-
-      return new Buttons(
-        interactive.bodyText || 'Seleccioná una opción:',
-        formattedButtons,
-        '🏥 Clínica Médica',
-        'Tocá una opción'
-      );
-    }
-  } catch (e) {
-    console.error('Error al construir objeto interactivo:', e);
-  }
-
-  return null;
-}
 
 // Manejar mensajes entrantes de pacientes
 client.on('message', async (msg) => {
@@ -145,25 +103,10 @@ client.on('message', async (msg) => {
 
     const data = await res.json();
 
-    // 4. Si el Worker devuelve un menú interactivo, intentar enviarlo como objeto List/Buttons nativo
-    let enviadoInteractivo = false;
-    if (data.interactive) {
-      try {
-        const interactiveObj = createWWebJSInteractive(data.interactive);
-        if (interactiveObj) {
-          await client.sendMessage(remitente, interactiveObj);
-          console.log(`🤖 Respuesta interactiva (${data.interactive.type}) enviada a ${remitente}`);
-          enviadoInteractivo = true;
-        }
-      } catch (err) {
-        console.warn('⚠️ No se pudo enviar como objeto interactivo nativo, enviando texto formateado:', err);
-      }
-    }
-
-    // 5. Fallback a texto si no había objeto interactivo o si falló el envio nativo
-    if (!enviadoInteractivo && data.respuesta) {
+    // 4. Enviar la respuesta del bot formateada en texto de forma 100% confiable
+    if (data.respuesta) {
       await client.sendMessage(remitente, data.respuesta);
-      console.log(`🤖 Respuesta de texto enviada a ${remitente}`);
+      console.log(`🤖 Respuesta enviada a ${remitente}`);
     }
   } catch (err) {
     console.error('❌ Error de conexión con el Worker:', err);
