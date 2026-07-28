@@ -77,7 +77,7 @@ export class FirestoreService {
       if (res.ok) {
         const data: any = await res.json();
         const fields = this.fromFirestoreFields(data.fields || {});
-        if (fields.mode) {
+        if (fields && fields.mode) {
           FirestoreService.globalScheduleMode = fields.mode as ScheduleMode;
           return fields.mode as ScheduleMode;
         }
@@ -92,14 +92,25 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-      await fetch(url, {
+      const patchUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario?updateMask.fieldPaths=mode&updateMask.fieldPaths=updatedAt${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+      const res = await fetch(patchUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fields: this.toFirestoreFields({ mode, updatedAt: new Date().toISOString() })
         })
       });
+
+      if (!res.ok && res.status === 404) {
+        const postUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion?documentId=horario${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+        await fetch(postUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: this.toFirestoreFields({ mode, updatedAt: new Date().toISOString() })
+          })
+        });
+      }
     } catch (e) {
       console.error('Error al guardar scheduleMode en Firestore:', e);
     }
