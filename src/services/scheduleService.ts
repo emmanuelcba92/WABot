@@ -80,10 +80,10 @@ export class ScheduleService {
    * Verifica si el momento actual (o simulado) se encuentra dentro del horario de atención:
    * Lunes a Viernes de 08:00 a 20:00 hs (America/Argentina/Buenos_Aires), o según el modo manual configurado.
    */
-  public static isWithinBusinessHours(simulatedIsoTime?: string): ScheduleCheckResult {
+  public static isWithinBusinessHours(simulatedIsoTime?: string, overrideMode: ScheduleMode = 'auto'): ScheduleCheckResult {
     const argTime = this.getArgentinaDateTime(simulatedIsoTime);
 
-    if (this.currentMode === 'always_open') {
+    if (overrideMode === 'always_open') {
       return {
         isWithinHours: true,
         dayOfWeek: argTime.dayName,
@@ -94,7 +94,7 @@ export class ScheduleService {
       };
     }
 
-    if (this.currentMode === 'always_closed') {
+    if (overrideMode === 'always_closed') {
       return {
         isWithinHours: false,
         dayOfWeek: argTime.dayName,

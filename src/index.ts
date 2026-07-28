@@ -11,8 +11,10 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors());
 
-app.get('/api/status', (c) => {
-  const schedule = ScheduleService.isWithinBusinessHours();
+app.get('/api/status', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const mode = await firestore.getScheduleMode();
+  const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
   return c.json({
     status: 'ok',
     service: 'WA Bot Backend - Clínica Médica',
@@ -21,10 +23,12 @@ app.get('/api/status', (c) => {
   });
 });
 
-app.get('/api/schedule-config', (c) => {
-  const schedule = ScheduleService.isWithinBusinessHours();
+app.get('/api/schedule-config', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const mode = await firestore.getScheduleMode();
+  const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
   return c.json({
-    mode: ScheduleService.getMode(),
+    mode,
     scheduleInfo: schedule
   });
 });
@@ -33,11 +37,12 @@ app.post('/api/schedule-config', async (c) => {
   try {
     const body = await c.req.json();
     const mode = (body.mode as ScheduleMode) || 'auto';
-    ScheduleService.setMode(mode);
-    const schedule = ScheduleService.isWithinBusinessHours();
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveScheduleMode(mode);
+    const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
     return c.json({
       success: true,
-      mode: ScheduleService.getMode(),
+      mode,
       scheduleInfo: schedule,
       mensaje: `Modo de horario actualizado a: ${mode}`
     });

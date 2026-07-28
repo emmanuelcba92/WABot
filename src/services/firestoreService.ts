@@ -1,5 +1,6 @@
 import { Env, StateType, UserSession, ChatMessage } from '../types';
 import { CONFIG } from '../config';
+import { ScheduleMode } from './scheduleService';
 
 export interface PendingOutgoingMsg {
   id: string;
@@ -18,6 +19,7 @@ export class FirestoreService {
   private static inMemorySessions: Map<string, UserSession> = new Map();
   private static inMemoryConsultas: Array<Record<string, any>> = [];
   private static pendingOutgoingMemory: PendingOutgoingMsg[] = [];
+  private static globalScheduleMode: ScheduleMode = 'auto';
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -64,6 +66,43 @@ export class FirestoreService {
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
+  }
+
+  public async getScheduleMode(): Promise<ScheduleMode> {
+    if (!this.projectId) return FirestoreService.globalScheduleMode;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields.mode) {
+          FirestoreService.globalScheduleMode = fields.mode as ScheduleMode;
+          return fields.mode as ScheduleMode;
+        }
+      }
+    } catch (e) {}
+
+    return FirestoreService.globalScheduleMode;
+  }
+
+  public async saveScheduleMode(mode: ScheduleMode): Promise<void> {
+    FirestoreService.globalScheduleMode = mode;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/configuracion/horario${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ mode, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar scheduleMode en Firestore:', e);
+    }
   }
 
   public async getSesion(remitente: string): Promise<UserSession> {

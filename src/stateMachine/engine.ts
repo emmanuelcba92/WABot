@@ -11,8 +11,9 @@ export class StateEngine {
     const firestore = new FirestoreService(env);
     const timestamp = new Date().toISOString();
 
-    // 1. Control de Horario
-    const scheduleCheck = ScheduleService.isWithinBusinessHours(simulatedTime);
+    // 1. Control de Horario (Persistido en Firestore)
+    const scheduleMode = await firestore.getScheduleMode();
+    const scheduleCheck = ScheduleService.isWithinBusinessHours(simulatedTime, scheduleMode);
     if (!scheduleCheck.isWithinHours) {
       return {
         remitente,
