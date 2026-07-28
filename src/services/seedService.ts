@@ -25,6 +25,23 @@ const OPCIONES_TIPOS = [
   'E_Reprogramacion_Cancelacion'
 ];
 
+// Generador de imagen SVG/dataURL de orden médica sintética
+function generateSampleOrderSvgDataUrl(nombrePaciente: string, estudio: string, os: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280">
+    <rect width="400" height="280" fill="#f8fafc" rx="12" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="44" fill="#00a884" rx="12"/>
+    <text x="20" y="28" font-family="sans-serif" font-size="16" font-weight="bold" fill="#ffffff">📋 PEDIDO MÉDICO - CLÍNICA</text>
+    <text x="20" y="75" font-family="sans-serif" font-size="14" font-weight="bold" fill="#0f172a">Paciente: ${nombrePaciente}</text>
+    <text x="20" y="105" font-family="sans-serif" font-size="13" fill="#334155">Estudio: ${estudio}</text>
+    <text x="20" y="135" font-family="sans-serif" font-size="13" fill="#334155">Obra Social / Prepaga: ${os}</text>
+    <text x="20" y="165" font-family="sans-serif" font-size="13" fill="#334155">Diagnóstico Presuntivo: Control de Rutina / Valoración</text>
+    <line x1="20" y1="210" x2="380" y2="210" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4"/>
+    <text x="240" y="235" font-family="sans-serif" font-size="12" font-style="italic" fill="#00a884">Dr. M. Ramírez (M.P. 45123)</text>
+    <text x="250" y="255" font-family="sans-serif" font-size="10" fill="#64748b">Firma y Sello Digitalizado</text>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
 export class SeedService {
   public static async generate70TestConsultas(env?: any): Promise<number> {
     const firestore = new FirestoreService(env);
@@ -44,6 +61,7 @@ export class SeedService {
       const tieneImagen = tipo.includes('Foto') || tipo.includes('Autorizacion');
       const simulatedDriveId = `demo_drive_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`;
       const driveUrl = tieneImagen ? `https://drive.google.com/file/d/${simulatedDriveId}/view` : null;
+      const sampleImgBase64 = tieneImagen ? generateSampleOrderSvgDataUrl(nombre, tipo.includes('ORL') ? 'Otorrinolaringología' : 'Ecografía / Radiografía', os) : null;
 
       const offsetMinutes = Math.floor(Math.random() * 300);
       const timestamp = new Date(Date.now() - offsetMinutes * 60000).toISOString();
@@ -63,12 +81,12 @@ export class SeedService {
         contenidoMensaje,
         lineasParseadas: contenidoMensaje.split('\n'),
         imagenUrl: driveUrl,
+        imagenBase64: sampleImgBase64,
         proveedorAlmacenamiento: tieneImagen ? 'google_drive' : null
       };
 
       await firestore.crearConsulta(remitente, tipo, datosEstructurados);
       
-      // Si está atendido, actualizar estado
       if (estado === 'atendido') {
         const consultas = await firestore.getConsultas();
         const ultima = consultas[consultas.length - 1];

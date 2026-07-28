@@ -170,6 +170,7 @@ export class StateEngine {
           contenidoMensaje: mensaje,
           lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
           imagenUrl: imagenSubidaUrl || null,
+          imagenBase64: imagenBase64 || null, // Guardar imagen base64 para previsualización directa en el panel de secretarias
           proveedorAlmacenamiento: proveedorAlmacenamiento || null
         };
 
