@@ -128,8 +128,7 @@ app.post('/api/send-message', async (c) => {
       timestamp: new Date().toISOString()
     });
 
-    // Encolar mensaje para que el conector de WhatsApp Web (gateway) lo entregue automáticamente al celular del paciente
-    await firestore.addPendingOutgoing(remitente, textoFinal);
+    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta);
 
     return c.json({
       success: true,

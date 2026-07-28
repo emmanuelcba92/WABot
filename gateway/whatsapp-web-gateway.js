@@ -66,12 +66,16 @@ async function pollSecretaryOutgoingMessages() {
     for (const item of messages) {
       if (item.remitente && item.text) {
         try {
-          // Asegurar formato de destino en whatsapp-web.js
-          const targetId = item.remitente.includes('@') ? item.remitente : `${item.remitente.replace(/\D/g, '')}@c.us`;
-          await client.sendMessage(targetId, item.text);
+          const chat = await client.getChatById(item.remitente);
+          await chat.sendMessage(item.text);
           console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}: "${item.text.substring(0, 45)}..."`);
         } catch (sendErr) {
-          console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, sendErr);
+          try {
+            await client.sendMessage(item.remitente, item.text);
+            console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}`);
+          } catch (err2) {
+            console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, err2?.message || err2);
+          }
         }
       }
     }

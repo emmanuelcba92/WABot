@@ -14,7 +14,7 @@ export class FirestoreService {
 
   private static inMemorySessions: Map<string, UserSession> = new Map();
   private static inMemoryConsultas: Array<Record<string, any>> = [];
-  private static pendingOutgoing: PendingOutgoingMsg[] = [];
+  private static pendingOutgoingMemory: PendingOutgoingMsg[] = [];
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -161,8 +161,8 @@ export class FirestoreService {
   }
 
   public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string): Promise<void> {
-    const consultas = await this.getConsultas('pendiente');
-    const consultaPaciente = consultas.find(c => c.remitente === remitente);
+    const consultas = await this.getConsultas();
+    const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
@@ -173,7 +173,6 @@ export class FirestoreService {
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
 
-      // Actualizar objeto en memoria
       consultaPaciente.datos = datos;
 
       if (this.projectId) {
@@ -189,7 +188,7 @@ export class FirestoreService {
     }
   }
 
-  public async addPendingOutgoing(remitente: string, text: string): Promise<void> {
+  public async addPendingOutgoing(remitente: string, text: string, idConsulta?: string): Promise<void> {
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       remitente,
@@ -197,43 +196,61 @@ export class FirestoreService {
       timestamp: new Date().toISOString()
     };
 
-    FirestoreService.pendingOutgoing.push(item);
+    FirestoreService.pendingOutgoingMemory.push(item);
 
-    if (this.projectId) {
+    // Guardar también dentro de la colección consultas que sabemos que funciona 100% en Firestore
+    if (this.projectId && idConsulta) {
       try {
-        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/pendientes_salida?documentId=${item.id}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fields: this.toFirestoreFields(item) })
-        });
-      } catch (e) {}
+        const consultas = await this.getConsultas();
+        const target = consultas.find(c => c.id === idConsulta);
+        if (target) {
+          const datos = target.datos || {};
+          const pendientes = datos.pendientesSalida || [];
+          datos.pendientesSalida = [...pendientes, item];
+          target.datos = datos;
+
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+          });
+        }
+      } catch (e) {
+        console.error('Error al guardar pendienteSalida en consulta:', e);
+      }
     }
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
-    let result: PendingOutgoingMsg[] = [...FirestoreService.pendingOutgoing];
-    FirestoreService.pendingOutgoing = [];
+    const result: PendingOutgoingMsg[] = [...FirestoreService.pendingOutgoingMemory];
+    FirestoreService.pendingOutgoingMemory = [];
 
     if (this.projectId) {
       try {
-        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/pendientes_salida${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json.documents) {
-            const fetched = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
-            result = [...result, ...fetched];
-            for (const doc of json.documents) {
-              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
-            }
+        const consultas = await this.getConsultas();
+        for (const c of consultas) {
+          const datos = c.datos || {};
+          const pendientes: PendingOutgoingMsg[] = datos.pendientesSalida || [];
+          if (pendientes.length > 0) {
+            result.push(...pendientes);
+            // Limpiar pendientesSalida en Firestore tras extraerlos
+            datos.pendientesSalida = [];
+            c.datos = datos;
+
+            const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${c.id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+            await fetch(url, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+            });
           }
         }
       } catch (e) {}
     }
 
     const uniqueMap = new Map();
-    result.forEach(item => uniqueMap.set(item.id || item.timestamp, item));
+    result.forEach(item => uniqueMap.set(item.id || (item.remitente + item.timestamp), item));
     return Array.from(uniqueMap.values());
   }
 
