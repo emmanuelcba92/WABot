@@ -92,5 +92,13 @@ Un operador procesará tu solicitud y te responderá por este medio a la breveda
 
 _Si necesitas hacer otra consulta, escribe "Hola" en cualquier momento para volver al menú principal._`,
 
+  CONFIRMACION_CHAT_FINALIZADO: `🏥 *[Clínica Médica]*
+
+✅ *Tu consulta ha sido atendida y finalizada por nuestro equipo de secretaría.*
+
+Si en el futuro necesitás solicitar un nuevo turno o realizar otra gestión, podés escribir *"Hola"* en cualquier momento para ingresar nuevamente al menú.
+
+¡Que tengas un excelente día! 👋`,
+
   OPCION_INVALIDA: `⚠️ Opción no válida. Por favor, selecciona una letra del menú principal (*A, B, C, D, E*) o escribe *"Hola"* para reiniciar.`
 };

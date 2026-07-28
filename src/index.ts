@@ -5,6 +5,7 @@ import { StateEngine } from './stateMachine/engine';
 import { ScheduleService } from './services/scheduleService';
 import { FirestoreService } from './services/firestoreService';
 import { SeedService } from './services/seedService';
+import { MESSAGES } from './templates/messages';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -96,6 +97,15 @@ app.patch('/api/consultas/:id', async (c) => {
 
   const firestore = new FirestoreService(c.env);
   const ok = await firestore.actualizarEstadoConsulta(id, nuevoEstado);
+
+  if (ok && nuevoEstado === 'atendido') {
+    const consultas = await firestore.getConsultas();
+    const target = consultas.find(item => item.id === id);
+    if (target && target.remitente) {
+      await firestore.saveSesion(target.remitente, 'inicio');
+      await firestore.addPendingOutgoing(target.remitente, MESSAGES.CONFIRMACION_CHAT_FINALIZADO, id);
+    }
+  }
 
   if (ok) {
     return c.json({ success: true, id, estado: nuevoEstado });
