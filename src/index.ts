@@ -26,6 +26,7 @@ app.get('/api/status', async (c) => {
 app.get('/api/schedule-config', async (c) => {
   const firestore = new FirestoreService(c.env);
   const mode = await firestore.getScheduleMode();
+  ScheduleService.setMode(mode);
   const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
   return c.json({
     mode,
@@ -37,6 +38,7 @@ app.post('/api/schedule-config', async (c) => {
   try {
     const body = await c.req.json();
     const mode = (body.mode as ScheduleMode) || 'auto';
+    ScheduleService.setMode(mode);
     const firestore = new FirestoreService(c.env);
     await firestore.saveScheduleMode(mode);
     const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
