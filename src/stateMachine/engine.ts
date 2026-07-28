@@ -124,7 +124,7 @@ export class StateEngine {
             timestamp
           };
         } else {
-          if (mensaje.length > 15) {
+          if (mensaje.length > 15 || imagenBase64) {
             return await this.guardarConsultaFinal(remitente, 'A1_Turno_ORL_9Datos', mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
           }
 
@@ -226,22 +226,22 @@ export class StateEngine {
       tipoSolicitud: opcionElegida,
       contenidoMensaje: mensaje,
       lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
-      imagenUrl: imagenSubidaUrl || null,
+      imagenUrl: (proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') ? imagenSubidaUrl : null,
       imagenBase64: imagenBase64 || null,
       proveedorAlmacenamiento: proveedorAlmacenamiento || null,
-      respuestasPaciente: [] // Historial de mensajes posteriores del paciente
+      respuestasPaciente: []
     };
 
     await firestore.crearConsulta(remitente, opcionElegida, datosEstructurados);
-    
-    // Cambiar estado a 'esperando_atencion_humana' para SILENCIAR al bot mientras la secretaría atiende
     await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
     let confirmacionMsg = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
-    if (imagenSubidaUrl) {
+    if (imagenSubidaUrl && proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') {
       const prov = proveedorAlmacenamiento === 'google_drive' ? 'Google Drive'
         : proveedorAlmacenamiento === 'supabase' ? 'Supabase' : 'Almacenamiento';
       confirmacionMsg += `\n\n📷 *Imagen adjuntada correctamente en ${prov}:*\n[Ver Imagen](${imagenSubidaUrl})`;
+    } else if (imagenBase64) {
+      confirmacionMsg += `\n\n📷 *Foto / Pedido médico adjunto recibido correctamente.*`;
     }
 
     return {
