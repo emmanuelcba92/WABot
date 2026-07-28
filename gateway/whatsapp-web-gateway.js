@@ -2,14 +2,13 @@
  * CONECTOR WHATSAPP WEB PARA EL BOT DE LA CLÍNICA
  * 
  * Este script se ejecuta en cualquier PC o servidor con Node.js.
- * Genera un código QR en pantalla para escanear con el teléfono de la clínica (igual que WhatsApp Web).
+ * Genera un código QR en pantalla para escanear con el teléfono de la clínica.
  * Reenvía los mensajes entrantes a tu Cloudflare Worker y responde automáticamente.
  */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
-// URL de tu Cloudflare Worker desplegado
 const WORKER_WEBHOOK_URL = process.env.WORKER_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
 
 console.log('🚀 Iniciando Conector de WhatsApp Web...');
@@ -31,7 +30,9 @@ const client = new Client({
   }
 });
 
-// Generar código QR en la terminal
+// Set de control para evitar duplicados de mensajes
+const processedMsgIds = new Set();
+
 client.on('qr', (qr) => {
   console.log('📱 ESCANEA ESTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:\n');
   qrcode.generate(qr, { small: true });
@@ -47,9 +48,21 @@ client.on('ready', () => {
 
 // Manejar mensajes entrantes de pacientes
 client.on('message', async (msg) => {
-  // Ignorar mensajes de grupos o del propio estado
+  // 1. Ignorar mensajes enviados por la propia cuenta (bot/secretarias)
+  if (msg.fromMe) return;
+
+  // 2. Ignorar mensajes de grupos, difundidos o estados
   if (msg.isGroupMsg || msg.from.includes('@g.us') || msg.from === 'status@broadcast') {
     return;
+  }
+
+  // 3. Evitar procesamiento doble del mismo ID de mensaje
+  const msgUniqueId = msg.id ? (msg.id.id || msg.id._serialized) : null;
+  if (msgUniqueId) {
+    if (processedMsgIds.has(msgUniqueId)) return;
+    processedMsgIds.add(msgUniqueId);
+    // Limpiar memoria de IDs procesados si supera los 2000
+    if (processedMsgIds.size > 2000) processedMsgIds.clear();
   }
 
   const remitente = msg.from;
@@ -60,11 +73,10 @@ client.on('message', async (msg) => {
   let imagenBase64 = null;
   let imagenNombre = null;
 
-  // Si el paciente envió una foto (pedido médico / carnet)
   if (msg.hasMedia) {
     try {
       const media = await msg.downloadMedia();
-      if (media && media.mimetype.startsWith('image/')) {
+      if (media && media.mimetype && media.mimetype.startsWith('image/')) {
         imagenBase64 = `data:${media.mimetype};base64,${media.data}`;
         imagenNombre = media.filename || `foto_${Date.now()}.${media.mimetype.split('/')[1] || 'jpg'}`;
         console.log(`📷 Foto recibida de ${remitente}`);
@@ -75,7 +87,6 @@ client.on('message', async (msg) => {
   }
 
   try {
-    // Enviar mensaje al Cloudflare Worker
     const res = await fetch(WORKER_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -94,7 +105,6 @@ client.on('message', async (msg) => {
 
     const data = await res.json();
 
-    // Enviar respuesta automática del bot al paciente en WhatsApp
     if (data.respuesta) {
       await client.sendMessage(remitente, data.respuesta);
       console.log(`🤖 Respuesta enviada a ${remitente}`);
