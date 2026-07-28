@@ -43,7 +43,8 @@ client.on('authenticated', () => {
 });
 
 client.on('ready', () => {
-  console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir y enviar mensajes!\n');
+  console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir y enviar mensajes!');
+  console.log('📡 Servicio de entrega automática de respuestas de secretaría ACTIVADO (Polling 3s)\n');
   
   // Iniciar polling de respuestas emitidas por las secretarias desde el Panel Web
   setInterval(pollSecretaryOutgoingMessages, 3000);
@@ -58,18 +59,24 @@ async function pollSecretaryOutgoingMessages() {
     const data = await res.json();
     const messages = data.messages || [];
 
+    if (messages.length > 0) {
+      console.log(`📬 [Secretaría] Encontrados ${messages.length} mensajes pendientes de entregar...`);
+    }
+
     for (const item of messages) {
       if (item.remitente && item.text) {
         try {
-          await client.sendMessage(item.remitente, item.text);
-          console.log(`📤 [Secretaría] Respuesta entregada a ${item.remitente}: "${item.text.substring(0, 40)}..."`);
+          // Asegurar formato de destino en whatsapp-web.js
+          const targetId = item.remitente.includes('@') ? item.remitente : `${item.remitente.replace(/\D/g, '')}@c.us`;
+          await client.sendMessage(targetId, item.text);
+          console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}: "${item.text.substring(0, 45)}..."`);
         } catch (sendErr) {
           console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, sendErr);
         }
       }
     }
   } catch (err) {
-    // Ignorar errores de red temporales
+    console.error('⚠️ Error al consultar respuestas pendientes de secretaría:', err?.message || err);
   }
 }
 
@@ -134,7 +141,7 @@ client.on('message', async (msg) => {
     // 4. Enviar la respuesta del bot formateada en texto de forma 100% confiable
     if (data.respuesta) {
       await client.sendMessage(remitente, data.respuesta);
-      console.log(`🤖 Respuesta enviada a ${remitente}`);
+      console.log(`🤖 Respuesta del bot enviada a ${remitente}`);
     }
   } catch (err) {
     console.error('❌ Error de conexión con el Worker:', err);
