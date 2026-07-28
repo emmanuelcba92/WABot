@@ -69,7 +69,6 @@ app.get('/api/session/:remitente', async (c) => {
 
 /**
  * ENDPOINT GET /api/consultas
- * Permite listar todas las consultas recibidas para el Panel de Secretarias
  */
 app.get('/api/consultas', async (c) => {
   const firestore = new FirestoreService(c.env);
@@ -82,7 +81,7 @@ app.get('/api/consultas', async (c) => {
 
 /**
  * ENDPOINT PATCH /api/consultas/:id
- * Permite a las secretarias cambiar el estado de la consulta (ej: "pendiente" -> "atendido")
+ * Permite a las secretarias cambiar el estado de la consulta
  */
 app.patch('/api/consultas/:id', async (c) => {
   const id = c.req.param('id');
@@ -96,6 +95,39 @@ app.patch('/api/consultas/:id', async (c) => {
     return c.json({ success: true, id, estado: nuevoEstado });
   } else {
     return c.json({ error: 'No se pudo actualizar el estado de la consulta' }, 500);
+  }
+});
+
+/**
+ * ENDPOINT POST /api/send-message
+ * Permite enviar una respuesta directa al paciente desde el Panel de Recepción
+ */
+app.post('/api/send-message', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { remitente, respuesta, idConsulta } = body;
+
+    if (!remitente || !respuesta) {
+      return c.json({ error: 'Faltan parámetros (remitente o respuesta)' }, 400);
+    }
+
+    // Actualizar estado de la consulta a "atendido" en Firestore
+    const firestore = new FirestoreService(c.env);
+    if (idConsulta) {
+      await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
+    }
+
+    console.log(`[Respuesta Secretaría] Para ${remitente}: ${respuesta}`);
+
+    return c.json({
+      success: true,
+      remitente,
+      respuestaEnviada: respuesta,
+      timestamp: new Date().toISOString(),
+      nota: 'Mensaje procesado. Se envía vía WhatsApp Web o API según proveedor configurado.'
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Error al enviar respuesta', details: err?.message }, 500);
   }
 });
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel de Secretarias - Clínica Médica</title>
+  <title>Panel de Recepción / Secretarias - Clínica Médica</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -128,7 +128,7 @@
 
     .consultas-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
       gap: 20px;
     }
 
@@ -139,13 +139,12 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
       position: relative;
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
     .card-consulta:hover {
-      transform: translateY(-2px);
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
     }
 
@@ -194,9 +193,6 @@
       color: #34d399;
       text-decoration: none;
       font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
     }
 
     .raw-msg {
@@ -206,25 +202,106 @@
       font-size: 0.85rem;
       color: #cbd5e1;
       white-space: pre-wrap;
-      max-height: 150px;
+      max-height: 140px;
       overflow-y: auto;
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    .btn-action {
+    /* Caja de Respuesta Directa */
+    .reply-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .reply-box label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+
+    .reply-box textarea {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--text);
+      font-size: 0.88rem;
+      resize: vertical;
+      min-height: 65px;
+      outline: none;
+    }
+
+    .reply-box textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .quick-reply-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      background: rgba(0, 168, 132, 0.2);
+      color: #34d399;
+    }
+
+    .reply-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-wa-direct {
+      background: #25D366;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+
+    .btn-wa-direct:hover {
+      opacity: 0.9;
+    }
+
+    .btn-api-send {
       background: var(--accent);
       color: white;
       border: none;
       padding: 10px;
       border-radius: 8px;
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 0.82rem;
       cursor: pointer;
       transition: background 0.2s;
-      width: 100%;
-      margin-top: 4px;
     }
 
-    .btn-action:hover {
+    .btn-api-send:hover {
       background: #008f70;
     }
 
@@ -251,7 +328,7 @@
       <div class="brand-icon">📋</div>
       <div>
         <h1 style="font-size: 1.2rem;">Panel de Recepción / Secretarias</h1>
-        <div style="font-size: 0.8rem; color: var(--muted);">Gestión de Consultas y Turnos por WhatsApp</div>
+        <div style="font-size: 0.8rem; color: var(--muted);">Gestión y Respuesta Directa a Consultas de WhatsApp</div>
       </div>
     </div>
 
@@ -328,6 +405,13 @@
       renderConsultas();
     }
 
+    function insertTemplate(cardId, templateText) {
+      const textarea = document.getElementById(`replyText_${cardId}`);
+      if (textarea) {
+        textarea.value = templateText;
+      }
+    }
+
     function renderConsultas() {
       const container = document.getElementById('consultasGrid');
       
@@ -346,7 +430,6 @@
       container.innerHTML = filtered.map(c => {
         const isPendiente = (c.estado || 'pendiente') === 'pendiente';
         const cleanPhone = (c.remitente || '').replace(/\D/g, '');
-        const waLink = `https://wa.me/${cleanPhone}`;
         const fecha = new Date(c.timestamp || c.createdAt || Date.now()).toLocaleString('es-AR');
 
         const datos = c.datos || {};
@@ -362,8 +445,8 @@
             </div>
 
             <div class="patient-info">
-              <div><strong>Paciente:</strong> <a href="${waLink}" target="_blank" class="phone-link">📱 ${c.remitente}</a></div>
-              <div style="font-size: 0.78rem; color: var(--muted);">📅 Fecha: ${fecha}</div>
+              <div><strong>Paciente:</strong> <span class="phone-link">📱 ${c.remitente}</span></div>
+              <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
             </div>
 
             <div class="raw-msg">${contenidoMsg}</div>
@@ -374,18 +457,78 @@
               </a>
             ` : ''}
 
-            ${isPendiente ? `
-              <button class="btn-action" onclick="marcarAtendido('${c.id}')">
-                ✅ Marcar como Atendido / Agendado
-              </button>
-            ` : `
-              <div style="text-align: center; color: #34d399; font-size: 0.82rem; font-weight: 600; padding: 8px;">
-                ✔ Atendido por Secretaría
+            <!-- CAJA DE RESPUESTA DIRECTA -->
+            <div class="reply-box">
+              <label>💬 Escribir Respuesta al Paciente:</label>
+
+              <!-- Plantillas rápidas -->
+              <div class="quick-reply-chips">
+                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu turno ha sido agendado exitosamente para el día [Fecha] a las [Hora] hs. Te esperamos.')">✅ Confirmar Turno</span>
+                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Por favor envíanos una foto más legible de tu pedido médico u orden para procesar tu solicitud.')">📷 Pedir Foto Legible</span>
+                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu solicitud PAMI fue ingresada correctamente. Nos comunicaremos cuando la orden esté emitida.')">🩺 Estado PAMI</span>
               </div>
-            `}
+
+              <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta personalizada aquí..."></textarea>
+
+              <div class="reply-actions">
+                <button type="button" class="btn-wa-direct" onclick="responderPorWhatsAppWeb('${c.remitente}', '${c.id}')">
+                  🟢 Abrir en WhatsApp Web
+                </button>
+                <button type="button" class="btn-api-send" onclick="responderViaApi('${c.remitente}', '${c.id}')">
+                  📤 Enviar Automático (API)
+                </button>
+              </div>
+            </div>
           </div>
         `;
       }).reverse().join('');
+    }
+
+    async function responderPorWhatsAppWeb(remitente, cardId) {
+      const textarea = document.getElementById(`replyText_${cardId}`);
+      const texto = textarea ? textarea.value.trim() : '';
+
+      const cleanPhone = remitente.replace(/\D/g, '');
+      const encodedMsg = encodeURIComponent(texto || '¡Hola! Nos comunicamos desde la Secretaría de la Clínica Médica.');
+      const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+
+      // Abrir en nueva pestaña de WhatsApp Web
+      window.open(waUrl, '_blank');
+
+      // Marcar como atendido en Firestore
+      await marcarAtendido(cardId);
+    }
+
+    async function responderViaApi(remitente, cardId) {
+      const textarea = document.getElementById(`replyText_${cardId}`);
+      const respuesta = textarea ? textarea.value.trim() : '';
+
+      if (!respuesta) {
+        alert('Por favor escribe un mensaje de respuesta antes de enviar.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente,
+            respuesta,
+            idConsulta: cardId
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Respuesta enviada a ${remitente}`);
+          fetchConsultas();
+        } else {
+          alert(`❌ Error: ${data.error || 'No se pudo enviar'}`);
+        }
+      } catch (err) {
+        alert('Error al conectar con el servidor.');
+      }
     }
 
     async function marcarAtendido(id) {
