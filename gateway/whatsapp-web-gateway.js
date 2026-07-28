@@ -14,6 +14,19 @@ const WORKER_WEBHOOK_URL = `${WORKER_BASE_URL}/webhook`;
 console.log('🚀 Iniciando Conector de WhatsApp Web...');
 console.log(`🔗 Webhook apuntando a: ${WORKER_WEBHOOK_URL}\n`);
 
+// Helper con reintentos automáticos para tolerar parpadeos de red o despliegues
+async function fetchWithRetry(url, options = {}, retries = 3, delayMs = 600) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
   puppeteer: {
@@ -53,8 +66,8 @@ client.on('ready', () => {
 // Polling continuo de respuestas enviadas por secretarias desde admin.html
 async function pollSecretaryOutgoingMessages() {
   try {
-    const res = await fetch(`${WORKER_BASE_URL}/api/pending-outgoing`);
-    if (!res.ok) return;
+    const res = await fetchWithRetry(`${WORKER_BASE_URL}/api/pending-outgoing`, {}, 2, 400);
+    if (!res || !res.ok) return;
 
     const data = await res.json();
     const messages = data.messages || [];
@@ -95,7 +108,7 @@ async function pollSecretaryOutgoingMessages() {
       }
     }
   } catch (err) {
-    console.error('⚠️ Error al consultar respuestas pendientes de secretaría:', err?.message || err);
+    // Silencioso en reintentos de red
   }
 }
 
@@ -139,7 +152,7 @@ client.on('message', async (msg) => {
   }
 
   try {
-    const res = await fetch(WORKER_WEBHOOK_URL, {
+    const res = await fetchWithRetry(WORKER_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,7 +161,7 @@ client.on('message', async (msg) => {
         imagenBase64,
         imagenNombre
       })
-    });
+    }, 3, 600);
 
     if (!res.ok) {
       console.error(`❌ Error del Worker HTTP ${res.status}`);
@@ -163,7 +176,7 @@ client.on('message', async (msg) => {
       console.log(`🤖 Respuesta del bot enviada a ${remitente}`);
     }
   } catch (err) {
-    console.error('❌ Error de conexión con el Worker:', err);
+    console.error('❌ Error de conexión con el Worker:', err?.message || err);
   }
 });
 
