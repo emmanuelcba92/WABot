@@ -614,9 +614,14 @@
 
       <div class="form-group">
         <label for="patientDropdown">👤 Seleccionar Paciente de Pruebas (70 chats)</label>
-        <select id="patientDropdown" onchange="onSelectPatientDropdown(this.value)">
-          <option value="">-- Buscar o Seleccionar Paciente --</option>
-        </select>
+        <div style="display: flex; gap: 6px;">
+          <select id="patientDropdown" onchange="onSelectPatientDropdown(this.value)" style="flex: 1;">
+            <option value="">-- Buscar o Seleccionar Paciente --</option>
+          </select>
+          <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.78rem; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;" onclick="generar70PruebasDesdeSimulador(event)" title="Generar 70 consultas de prueba automáticamente">
+            ⚡ Cargar 70
+          </button>
+        </div>
       </div>
 
       <div class="form-group">
@@ -1053,12 +1058,38 @@
     }
 
     function pickRandomPatient() {
-      if (allPatientsList.length === 0) {
-        alert('No hay pacientes cargados. Presioná primero "Generar 70 Consultas de Prueba" en el panel de secretarias.');
-        return;
+      if (allPatientsList.length > 0) {
+        const randomPatient = allPatientsList[Math.floor(Math.random() * allPatientsList.length)];
+        loadPatientDirect(randomPatient.phone);
+      } else {
+        // Generar un número aleatorio de celular argentino (+54911 + 8 dígitos)
+        const area = ['11', '351', '261', '341', '381'][Math.floor(Math.random() * 5)];
+        const num = Math.floor(10000000 + Math.random() * 89999999);
+        const randomPhone = `+549${area}${num}`;
+        loadPatientDirect(randomPhone);
       }
-      const randomPatient = allPatientsList[Math.floor(Math.random() * allPatientsList.length)];
-      loadPatientDirect(randomPatient.phone);
+    }
+
+    async function generar70PruebasDesdeSimulador(evt) {
+      const btn = evt ? evt.target : null;
+      if (btn) {
+        btn.innerText = '⏳ Cargando...';
+        btn.disabled = true;
+      }
+
+      try {
+        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const data = await res.json();
+        fetchConsultas();
+        setTimeout(pickRandomPatient, 500);
+      } catch (e) {
+        alert('Error al generar consultas de prueba.');
+      } finally {
+        if (btn) {
+          btn.innerText = '⚡ Cargar 70';
+          btn.disabled = false;
+        }
+      }
     }
 
     function loadPatientDirect(phone) {
