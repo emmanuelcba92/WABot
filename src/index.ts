@@ -79,9 +79,14 @@ app.get('/api/session/:remitente', async (c) => {
   return c.json(sesion);
 });
 
+/**
+ * ENDPOINT GET /api/consultas
+ * Soporta filtro por estado (?estado=pendiente | atendido | todos) para optimizar lectura
+ */
 app.get('/api/consultas', async (c) => {
+  const estado = c.req.query('estado');
   const firestore = new FirestoreService(c.env);
-  const consultas = await firestore.getConsultas();
+  const consultas = await firestore.getConsultas(estado);
   return c.json({
     total: consultas.length,
     consultas
@@ -149,10 +154,6 @@ app.post('/api/seed-consultas', async (c) => {
   }
 });
 
-/**
- * ENDPOINT DELETE /api/consultas (y POST /api/clear-consultas)
- * Vacía todas las consultas y sesiones de prueba
- */
 app.post('/api/clear-consultas', async (c) => {
   const firestore = new FirestoreService(c.env);
   await firestore.clearAllConsultas();

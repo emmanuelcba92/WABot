@@ -201,23 +201,31 @@ export class FirestoreService {
     return consultaId;
   }
 
-  public async getConsultas(): Promise<Array<Record<string, any>>> {
+  public async getConsultas(estadoFilter?: string): Promise<Array<Record<string, any>>> {
+    let items: Array<Record<string, any>> = [];
+
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      return [...FirestoreService.inMemoryConsultas];
+      items = [...FirestoreService.inMemoryConsultas];
+    } else {
+      try {
+        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json.documents) {
+            items = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
+          }
+        }
+      } catch (e) {
+        items = [...FirestoreService.inMemoryConsultas];
+      }
     }
 
-    try {
-      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-      const res = await fetch(url);
-      if (!res.ok) return [...FirestoreService.inMemoryConsultas];
-
-      const json: any = await res.json();
-      if (!json.documents) return [...FirestoreService.inMemoryConsultas];
-
-      return json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
-    } catch (e) {
-      return [...FirestoreService.inMemoryConsultas];
+    if (estadoFilter && estadoFilter !== 'todos') {
+      items = items.filter(c => (c.estado || 'pendiente') === estadoFilter);
     }
+
+    return items;
   }
 
   public async actualizarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
@@ -256,7 +264,6 @@ export class FirestoreService {
     }
 
     try {
-      // Borrar colección consultas en Firestore
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
       const res = await fetch(url);
       if (res.ok) {
