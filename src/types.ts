@@ -1,11 +1,9 @@
 export interface Env {
   FIREBASE_PROJECT_ID?: string;
   FIREBASE_API_KEY?: string;
-  // Supabase credentials (opcional)
   SUPABASE_URL?: string;
   SUPABASE_KEY?: string;
   SUPABASE_BUCKET?: string;
-  // Google Drive credentials (opcional)
   GOOGLE_DRIVE_FOLDER_ID?: string;
   GOOGLE_ACCESS_TOKEN?: string;
   ASSETS?: Fetcher;
@@ -23,19 +21,28 @@ export type StateType =
   | 'esperando_datos_opcion_d'
   | 'esperando_datos_opcion_e';
 
+export interface ChatMessage {
+  id: string;
+  sender: 'paciente' | 'bot' | 'secretaria';
+  text: string;
+  timestamp: string;
+  imageUrl?: string;
+}
+
 export interface UserSession {
   remitente: string;
   estado: StateType;
   datosTemporales?: Record<string, any>;
+  historialMensajes?: ChatMessage[];
   updatedAt: string;
 }
 
 export interface WebhookPayload {
   remitente: string;
   mensaje: string;
-  simulatedTime?: string; // Ej: "2026-07-27T14:30:00-03:00"
-  imagenBase64?: string;  // Data URL base64 o string base64 de la imagen enviada
-  imagenNombre?: string;  // Nombre opcional del archivo (ej: "pedido_medico.jpg")
+  simulatedTime?: string;
+  imagenBase64?: string;
+  imagenNombre?: string;
 }
 
 export interface WebhookResponse {
@@ -44,5 +51,5 @@ export interface WebhookResponse {
   estadoActual: StateType;
   enHorario: boolean;
   timestamp: string;
-  imagenSubidaUrl?: string; // URL de la imagen subida en Google Drive o Supabase
+  imagenSubidaUrl?: string;
 }

@@ -36,7 +36,6 @@
       flex-direction: column;
     }
 
-    /* Header */
     header {
       background: rgba(15, 23, 42, 0.9);
       backdrop-filter: blur(12px);
@@ -108,7 +107,6 @@
       background: currentColor;
     }
 
-    /* Layout Principal */
     .app-container {
       display: grid;
       grid-template-columns: 340px 1fr 340px;
@@ -135,7 +133,6 @@
       }
     }
 
-    /* Paneles */
     .panel {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -187,7 +184,6 @@
       box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
     }
 
-    /* Botones de acción rápida */
     .quick-actions {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -239,7 +235,6 @@
       background: rgba(59, 130, 246, 0.3);
     }
 
-    /* Simulador de Chat Estilo WhatsApp */
     .chat-panel {
       background: var(--chat-bg);
       border: 1px solid var(--border-color);
@@ -408,7 +403,6 @@
       transform: scale(1.05);
     }
 
-    /* Estado de Firestore */
     .state-card {
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid var(--border-color);
@@ -482,13 +476,12 @@
 
   <div class="app-container">
 
-    <!-- Panel de Controles y Prueba de Horario -->
     <div class="panel">
       <div class="panel-title">⚙️ Configuración & Horario</div>
 
       <div class="form-group">
         <label for="remitenteInput">📱 Teléfono del Paciente (remitente)</label>
-        <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678">
+        <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678" onchange="resetChatForNewUser()">
       </div>
 
       <div class="form-group">
@@ -522,7 +515,6 @@
       </div>
     </div>
 
-    <!-- Panel de Chat Principal Estilo WhatsApp -->
     <div class="chat-panel">
       <div class="chat-header">
         <div class="avatar">🤖</div>
@@ -533,10 +525,9 @@
       </div>
 
       <div class="chat-messages" id="chatMessages">
-        <!-- Mensajes generados dinámicamente -->
+        <!-- Mensajes renderizados -->
       </div>
 
-      <!-- Bar de previsualización de imagen si se adjunta -->
       <div class="image-preview-bar" id="imagePreviewBar" style="display: none;">
         <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Vista previa">
         <div style="flex: 1; font-size: 0.8rem;" id="imagePreviewName">pedido_medico.jpg</div>
@@ -544,10 +535,9 @@
       </div>
 
       <form class="chat-input-area" onsubmit="handleSendSubmit(event)">
-        <!-- Input de archivo imagen oculto -->
         <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelected(event)">
         
-        <button type="button" class="btn-attach" title="Adjuntar Imagen / Pedido Médico / Carnet" onclick="document.getElementById('fileInput').click()">
+        <button type="button" class="btn-attach" title="Adjuntar Imagen" onclick="document.getElementById('fileInput').click()">
           📷
         </button>
 
@@ -560,7 +550,6 @@
       </form>
     </div>
 
-    <!-- Panel de Depuración de Firestore y Drive -->
     <div class="panel panel-firestore">
       <div class="panel-title">🔥 Estado Firestore</div>
 
@@ -572,7 +561,7 @@
 
       <div class="panel-title" style="margin-top: 10px;">📂 Almacenamiento Fotos</div>
       <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-        Las fotos adjuntadas se suben a <strong>Google Drive / Supabase</strong> y se guarda el enlace en la consulta de Firestore.
+        Las fotos adjuntadas se suben a <strong>Google Drive / Supabase</strong> y el enlace se guarda en la consulta de Firestore.
       </div>
 
       <div class="panel-title" style="margin-top: 10px;">📦 Consultas Registradas</div>
@@ -586,12 +575,19 @@
   <script>
     let attachedImageBase64 = null;
     let attachedImageName = null;
+    let renderedMsgIds = new Set(); // Evitar duplicar mensajes renderizados
 
     window.addEventListener('DOMContentLoaded', () => {
-      addBotMessage("🏥 *¡Hola! Bienvenido/a al Simulador de WhatsApp de la Clínica.* \n\nEscribe *'Hola'* o usa los botones de prueba. Puedes adjuntar imágenes con el botón 📷.");
       checkStatus();
       updateSessionState();
+      setInterval(pollSessionAndMessages, 3000); // Polling cada 3 segundos para sincronizar respuestas de secretaría
     });
+
+    function resetChatForNewUser() {
+      renderedMsgIds.clear();
+      document.getElementById('chatMessages').innerHTML = '';
+      updateSessionState();
+    }
 
     function getSimulatedTime() {
       const mode = document.getElementById('simulatedTimeSelect').value;
@@ -665,10 +661,15 @@
       return html;
     }
 
-    function addUserMessage(text, imgBase64) {
+    function renderMessage(msgId, sender, text, timestampStr, imgBase64) {
+      if (renderedMsgIds.has(msgId)) return;
+      renderedMsgIds.add(msgId);
+
       const container = document.getElementById('chatMessages');
       const msgDiv = document.createElement('div');
-      msgDiv.className = 'message message-out';
+      
+      const isOut = sender === 'paciente';
+      msgDiv.className = `message ${isOut ? 'message-out' : 'message-in'}`;
       
       let contentHtml = '';
       if (imgBase64) {
@@ -676,23 +677,33 @@
       }
       contentHtml += formatTextToHtml(text);
 
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      msgDiv.innerHTML = `${contentHtml}<div class="message-time">${now}</div>`;
+      const timeStr = timestampStr ? new Date(timestampStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      msgDiv.innerHTML = `${contentHtml}<div class="message-time">${timeStr}</div>`;
       
       container.appendChild(msgDiv);
       container.scrollTop = container.scrollHeight;
     }
 
-    function addBotMessage(text) {
-      const container = document.getElementById('chatMessages');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'message message-in';
-      
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      msgDiv.innerHTML = `${formatTextToHtml(text)}<div class="message-time">${now}</div>`;
-      
-      container.appendChild(msgDiv);
-      container.scrollTop = container.scrollHeight;
+    async function pollSessionAndMessages() {
+      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
+      try {
+        const res = await fetch(`/api/session/${encodeURIComponent(remitente)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        document.getElementById('currentStateDisplay').innerText = data.estado || 'inicio';
+
+        const historial = data.historialMensajes || [];
+        if (historial.length === 0 && renderedMsgIds.size === 0) {
+          renderMessage('init_welcome', 'bot', "🏥 *¡Hola! Bienvenido/a al Simulador de WhatsApp de la Clínica.* \n\nEscribe *'Hola'* o usa los botones de prueba.");
+        } else {
+          for (const m of historial) {
+            renderMessage(m.id, m.sender, m.text, m.timestamp, m.imageUrl);
+          }
+        }
+
+        fetchConsultas();
+      } catch (e) {}
     }
 
     async function sendMessage(mensajeText) {
@@ -701,8 +712,6 @@
       const currentImageBase64 = attachedImageBase64;
       const currentImageName = attachedImageName;
       cancelAttachedImage();
-
-      addUserMessage(mensajeText, currentImageBase64);
 
       const simulatedTime = getSimulatedTime();
 
@@ -720,21 +729,9 @@
         });
 
         const data = await response.json();
-
-        if (data.respuesta) {
-          addBotMessage(data.respuesta);
-        } else if (data.error) {
-          addBotMessage(`❌ Error: ${data.error}`);
-        }
-
-        if (data.estadoActual) {
-          document.getElementById('currentStateDisplay').innerText = data.estadoActual;
-          document.getElementById('updatedAtDisplay').innerText = 'Actualizado: ' + new Date().toLocaleTimeString();
-        }
-
-        fetchConsultas();
+        pollSessionAndMessages();
       } catch (err) {
-        addBotMessage('❌ Error de conexión al servidor.');
+        console.error(err);
       }
     }
 
@@ -752,7 +749,6 @@
     }
 
     function sendSampleDataA2WithImage() {
-      // Crear canvas simulado de imagen de pedido médico de ejemplo
       const canvas = document.createElement('canvas');
       canvas.width = 400;
       canvas.height = 300;
@@ -783,14 +779,7 @@
     }
 
     async function updateSessionState() {
-      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
-      try {
-        const res = await fetch(`/api/session/${encodeURIComponent(remitente)}`);
-        if (res.ok) {
-          const data = await res.json();
-          document.getElementById('currentStateDisplay').innerText = data.estado || 'inicio';
-        }
-      } catch (e) {}
+      pollSessionAndMessages();
     }
 
     async function fetchConsultas() {

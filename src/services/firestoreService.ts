@@ -1,15 +1,10 @@
-import { Env, StateType, UserSession } from '../types';
+import { Env, StateType, UserSession, ChatMessage } from '../types';
 import { CONFIG } from '../config';
 
-/**
- * Servicio de Firestore ultra-ligero que utiliza la API REST oficial de Firestore.
- * Diseñado específicamente para ser 100% compatible con Cloudflare Workers (sin Node.js gRPC/fs).
- * Incluye almacenamiento en memoria como fallback si se ejecuta en modo demo o sin credenciales.
- */
 export class FirestoreService {
   private projectId: string;
   private apiKey?: string;
-  // Fallback en memoria para desarrollo local / demo sin credenciales
+
   private static inMemorySessions: Map<string, UserSession> = new Map();
   private static inMemoryConsultas: Array<Record<string, any>> = [];
 
@@ -18,9 +13,6 @@ export class FirestoreService {
     this.apiKey = env?.FIREBASE_API_KEY;
   }
 
-  /**
-   * Helper para convertir un objeto JS simple a los campos requeridos por Firestore REST API.
-   */
   private toFirestoreFields(obj: Record<string, any>): Record<string, any> {
     const fields: Record<string, any> = {};
     for (const [key, val] of Object.entries(obj)) {
@@ -32,6 +24,8 @@ export class FirestoreService {
         fields[key] = Number.isInteger(val) ? { integerValue: val.toString() } : { doubleValue: val };
       } else if (typeof val === 'boolean') {
         fields[key] = { booleanValue: val };
+      } else if (Array.isArray(val)) {
+        fields[key] = { arrayValue: { values: val.map(item => typeof item === 'object' ? { mapValue: { fields: this.toFirestoreFields(item) } } : { stringValue: String(item) }) } };
       } else if (typeof val === 'object') {
         fields[key] = { mapValue: { fields: this.toFirestoreFields(val) } };
       }
@@ -39,9 +33,6 @@ export class FirestoreService {
     return fields;
   }
 
-  /**
-   * Helper para convertir los campos de Firestore REST API a un objeto JS plano.
-   */
   private fromFirestoreFields(fields: Record<string, any>): Record<string, any> {
     const result: Record<string, any> = {};
     if (!fields) return result;
@@ -52,14 +43,18 @@ export class FirestoreService {
       else if ('doubleValue' in valueObj) result[key] = parseFloat(valueObj.doubleValue);
       else if ('booleanValue' in valueObj) result[key] = valueObj.booleanValue;
       else if ('mapValue' in valueObj) result[key] = this.fromFirestoreFields(valueObj.mapValue.fields || {});
+      else if ('arrayValue' in valueObj) {
+        result[key] = (valueObj.arrayValue.values || []).map((v: any) => {
+          if ('mapValue' in v) return this.fromFirestoreFields(v.mapValue.fields || {});
+          if ('stringValue' in v) return v.stringValue;
+          return v;
+        });
+      }
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
   }
 
-  /**
-   * Obtener sesión del usuario desde Firestore (colección 'sesiones').
-   */
   public async getSesion(remitente: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
@@ -70,6 +65,7 @@ export class FirestoreService {
         remitente,
         estado: 'inicio',
         datosTemporales: {},
+        historialMensajes: [],
         updatedAt: new Date().toISOString()
       };
     }
@@ -83,6 +79,7 @@ export class FirestoreService {
           remitente,
           estado: 'inicio',
           datosTemporales: {},
+          historialMensajes: [],
           updatedAt: new Date().toISOString()
         };
       }
@@ -92,6 +89,7 @@ export class FirestoreService {
           remitente,
           estado: 'inicio',
           datosTemporales: {},
+          historialMensajes: [],
           updatedAt: new Date().toISOString()
         };
       }
@@ -103,6 +101,7 @@ export class FirestoreService {
         remitente,
         estado: (fields.estado as StateType) || 'inicio',
         datosTemporales: fields.datosTemporales || {},
+        historialMensajes: fields.historialMensajes || [],
         updatedAt: fields.updatedAt || new Date().toISOString()
       };
     } catch (err) {
@@ -110,21 +109,24 @@ export class FirestoreService {
         remitente,
         estado: 'inicio',
         datosTemporales: {},
+        historialMensajes: [],
         updatedAt: new Date().toISOString()
       };
     }
   }
 
-  /**
-   * Guardar / actualizar estado de la sesión del usuario en Firestore.
-   */
-  public async saveSesion(remitente: string, estado: StateType, datosTemporales: Record<string, any> = {}): Promise<void> {
+  public async saveSesion(remitente: string, estado: StateType, datosTemporales: Record<string, any> = {}, historialMensajes: ChatMessage[] = []): Promise<void> {
     const docId = encodeURIComponent(remitente.trim());
     const updatedAt = new Date().toISOString();
+
+    const sesionExistente = await this.getSesion(remitente);
+    const historialFinal = historialMensajes.length > 0 ? historialMensajes : (sesionExistente.historialMensajes || []);
+
     const sesionData: UserSession = {
       remitente,
       estado,
       datosTemporales,
+      historialMensajes: historialFinal,
       updatedAt
     };
 
@@ -150,9 +152,13 @@ export class FirestoreService {
     }
   }
 
-  /**
-   * Guardar la consulta finalizada en la colección "consultas" marcándola con estado "pendiente".
-   */
+  public async agregarMensajeHistorial(remitente: string, msg: ChatMessage): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    const historial = sesion.historialMensajes || [];
+    historial.push(msg);
+    await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
+  }
+
   public async crearConsulta(
     remitente: string,
     opcionElegida: string,
@@ -195,9 +201,6 @@ export class FirestoreService {
     return consultaId;
   }
 
-  /**
-   * Obtener todas las consultas para el panel de secretarias
-   */
   public async getConsultas(): Promise<Array<Record<string, any>>> {
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
       return [...FirestoreService.inMemoryConsultas];
@@ -217,9 +220,6 @@ export class FirestoreService {
     }
   }
 
-  /**
-   * Actualizar estado de consulta (ej: de "pendiente" a "atendido")
-   */
   public async actualizarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
     const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === id);
     if (itemMem) {

@@ -7,10 +7,8 @@ import { FirestoreService } from './services/firestoreService';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Habilitar CORS para permitir acceso desde cualquier navegador
 app.use('*', cors());
 
-// Endpoint de prueba de salud
 app.get('/api/status', (c) => {
   const schedule = ScheduleService.isWithinBusinessHours();
   return c.json({
@@ -21,10 +19,6 @@ app.get('/api/status', (c) => {
   });
 });
 
-/**
- * ENDPOINT PRINCIPAL POST /webhook
- * Recibe: { remitente: string, mensaje: string, simulatedTime?: string, imagenBase64?: string }
- */
 app.post('/webhook', async (c) => {
   try {
     let body: Partial<WebhookPayload>;
@@ -38,7 +32,7 @@ app.post('/webhook', async (c) => {
     const mensaje = body.mensaje ?? '';
 
     if (!remitente) {
-      return c.json({ error: 'El campo "remitente" es requerido (ej: "+5491112345678")' }, 400);
+      return c.json({ error: 'El campo "remitente" es requerido' }, 400);
     }
 
     const payload: WebhookPayload = {
@@ -49,7 +43,28 @@ app.post('/webhook', async (c) => {
       imagenNombre: body.imagenNombre
     };
 
+    const firestore = new FirestoreService(c.env);
+    
+    // Registrar mensaje del paciente en historial
+    await firestore.agregarMensajeHistorial(remitente, {
+      id: `msg_${Date.now()}_pac`,
+      sender: 'paciente',
+      text: mensaje || '(Imagen adjunta)',
+      timestamp: new Date().toISOString(),
+      imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
+    });
+
     const result = await StateEngine.processMessage(payload, c.env);
+
+    // Registrar respuesta del bot en historial
+    await firestore.agregarMensajeHistorial(remitente, {
+      id: `msg_${Date.now()}_bot`,
+      sender: 'bot',
+      text: result.respuesta,
+      timestamp: new Date().toISOString(),
+      imageUrl: result.imagenSubidaUrl
+    });
+
     return c.json(result, 200);
   } catch (err: any) {
     console.error('Error en /webhook:', err);
@@ -57,9 +72,6 @@ app.post('/webhook', async (c) => {
   }
 });
 
-/**
- * ENDPOINT GET /api/session/:remitente
- */
 app.get('/api/session/:remitente', async (c) => {
   const remitente = c.req.param('remitente');
   const firestore = new FirestoreService(c.env);
@@ -67,9 +79,6 @@ app.get('/api/session/:remitente', async (c) => {
   return c.json(sesion);
 });
 
-/**
- * ENDPOINT GET /api/consultas
- */
 app.get('/api/consultas', async (c) => {
   const firestore = new FirestoreService(c.env);
   const consultas = await firestore.getConsultas();
@@ -79,10 +88,6 @@ app.get('/api/consultas', async (c) => {
   });
 });
 
-/**
- * ENDPOINT PATCH /api/consultas/:id
- * Permite a las secretarias cambiar el estado de la consulta
- */
 app.patch('/api/consultas/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
@@ -98,10 +103,6 @@ app.patch('/api/consultas/:id', async (c) => {
   }
 });
 
-/**
- * ENDPOINT POST /api/send-message
- * Permite enviar una respuesta directa al paciente desde el Panel de Recepción
- */
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
@@ -111,20 +112,25 @@ app.post('/api/send-message', async (c) => {
       return c.json({ error: 'Faltan parámetros (remitente o respuesta)' }, 400);
     }
 
-    // Actualizar estado de la consulta a "atendido" en Firestore
     const firestore = new FirestoreService(c.env);
+    
     if (idConsulta) {
       await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
     }
 
-    console.log(`[Respuesta Secretaría] Para ${remitente}: ${respuesta}`);
+    // Guardar el mensaje enviado por la secretaria en el historial de chat del paciente
+    await firestore.agregarMensajeHistorial(remitente, {
+      id: `msg_${Date.now()}_sec`,
+      sender: 'secretaria',
+      text: `👩‍⚕️ *[Secretaría]* ${respuesta}`,
+      timestamp: new Date().toISOString()
+    });
 
     return c.json({
       success: true,
       remitente,
       respuestaEnviada: respuesta,
-      timestamp: new Date().toISOString(),
-      nota: 'Mensaje procesado. Se envía vía WhatsApp Web o API según proveedor configurado.'
+      timestamp: new Date().toISOString()
     });
   } catch (err: any) {
     return c.json({ error: 'Error al enviar respuesta', details: err?.message }, 500);

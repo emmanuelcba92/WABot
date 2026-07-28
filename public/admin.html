@@ -144,10 +144,6 @@
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
-    .card-consulta:hover {
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-    }
-
     .card-header {
       display: flex;
       justify-content: space-between;
@@ -207,7 +203,6 @@
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
-    /* Caja de Respuesta Directa */
     .reply-box {
       background: rgba(15, 23, 42, 0.8);
       border: 1px solid var(--border);
@@ -337,7 +332,6 @@
 
   <div class="container">
 
-    <!-- Tarjetas de Estadísticas -->
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-title">Consultas Pendientes</div>
@@ -353,7 +347,6 @@
       </div>
     </div>
 
-    <!-- Barra de Filtros -->
     <div class="filters-bar">
       <span style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Filtrar por Estado:</span>
       <button class="tab-btn active" onclick="setFilter('todos', this)">Todas</button>
@@ -361,7 +354,6 @@
       <button class="tab-btn" onclick="setFilter('atendido', this)">Atendidas</button>
     </div>
 
-    <!-- Listado Grid de Consultas -->
     <div class="consultas-grid" id="consultasGrid">
       <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando consultas...</div>
     </div>
@@ -371,11 +363,16 @@
   <script>
     let allConsultas = [];
     let currentFilter = 'todos';
+    let draftResponses = {}; // Almacenar borradores de texto de secretarias para que no se borren con el auto-refresco
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchConsultas();
-      setInterval(fetchConsultas, 10000); // Auto-refresco cada 10 segundos
+      setInterval(fetchConsultas, 8000); // Auto-refresco cada 8 segundos
     });
+
+    function saveDraft(cardId, value) {
+      draftResponses[cardId] = value;
+    }
 
     async function fetchConsultas() {
       try {
@@ -409,11 +406,18 @@
       const textarea = document.getElementById(`replyText_${cardId}`);
       if (textarea) {
         textarea.value = templateText;
+        draftResponses[cardId] = templateText;
       }
     }
 
     function renderConsultas() {
       const container = document.getElementById('consultasGrid');
+
+      // Guardar lo que se esté escribiendo actualmente antes de re-renderizar
+      document.querySelectorAll('.reply-box textarea').forEach(ta => {
+        const cardId = ta.id.replace('replyText_', '');
+        draftResponses[cardId] = ta.value;
+      });
       
       let filtered = allConsultas;
       if (currentFilter === 'pendiente') {
@@ -436,6 +440,7 @@
         const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '';
         const imgUrl = datos.imagenUrl;
         const proveedor = datos.proveedorAlmacenamiento || 'Drive';
+        const currentDraft = draftResponses[c.id] || '';
 
         return `
           <div class="card-consulta">
@@ -468,7 +473,7 @@
                 <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu solicitud PAMI fue ingresada correctamente. Nos comunicaremos cuando la orden esté emitida.')">🩺 Estado PAMI</span>
               </div>
 
-              <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta personalizada aquí..."></textarea>
+              <textarea id="replyText_${c.id}" oninput="saveDraft('${c.id}', this.value)" placeholder="Escribe tu respuesta personalizada aquí...">${currentDraft}</textarea>
 
               <div class="reply-actions">
                 <button type="button" class="btn-wa-direct" onclick="responderPorWhatsAppWeb('${c.remitente}', '${c.id}')">
@@ -486,22 +491,31 @@
 
     async function responderPorWhatsAppWeb(remitente, cardId) {
       const textarea = document.getElementById(`replyText_${cardId}`);
-      const texto = textarea ? textarea.value.trim() : '';
+      const texto = textarea ? textarea.value.trim() : (draftResponses[cardId] || '');
 
       const cleanPhone = remitente.replace(/\D/g, '');
       const encodedMsg = encodeURIComponent(texto || '¡Hola! Nos comunicamos desde la Secretaría de la Clínica Médica.');
       const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
 
-      // Abrir en nueva pestaña de WhatsApp Web
       window.open(waUrl, '_blank');
 
-      // Marcar como atendido en Firestore
-      await marcarAtendido(cardId);
+      if (texto) {
+        await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remitente, respuesta: texto, idConsulta: cardId })
+        });
+      } else {
+        await marcarAtendido(cardId);
+      }
+
+      delete draftResponses[cardId];
+      fetchConsultas();
     }
 
     async function responderViaApi(remitente, cardId) {
       const textarea = document.getElementById(`replyText_${cardId}`);
-      const respuesta = textarea ? textarea.value.trim() : '';
+      const respuesta = textarea ? textarea.value.trim() : (draftResponses[cardId] || '');
 
       if (!respuesta) {
         alert('Por favor escribe un mensaje de respuesta antes de enviar.');
@@ -521,6 +535,7 @@
 
         const data = await res.json();
         if (data.success) {
+          delete draftResponses[cardId];
           alert(`✅ Respuesta enviada a ${remitente}`);
           fetchConsultas();
         } else {
