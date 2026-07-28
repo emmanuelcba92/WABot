@@ -1,12 +1,9 @@
 /**
  * CONECTOR WHATSAPP WEB PARA EL BOT DE LA CLÍNICA
- * 
- * Este script se ejecuta en cualquier PC o servidor con Node.js.
- * Genera un código QR en pantalla para escanear con el teléfono de la clínica.
- * Reenvía los mensajes entrantes a tu Cloudflare Worker y responde automáticamente.
+ * Con soporte para Menús Interactivos Nativos (Listas y Botones)
  */
 
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, List, Buttons } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const WORKER_WEBHOOK_URL = process.env.WORKER_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
@@ -46,6 +43,50 @@ client.on('ready', () => {
   console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir mensajes!\n');
 });
 
+// Helper para convertir el payload interactivo de Cloudflare Worker a objetos nativos de whatsapp-web.js
+function createWWebJSInteractive(interactive) {
+  if (!interactive) return null;
+
+  try {
+    if (interactive.type === 'list') {
+      const sections = (interactive.sections || []).map(sec => ({
+        title: sec.title || 'Opciones',
+        rows: (sec.rows || []).map(r => ({
+          id: r.id,
+          title: r.title.substring(0, 24), // Límite de 24 caracteres en WA
+          description: (r.description || '').substring(0, 72)
+        }))
+      }));
+
+      return new List(
+        interactive.bodyText || 'Seleccioná una opción:',
+        interactive.buttonLabel || '📋 Ver Opciones',
+        sections,
+        '🏥 Clínica Médica',
+        'Tocá para desplegar el menú'
+      );
+    }
+
+    if (interactive.type === 'button') {
+      const formattedButtons = (interactive.buttons || []).map(b => ({
+        id: b.id,
+        body: `${b.emoji || ''} ${b.title}`.trim().substring(0, 20) // Límite de 20 caracteres en botones WA
+      }));
+
+      return new Buttons(
+        interactive.bodyText || 'Seleccioná una opción:',
+        formattedButtons,
+        '🏥 Clínica Médica',
+        'Tocá una opción'
+      );
+    }
+  } catch (e) {
+    console.error('Error al construir objeto interactivo:', e);
+  }
+
+  return null;
+}
+
 // Manejar mensajes entrantes de pacientes
 client.on('message', async (msg) => {
   // 1. Ignorar mensajes enviados por la propia cuenta (bot/secretarias)
@@ -61,7 +102,6 @@ client.on('message', async (msg) => {
   if (msgUniqueId) {
     if (processedMsgIds.has(msgUniqueId)) return;
     processedMsgIds.add(msgUniqueId);
-    // Limpiar memoria de IDs procesados si supera los 2000
     if (processedMsgIds.size > 2000) processedMsgIds.clear();
   }
 
@@ -105,9 +145,25 @@ client.on('message', async (msg) => {
 
     const data = await res.json();
 
-    if (data.respuesta) {
+    // 4. Si el Worker devuelve un menú interactivo, intentar enviarlo como objeto List/Buttons nativo
+    let enviadoInteractivo = false;
+    if (data.interactive) {
+      try {
+        const interactiveObj = createWWebJSInteractive(data.interactive);
+        if (interactiveObj) {
+          await client.sendMessage(remitente, interactiveObj);
+          console.log(`🤖 Respuesta interactiva (${data.interactive.type}) enviada a ${remitente}`);
+          enviadoInteractivo = true;
+        }
+      } catch (err) {
+        console.warn('⚠️ No se pudo enviar como objeto interactivo nativo, enviando texto formateado:', err);
+      }
+    }
+
+    // 5. Fallback a texto si no había objeto interactivo o si falló el envio nativo
+    if (!enviadoInteractivo && data.respuesta) {
       await client.sendMessage(remitente, data.respuesta);
-      console.log(`🤖 Respuesta enviada a ${remitente}`);
+      console.log(`🤖 Respuesta de texto enviada a ${remitente}`);
     }
   } catch (err) {
     console.error('❌ Error de conexión con el Worker:', err);
