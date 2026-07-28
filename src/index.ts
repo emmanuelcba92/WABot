@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Env, WebhookPayload } from './types';
 import { StateEngine } from './stateMachine/engine';
-import { ScheduleService } from './services/scheduleService';
+import { ScheduleService, ScheduleMode } from './services/scheduleService';
 import { FirestoreService } from './services/firestoreService';
 import { SeedService } from './services/seedService';
 import { MESSAGES } from './templates/messages';
@@ -19,6 +19,31 @@ app.get('/api/status', (c) => {
     platform: 'Cloudflare Worker',
     scheduleInfo: schedule
   });
+});
+
+app.get('/api/schedule-config', (c) => {
+  const schedule = ScheduleService.isWithinBusinessHours();
+  return c.json({
+    mode: ScheduleService.getMode(),
+    scheduleInfo: schedule
+  });
+});
+
+app.post('/api/schedule-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const mode = (body.mode as ScheduleMode) || 'auto';
+    ScheduleService.setMode(mode);
+    const schedule = ScheduleService.isWithinBusinessHours();
+    return c.json({
+      success: true,
+      mode: ScheduleService.getMode(),
+      scheduleInfo: schedule,
+      mensaje: `Modo de horario actualizado a: ${mode}`
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al cambiar modo de horario', details: e?.message }, 500);
+  }
 });
 
 app.post('/webhook', async (c) => {

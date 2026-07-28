@@ -39,6 +39,8 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     .brand {
@@ -106,6 +108,7 @@
       padding: 14px 20px;
       border-radius: 14px;
       border: 1px solid var(--border);
+      justify-content: space-between;
     }
 
     .tab-btn {
@@ -438,6 +441,16 @@
       gap: 4px;
       justify-content: center;
     }
+
+    .schedule-control-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 10px;
+    }
   </style>
 </head>
 <body>
@@ -449,6 +462,20 @@
         <h1 style="font-size: 1.2rem;">Panel de Recepción / Secretarias</h1>
         <div style="font-size: 0.8rem; color: var(--muted);">Gestión y Respuesta Directa a Consultas de WhatsApp</div>
       </div>
+    </div>
+
+    <!-- ⏰ CONTROL MANUAL DE HORARIO DE ATENCIÓN -->
+    <div class="schedule-control-bar">
+      <span style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">⏰ Horario Bot:</span>
+      <button id="schedAuto" onclick="setScheduleMode('auto')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem;" title="Lunes a Viernes 08:00 a 20:00 hs">
+        ⏰ Automático (8-20h)
+      </button>
+      <button id="schedOpen" onclick="setScheduleMode('always_open')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem; border-color: rgba(52, 211, 153, 0.5); color: #34d399;" title="Permite que las secretarias atiendan fuera de horario (Sábados/Noches)">
+        🟢 Forzar Abierto (24/7)
+      </button>
+      <button id="schedClosed" onclick="setScheduleMode('always_closed')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem; border-color: rgba(239, 68, 68, 0.5); color: #ef4444;" title="Activa el mensaje automático de fuera de horario de inmediato">
+        🌙 Forzar Cerrado
+      </button>
     </div>
 
     <div style="display: flex; gap: 10px; align-items: center;">
@@ -476,10 +503,16 @@
     </div>
 
     <div class="filters-bar">
-      <span style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Sección Principal:</span>
-      <button class="tab-btn active" onclick="setFilter('pendiente', this)">⏳ Pendientes (Bandeja Entrada)</button>
-      <button class="tab-btn" onclick="setFilter('atendido', this)">📁 Historial Archivo (Atendidas)</button>
-      <button class="tab-btn" onclick="setFilter('todos', this)">📋 Ver Todas</button>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Sección Principal:</span>
+        <button class="tab-btn active" onclick="setFilter('pendiente', this)">⏳ Pendientes (Bandeja Entrada)</button>
+        <button class="tab-btn" onclick="setFilter('atendido', this)">📁 Historial Archivo (Atendidas)</button>
+        <button class="tab-btn" onclick="setFilter('todos', this)">📋 Ver Todas</button>
+      </div>
+
+      <div id="scheduleStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 4px 10px; border-radius: 20px;">
+        🟢 Horario Activo: Automático (Lun-Vie 8-20h)
+      </div>
     </div>
 
     <div class="consultas-grid" id="consultasGrid">
@@ -501,6 +534,7 @@
     let customPdfBase64 = {};
     let customPdfNames = {};
     let lastRenderedSignature = '';
+    let currentScheduleMode = 'auto';
 
     const PREDEFINED_PDFS = {
       'sangre': { name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf', title: '📄 Preparación Análisis de Sangre / Laboratorio' },
@@ -510,9 +544,66 @@
     };
 
     window.addEventListener('DOMContentLoaded', () => {
+      fetchScheduleConfig();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
+      setInterval(fetchScheduleConfig, 10000);
     });
+
+    async function fetchScheduleConfig() {
+      try {
+        const res = await fetch('/api/schedule-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        currentScheduleMode = data.mode || 'auto';
+        updateScheduleUI(data);
+      } catch (e) {}
+    }
+
+    async function setScheduleMode(mode) {
+      try {
+        const res = await fetch('/api/schedule-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        });
+        const data = await res.json();
+        currentScheduleMode = data.mode || 'auto';
+        updateScheduleUI(data);
+      } catch (e) {
+        alert('Error al cambiar el modo de horario.');
+      }
+    }
+
+    function updateScheduleUI(data) {
+      const mode = data.mode || 'auto';
+      const isWithin = data.scheduleInfo ? data.scheduleInfo.isWithinHours : true;
+
+      const autoBtn = document.getElementById('schedAuto');
+      const openBtn = document.getElementById('schedOpen');
+      const closedBtn = document.getElementById('schedClosed');
+      const badge = document.getElementById('scheduleStatusBadge');
+
+      if (autoBtn) autoBtn.style.background = mode === 'auto' ? 'rgba(59, 130, 246, 0.4)' : 'transparent';
+      if (openBtn) openBtn.style.background = mode === 'always_open' ? 'rgba(52, 211, 153, 0.4)' : 'transparent';
+      if (closedBtn) closedBtn.style.background = mode === 'always_closed' ? 'rgba(239, 68, 68, 0.4)' : 'transparent';
+
+      if (badge) {
+        if (mode === 'always_open') {
+          badge.innerText = '🟢 Horario Activo: FORZADO ABIERTO 24/7 (Atendiendo)';
+          badge.style.color = '#34d399';
+          badge.style.background = 'rgba(52, 211, 153, 0.2)';
+        } else if (mode === 'always_closed') {
+          badge.innerText = '🌙 Horario Activo: FORZADO CERRADO (Respuesta Fuera de Horario)';
+          badge.style.color = '#f87171';
+          badge.style.background = 'rgba(239, 68, 68, 0.2)';
+        } else {
+          badge.innerText = isWithin ? '⏰ Horario Activo: Automático (En Horario Laboral)' : '🌙 Horario Activo: Automático (Fuera de Horario)';
+          badge.style.color = isWithin ? '#34d399' : '#fbbf24';
+          badge.style.background = isWithin ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+        }
+      }
+    }
 
     function saveDraft(cardId, value) {
       draftResponses[cardId] = value;
@@ -813,8 +904,7 @@
 
       if (pdfKey && pdfKey !== 'custom' && PREDEFINED_PDFS[pdfKey]) {
         pdfNombre = PREDEFINED_PDFS[pdfKey].name;
-        // Generar PDF base64 demostrativo predefinido
-        pdfBase64 = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4gZW5kb2JqCjQgMCBvYmogPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+IGVuZG9iago1IDAgb2JqIDw8IC9MZW5ndGggMTMwID4+CnN0cmVhbQpCVAovRjEgMjAgVGYKNTAgNzAwIFRkCihJTkRJQ0FDSU9ORVMgTUVESUNBUyAtIENMSU5JQ0EgTUVESUNBKSBUagowIC0zMCBUZAovRjEgMTIgVGYKKEYgZmF2b3Igc2lndWEgYXRlbnRhbWVudGUgZXN0YXMgaW5zdHJ1Y2Npb25lcyBhbnRlcyBkZSBzdSBlc3R1ZGlvLkkgVGoKRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDYgMDAwMDAgbiAKMDAwMDAwMDMxOCAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjUwMAolJUVPRg==';
+        pdfBase64 = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4gZW5kb2JqCjQgMCBvYmogPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+IGVuZG9iago1IDAgb2JqIDw8IC9MZW5ndGggMTMwID4+CnN0cmVhbQpCVAovRjEgMjAgVGYKNTAgNzAwIFRkCihJTkRJQ0FDSU9ORVMgTUVESUNBUyAtIENMSU5JQ0EgTUVESUNBKSBUagowIC0zMCBUZAovRjEgMTIgVGYKKEYgZmF2b3Igc2lndWEgYXRlbnRhbWVudGUgZXN0YXMgaW5zdHJ1Y2Npb25lcyBhbnRlcyBkZSBzdSBlc3R1ZGlvLikgVGoKRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDYgMDAwMDAgbiAKMDAwMDAwMDMxOCAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjUwMAolJUVPRg==';
       } else if (pdfKey === 'custom' && customPdfBase64[cardId]) {
         pdfBase64 = customPdfBase64[cardId];
         pdfNombre = customPdfNames[cardId] || 'Indicaciones.pdf';
