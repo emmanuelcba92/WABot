@@ -140,14 +140,23 @@ client.on('message', async (msg) => {
 
   if (msg.hasMedia) {
     try {
-      const media = await msg.downloadMedia();
-      if (media && media.mimetype && media.mimetype.startsWith('image/')) {
-        imagenBase64 = `data:${media.mimetype};base64,${media.data}`;
-        imagenNombre = media.filename || `foto_${Date.now()}.${media.mimetype.split('/')[1] || 'jpg'}`;
-        console.log(`📷 Foto recibida de ${remitente}`);
+      // Reintento de descarga por si la imagen está en desencriptación en Puppeteer
+      let media = await msg.downloadMedia().catch(() => null);
+      if (!media || !media.data) {
+        await new Promise(r => setTimeout(r, 1000));
+        media = await msg.downloadMedia().catch(() => null);
+      }
+
+      if (media && media.data) {
+        const mime = media.mimetype || 'image/jpeg';
+        imagenBase64 = `data:${mime};base64,${media.data}`;
+        imagenNombre = media.filename || `foto_${Date.now()}.${mime.split('/')[1] || 'jpg'}`;
+        console.log(`📷 Foto/Imagen recibida correctamente de ${remitente}`);
+      } else {
+        console.warn(`⚠️ Foto recibida de ${remitente} pero no se pudo desencriptar el blob de WhatsApp Web.`);
       }
     } catch (err) {
-      console.error('Error al descargar multimedia:', err);
+      console.warn('⚠️ No se pudo descargar la multimedia de WhatsApp Web:', err?.message || err);
     }
   }
 
