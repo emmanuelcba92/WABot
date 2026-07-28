@@ -140,25 +140,12 @@ client.on('message', async (msg) => {
 
   if (msg.hasMedia) {
     try {
-      // 1. Forzar a WhatsApp Web en Puppeteer a desencriptar el blob de la imagen en memoria
-      const msgSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
-      if (msgSerialized && client.pupPage) {
-        await client.pupPage.evaluate(async (serialized) => {
-          try {
-            const msgObj = window.Store.Msg.get(serialized);
-            if (msgObj && window.Store.MediaDownload) {
-              await window.Store.MediaDownload.downloadMedia({ msg: msgObj });
-            }
-          } catch (e) {}
-        }, msgSerialized).catch(() => {});
-        
-        await new Promise(r => setTimeout(r, 1200));
-      }
-
-      // 2. Descargar el objeto multimedia desencriptado
+      // Cargar el chat activo para resolver las llaves de desencriptación multimedia de WhatsApp Web
+      await msg.getChat().catch(() => {});
+      
       let media = await msg.downloadMedia().catch(() => null);
       if (!media || !media.data) {
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 800));
         media = await msg.downloadMedia().catch(() => null);
       }
 
@@ -167,8 +154,6 @@ client.on('message', async (msg) => {
         imagenBase64 = `data:${mime};base64,${media.data}`;
         imagenNombre = media.filename || `foto_${Date.now()}.${mime.split('/')[1] || 'jpg'}`;
         console.log(`📷 Foto/Imagen recibida y desencriptada correctamente de ${remitente}`);
-      } else {
-        console.warn(`⚠️ Nota: Foto recibida de ${remitente} (sin vista previa base64 por restricción de WhatsApp).`);
       }
     } catch (err) {
       console.warn('⚠️ No se pudo descargar la multimedia de WhatsApp Web:', err?.message || err);
