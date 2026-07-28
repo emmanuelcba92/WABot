@@ -79,10 +79,6 @@ app.get('/api/session/:remitente', async (c) => {
   return c.json(sesion);
 });
 
-/**
- * ENDPOINT GET /api/consultas
- * Soporta filtro por estado (?estado=pendiente | atendido | todos) para optimizar lectura
- */
 app.get('/api/consultas', async (c) => {
   const estado = c.req.query('estado');
   const firestore = new FirestoreService(c.env);
@@ -123,12 +119,17 @@ app.post('/api/send-message', async (c) => {
       await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
     }
 
+    const textoFinal = `👩‍⚕️ *[Secretaría]* ${respuesta}`;
+
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_sec`,
       sender: 'secretaria',
-      text: `👩‍⚕️ *[Secretaría]* ${respuesta}`,
+      text: textoFinal,
       timestamp: new Date().toISOString()
     });
+
+    // Encolar mensaje para que el conector de WhatsApp Web (gateway) lo entregue automáticamente al celular del paciente
+    await firestore.addPendingOutgoing(remitente, textoFinal);
 
     return c.json({
       success: true,
@@ -139,6 +140,15 @@ app.post('/api/send-message', async (c) => {
   } catch (err: any) {
     return c.json({ error: 'Error al enviar respuesta', details: err?.message }, 500);
   }
+});
+
+app.get('/api/pending-outgoing', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const messages = await firestore.popPendingOutgoing();
+  return c.json({
+    total: messages.length,
+    messages
+  });
 });
 
 app.post('/api/seed-consultas', async (c) => {

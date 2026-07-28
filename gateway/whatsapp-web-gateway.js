@@ -2,13 +2,14 @@
  * CONECTOR WHATSAPP WEB PARA EL BOT DE LA CLÍNICA
  * 
  * Este script reenvía los mensajes entrantes de WhatsApp al Cloudflare Worker
- * y entrega las respuestas formateadas al paciente de forma 100% confiable.
+ * y entrega las respuestas de la secretaría y del bot al paciente de forma 100% automática.
  */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
-const WORKER_WEBHOOK_URL = process.env.WORKER_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
+const WORKER_BASE_URL = process.env.WORKER_URL ? process.env.WORKER_URL.replace('/webhook', '') : 'https://coatwa.emmanuel-ag92.workers.dev';
+const WORKER_WEBHOOK_URL = `${WORKER_BASE_URL}/webhook`;
 
 console.log('🚀 Iniciando Conector de WhatsApp Web...');
 console.log(`🔗 Webhook apuntando a: ${WORKER_WEBHOOK_URL}\n`);
@@ -42,8 +43,35 @@ client.on('authenticated', () => {
 });
 
 client.on('ready', () => {
-  console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir mensajes!\n');
+  console.log('✅ ¡WhatsApp Web Conectado y Listo para recibir y enviar mensajes!\n');
+  
+  // Iniciar polling de respuestas emitidas por las secretarias desde el Panel Web
+  setInterval(pollSecretaryOutgoingMessages, 3000);
 });
+
+// Polling continuo de respuestas enviadas por secretarias desde admin.html
+async function pollSecretaryOutgoingMessages() {
+  try {
+    const res = await fetch(`${WORKER_BASE_URL}/api/pending-outgoing`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const messages = data.messages || [];
+
+    for (const item of messages) {
+      if (item.remitente && item.text) {
+        try {
+          await client.sendMessage(item.remitente, item.text);
+          console.log(`📤 [Secretaría] Respuesta entregada a ${item.remitente}: "${item.text.substring(0, 40)}..."`);
+        } catch (sendErr) {
+          console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, sendErr);
+        }
+      }
+    }
+  } catch (err) {
+    // Ignorar errores de red temporales
+  }
+}
 
 // Manejar mensajes entrantes de pacientes
 client.on('message', async (msg) => {

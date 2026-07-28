@@ -1,12 +1,20 @@
 import { Env, StateType, UserSession, ChatMessage } from '../types';
 import { CONFIG } from '../config';
 
+export interface PendingOutgoingMsg {
+  id: string;
+  remitente: string;
+  text: string;
+  timestamp: string;
+}
+
 export class FirestoreService {
   private projectId: string;
   private apiKey?: string;
 
   private static inMemorySessions: Map<string, UserSession> = new Map();
   private static inMemoryConsultas: Array<Record<string, any>> = [];
+  private static pendingOutgoing: PendingOutgoingMsg[] = [];
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -58,7 +66,6 @@ export class FirestoreService {
   public async getSesion(remitente: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
-    // 1. Revisar siempre primero el cache local activo
     const sesionMem = FirestoreService.inMemorySessions.get(docId);
     if (sesionMem) {
       return sesionMem;
@@ -151,6 +158,56 @@ export class FirestoreService {
     const sesion = await this.getSesion(remitente);
     const historial = [...(sesion.historialMensajes || []), msg];
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
+  }
+
+  public async addPendingOutgoing(remitente: string, text: string): Promise<void> {
+    const item: PendingOutgoingMsg = {
+      id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      remitente,
+      text,
+      timestamp: new Date().toISOString()
+    };
+
+    FirestoreService.pendingOutgoing.push(item);
+
+    if (this.projectId) {
+      try {
+        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/pendientes_salida?documentId=${item.id}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: this.toFirestoreFields(item) })
+        });
+      } catch (e) {}
+    }
+  }
+
+  public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
+    let result: PendingOutgoingMsg[] = [...FirestoreService.pendingOutgoing];
+    FirestoreService.pendingOutgoing = [];
+
+    if (this.projectId) {
+      try {
+        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/pendientes_salida${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json.documents) {
+            const fetched = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
+            result = [...result, ...fetched];
+            // Borrar de Firestore tras leer
+            for (const doc of json.documents) {
+              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Filtrar duplicados por ID
+    const uniqueMap = new Map();
+    result.forEach(item => uniqueMap.set(item.id || item.timestamp, item));
+    return Array.from(uniqueMap.values());
   }
 
   public async crearConsulta(
