@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Bot de WhatsApp - Clínica Médica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      --chat-bg: #0b141a;
+      --bubble-out: #005c4b;
+      --bubble-in: #202c33;
+      --text-main: #e9edef;
+      --text-muted: #8696a0;
+      --accent-green: #00a884;
+      --accent-blue: #3b82f6;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #00a884, #059669);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .badge-open {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-closed {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Layout Principal */
+    .app-container {
+      display: grid;
+      grid-template-columns: 340px 1fr 340px;
+      gap: 20px;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+      flex: 1;
+    }
+
+    @media (max-width: 1200px) {
+      .app-container {
+        grid-template-columns: 300px 1fr;
+      }
+      .panel-firestore {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Paneles */
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent-green);
+      box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
+    }
+
+    /* Botones de acción rápida */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: rgba(0, 168, 132, 0.2);
+      border-color: var(--accent-green);
+      color: #34d399;
+    }
+
+    .btn-primary {
+      background: var(--accent-green);
+      color: #ffffff;
+      grid-column: span 2;
+    }
+
+    .btn-primary:hover {
+      background: #008f70;
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      grid-column: span 2;
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.3);
+      color: #60a5fa;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(59, 130, 246, 0.3);
+    }
+
+    /* Simulador de Chat Estilo WhatsApp */
+    .chat-panel {
+      background: var(--chat-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .chat-header {
+      background: #202c33;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      background: #00a884;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .chat-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .chat-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
+      min-height: 400px;
+      max-height: 550px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      position: relative;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-out {
+      align-self: flex-end;
+      background: var(--bubble-out);
+      color: #e9edef;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message-in {
+      align-self: flex-start;
+      background: var(--bubble-in);
+      color: #e9edef;
+      border-bottom-left-radius: 2px;
+    }
+
+    .message-img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      display: block;
+      object-fit: cover;
+    }
+
+    .message-time {
+      font-size: 0.68rem;
+      color: rgba(233, 237, 239, 0.6);
+      text-align: right;
+      margin-top: 4px;
+    }
+
+    .image-preview-bar {
+      background: #182229;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .image-preview-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--accent-green);
+    }
+
+    .chat-input-area {
+      background: #202c33;
+      padding: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .chat-input-area input[type="text"] {
+      flex: 1;
+      background: #2a3942;
+      border: none;
+      padding: 12px 16px;
+      font-size: 0.92rem;
+    }
+
+    .btn-attach {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+    }
+
+    .btn-attach:hover {
+      color: var(--accent-green);
+    }
+
+    .btn-send {
+      background: var(--accent-green);
+      color: white;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .btn-send:hover {
+      transform: scale(1.05);
+    }
+
+    /* Estado de Firestore */
+    .state-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.82rem;
+    }
+
+    .state-tag {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+
+    .consultas-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .consulta-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.78rem;
+    }
+
+    .consulta-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 600;
+      color: #34d399;
+      margin-bottom: 4px;
+    }
+
+    .badge-drive {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      display: inline-block;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🏥</div>
+      <div>
+        <div class="brand-title">Bot de Clínica Médica</div>
+        <div class="brand-subtitle">Cloudflare Worker + Firestore + Google Drive / Supabase</div>
+      </div>
+    </div>
+
+    <div id="statusBadge" class="badge-status badge-open">
+      <span class="status-dot"></span>
+      <span id="statusText">En Horario (Argentina)</span>
+    </div>
+  </header>
+
+  <div class="app-container">
+
+    <!-- Panel de Controles y Prueba de Horario -->
+    <div class="panel">
+      <div class="panel-title">⚙️ Configuración & Horario</div>
+
+      <div class="form-group">
+        <label for="remitenteInput">📱 Teléfono del Paciente (remitente)</label>
+        <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678">
+      </div>
+
+      <div class="form-group">
+        <label for="simulatedTimeSelect">🕒 Simulación de Horario (GMT-3)</label>
+        <select id="simulatedTimeSelect" onchange="onTimeModeChange()">
+          <option value="REAL">✅ Horario Real (Seguimiento Sistema)</option>
+          <option value="IN_HOURS">☀️ En Horario (Martes 14:30 hs)</option>
+          <option value="OUT_HOURS">🌙 Fuera de Horario (Domingo 22:00 hs)</option>
+          <option value="CUSTOM">📅 Fecha/Hora Personalizada</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="customTimeGroup" style="display: none;">
+        <label for="customDateTime">Fecha y Hora Personalizada</label>
+        <input type="datetime-local" id="customDateTime" value="2026-07-27T15:00">
+      </div>
+
+      <div class="panel-title" style="margin-top: 10px;">⚡ Botones de Prueba Rápida</div>
+      
+      <div class="quick-actions">
+        <button class="btn btn-primary" onclick="sendQuickMsg('Hola')">👋 1. Enviar Hola / Menú</button>
+        <button class="btn" onclick="sendQuickMsg('A')">Opción A (Turnos)</button>
+        <button class="btn" onclick="sendQuickMsg('1')">A -> 1 (ORL)</button>
+        <button class="btn" onclick="sendQuickMsg('2')">A -> 2 (Estudios + Foto)</button>
+        <button class="btn" onclick="sendQuickMsg('3')">A -> 3 (Cirugías + Foto)</button>
+        <button class="btn" onclick="sendQuickMsg('B')">Opción B (Autoriz. + Foto)</button>
+        <button class="btn" onclick="sendQuickMsg('C')">Opción C (Ayuda)</button>
+        <button class="btn" onclick="sendQuickMsg('D')">Opción D (PAMI)</button>
+        <button class="btn" onclick="sendQuickMsg('E')">Opción E (Reprog.)</button>
+        <button class="btn btn-secondary" onclick="sendSampleDataA2WithImage()">📷 Probar Opción A2 con Imagen de Ejemplo</button>
+      </div>
+    </div>
+
+    <!-- Panel de Chat Principal Estilo WhatsApp -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="chat-title">Atención WhatsApp Clínica</div>
+          <div class="chat-subtitle" id="chatSub">Lunes a Viernes de 08:00 a 20:00 hs</div>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <!-- Mensajes generados dinámicamente -->
+      </div>
+
+      <!-- Bar de previsualización de imagen si se adjunta -->
+      <div class="image-preview-bar" id="imagePreviewBar" style="display: none;">
+        <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Vista previa">
+        <div style="flex: 1; font-size: 0.8rem;" id="imagePreviewName">pedido_medico.jpg</div>
+        <button type="button" onclick="cancelAttachedImage()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size: 1.1rem;">✕</button>
+      </div>
+
+      <form class="chat-input-area" onsubmit="handleSendSubmit(event)">
+        <!-- Input de archivo imagen oculto -->
+        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelected(event)">
+        
+        <button type="button" class="btn-attach" title="Adjuntar Imagen / Pedido Médico / Carnet" onclick="document.getElementById('fileInput').click()">
+          📷
+        </button>
+
+        <input type="text" id="userInput" placeholder="Escribe un mensaje..." autocomplete="off">
+        <button type="submit" class="btn-send" title="Enviar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+    <!-- Panel de Depuración de Firestore y Drive -->
+    <div class="panel panel-firestore">
+      <div class="panel-title">🔥 Estado Firestore</div>
+
+      <div class="state-card">
+        <div>Sesión Paciente:</div>
+        <div class="state-tag" id="currentStateDisplay">inicio</div>
+        <div style="margin-top: 8px; font-size: 0.72rem; color: #94a3b8;" id="updatedAtDisplay">Actualizado: -</div>
+      </div>
+
+      <div class="panel-title" style="margin-top: 10px;">📂 Almacenamiento Fotos</div>
+      <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+        Las fotos adjuntadas se suben a <strong>Google Drive / Supabase</strong> y se guarda el enlace en la consulta de Firestore.
+      </div>
+
+      <div class="panel-title" style="margin-top: 10px;">📦 Consultas Registradas</div>
+      <div class="consultas-list" id="consultasList">
+        <div class="consulta-item" style="color: var(--text-muted);">Sin consultas registradas aún.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let attachedImageBase64 = null;
+    let attachedImageName = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      addBotMessage("🏥 *¡Hola! Bienvenido/a al Simulador de WhatsApp de la Clínica.* \n\nEscribe *'Hola'* o usa los botones de prueba. Puedes adjuntar imágenes con el botón 📷.");
+      checkStatus();
+      updateSessionState();
+    });
+
+    function getSimulatedTime() {
+      const mode = document.getElementById('simulatedTimeSelect').value;
+      if (mode === 'IN_HOURS') return '2026-07-28T14:30:00-03:00';
+      if (mode === 'OUT_HOURS') return '2026-07-26T22:00:00-03:00';
+      if (mode === 'CUSTOM') {
+        const customVal = document.getElementById('customDateTime').value;
+        return customVal ? new Date(customVal).toISOString() : undefined;
+      }
+      return undefined;
+    }
+
+    function onTimeModeChange() {
+      const mode = document.getElementById('simulatedTimeSelect').value;
+      document.getElementById('customTimeGroup').style.display = (mode === 'CUSTOM') ? 'flex' : 'none';
+      checkStatus();
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        
+        const mode = document.getElementById('simulatedTimeSelect').value;
+        let inHours = data.scheduleInfo.isWithinHours;
+
+        if (mode === 'IN_HOURS') inHours = true;
+        if (mode === 'OUT_HOURS') inHours = false;
+
+        const badge = document.getElementById('statusBadge');
+        const text = document.getElementById('statusText');
+
+        if (inHours) {
+          badge.className = 'badge-status badge-open';
+          text.innerText = 'En Horario (08:00 - 20:00)';
+        } else {
+          badge.className = 'badge-status badge-closed';
+          text.innerText = 'Fuera de Horario (Cerrado)';
+        }
+      } catch (err) {}
+    }
+
+    function handleFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      attachedImageName = file.name;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        attachedImageBase64 = evt.target.result;
+        document.getElementById('imagePreviewThumb').src = attachedImageBase64;
+        document.getElementById('imagePreviewName').innerText = file.name;
+        document.getElementById('imagePreviewBar').style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function cancelAttachedImage() {
+      attachedImageBase64 = null;
+      attachedImageName = null;
+      document.getElementById('fileInput').value = '';
+      document.getElementById('imagePreviewBar').style.display = 'none';
+    }
+
+    function formatTextToHtml(text) {
+      if (!text) return '';
+      let html = text
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>')
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: #60a5fa; text-decoration: underline;">$1</a>');
+      return html;
+    }
+
+    function addUserMessage(text, imgBase64) {
+      const container = document.getElementById('chatMessages');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message message-out';
+      
+      let contentHtml = '';
+      if (imgBase64) {
+        contentHtml += `<img src="${imgBase64}" class="message-img" alt="Imagen adjunta">`;
+      }
+      contentHtml += formatTextToHtml(text);
+
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      msgDiv.innerHTML = `${contentHtml}<div class="message-time">${now}</div>`;
+      
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addBotMessage(text) {
+      const container = document.getElementById('chatMessages');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message message-in';
+      
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      msgDiv.innerHTML = `${formatTextToHtml(text)}<div class="message-time">${now}</div>`;
+      
+      container.appendChild(msgDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendMessage(mensajeText) {
+      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
+      
+      const currentImageBase64 = attachedImageBase64;
+      const currentImageName = attachedImageName;
+      cancelAttachedImage();
+
+      addUserMessage(mensajeText, currentImageBase64);
+
+      const simulatedTime = getSimulatedTime();
+
+      try {
+        const response = await fetch('/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente,
+            mensaje: mensajeText,
+            simulatedTime,
+            imagenBase64: currentImageBase64,
+            imagenNombre: currentImageName
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.respuesta) {
+          addBotMessage(data.respuesta);
+        } else if (data.error) {
+          addBotMessage(`❌ Error: ${data.error}`);
+        }
+
+        if (data.estadoActual) {
+          document.getElementById('currentStateDisplay').innerText = data.estadoActual;
+          document.getElementById('updatedAtDisplay').innerText = 'Actualizado: ' + new Date().toLocaleTimeString();
+        }
+
+        fetchConsultas();
+      } catch (err) {
+        addBotMessage('❌ Error de conexión al servidor.');
+      }
+    }
+
+    function sendQuickMsg(text) {
+      sendMessage(text);
+    }
+
+    function handleSendSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('userInput');
+      const text = input.value.trim();
+      if (!text && !attachedImageBase64) return;
+      input.value = '';
+      sendMessage(text || '(Imagen adjunta)');
+    }
+
+    function sendSampleDataA2WithImage() {
+      // Crear canvas simulado de imagen de pedido médico de ejemplo
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, 400, 300);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('📋 PEDIDO MÉDICO - CLINICA', 20, 40);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('Paciente: María González (DNI 32.456.789)', 20, 80);
+      ctx.fillText('Estudio: Ecografía Abdominal', 20, 110);
+      ctx.fillText('Obra Social: OSDE 210', 20, 140);
+      ctx.fillText('Firma y Sello Dr. Ramírez M.P. 45123', 20, 240);
+
+      attachedImageBase64 = canvas.toDataURL('image/jpeg');
+      attachedImageName = 'pedido_medico_muestra.jpg';
+
+      const sampleMsg = `1. María González
+2. 32456789
+3. 22/08/1992
+4. OSDE 210
+5. 1155443322
+6. Ecografía Abdominal
+7. Mañana (09 a 12 hs)`;
+
+      sendMessage(sampleMsg);
+    }
+
+    async function updateSessionState() {
+      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
+      try {
+        const res = await fetch(`/api/session/${encodeURIComponent(remitente)}`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('currentStateDisplay').innerText = data.estado || 'inicio';
+        }
+      } catch (e) {}
+    }
+
+    async function fetchConsultas() {
+      try {
+        const res = await fetch('/api/consultas');
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = document.getElementById('consultasList');
+
+        if (!data.consultas || data.consultas.length === 0) {
+          list.innerHTML = `<div class="consulta-item" style="color: var(--text-muted);">Sin consultas registradas aún.</div>`;
+          return;
+        }
+
+        list.innerHTML = data.consultas.map(c => `
+          <div class="consulta-item">
+            <div class="consulta-header">
+              <span>${c.opcion || 'Consulta'}</span>
+              <span>${c.estado || 'pendiente'}</span>
+            </div>
+            <div><strong>Remitente:</strong> ${c.remitente}</div>
+            ${c.datos && c.datos.imagenUrl ? `<div class="badge-drive">📷 <a href="${c.datos.imagenUrl}" target="_blank" style="color:inherit;">Ver Imagen (${c.datos.proveedorAlmacenamiento || 'Drive'})</a></div>` : ''}
+            <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">${new Date(c.timestamp).toLocaleString()}</div>
+          </div>
+        `).reverse().join('');
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
