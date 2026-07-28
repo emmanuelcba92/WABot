@@ -1,19 +1,17 @@
 import { Env, StateType, WebhookPayload, WebhookResponse } from '../types';
 import { MESSAGES } from '../templates/messages';
+import { MENU_PRINCIPAL, SUBMENU_TURNOS, interactiveToPlainText } from '../templates/interactiveMenus';
 import { ScheduleService } from '../services/scheduleService';
 import { FirestoreService } from '../services/firestoreService';
 import { ImageUploadService } from '../services/imageUploadService';
 
 export class StateEngine {
-  /**
-   * Procesa un mensaje entrante según la máquina de estados y las reglas de negocio.
-   */
   public static async processMessage(payload: WebhookPayload, env?: Env): Promise<WebhookResponse> {
     const { remitente, mensaje, simulatedTime, imagenBase64, imagenNombre } = payload;
     const firestore = new FirestoreService(env);
     const timestamp = new Date().toISOString();
 
-    // 1. Control de Horario (Zona Horaria Argentina: Lun-Vie 08:00 a 20:00 hs)
+    // 1. Control de Horario
     const scheduleCheck = ScheduleService.isWithinBusinessHours(simulatedTime);
     if (!scheduleCheck.isWithinHours) {
       return {
@@ -25,41 +23,45 @@ export class StateEngine {
       };
     }
 
-    // 2. Obtener estado de la sesión del paciente en Firestore
+    // 2. Obtener sesión
     const sesion = await firestore.getSesion(remitente);
     const msgClean = mensaje.trim().toLowerCase();
 
-    // Palabras clave de saludo para reiniciar o iniciar conversación
-    const saludos = ['hola', 'buen dia', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'iniciar', 'menu', 'inicio', 'recomenzar', 'bot', 'ayuda', 'start'];
-    const esSaludo = saludos.some(saludo => msgClean.includes(saludo));
+    // Palabras clave de saludo
+    const saludos = ['hola', 'buen dia', 'buenas', 'buenos dias', 'buenas tardes',
+      'buenas noches', 'iniciar', 'menu', 'inicio', 'recomenzar', 'bot', 'ayuda', 'start'];
+    const esSaludo = saludos.some(s => msgClean.includes(s));
 
-    // Si es un saludo o el estado actual es 'inicio', mostrar Saludo de Bienvenida
+    // 3. Mostrar Menú Principal (interactivo) si es saludo o inicio
     if (esSaludo || sesion.estado === 'inicio') {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
         remitente,
-        respuesta: MESSAGES.SALUDO_BIENVENIDA,
+        respuesta: interactiveToPlainText(MENU_PRINCIPAL),
+        interactive: MENU_PRINCIPAL,
         estadoActual: 'esperando_opcion_principal',
         enHorario: true,
         timestamp
       };
     }
 
-    // 3. Procesar según el Estado Actual de la conversación
+    // 4. Máquina de estados
     switch (sesion.estado) {
-      case 'esperando_opcion_principal': {
-        const opcion = msgClean.charAt(0); // Tomar primera letra (a, b, c, d, e)
 
-        if (opcion === 'a') {
+      case 'esperando_opcion_principal': {
+        const opcion = msgClean.charAt(0).toUpperCase();
+
+        if (opcion === 'A') {
           await firestore.saveSesion(remitente, 'esperando_opcion_a_sub');
           return {
             remitente,
-            respuesta: MESSAGES.SUBMENU_OPCION_A,
+            respuesta: interactiveToPlainText(SUBMENU_TURNOS),
+            interactive: SUBMENU_TURNOS,
             estadoActual: 'esperando_opcion_a_sub',
             enHorario: true,
             timestamp
           };
-        } else if (opcion === 'b') {
+        } else if (opcion === 'B') {
           await firestore.saveSesion(remitente, 'esperando_datos_opcion_b');
           return {
             remitente,
@@ -68,7 +70,7 @@ export class StateEngine {
             enHorario: true,
             timestamp
           };
-        } else if (opcion === 'c') {
+        } else if (opcion === 'C') {
           await firestore.saveSesion(remitente, 'esperando_datos_opcion_c');
           return {
             remitente,
@@ -77,7 +79,7 @@ export class StateEngine {
             enHorario: true,
             timestamp
           };
-        } else if (opcion === 'd') {
+        } else if (opcion === 'D') {
           await firestore.saveSesion(remitente, 'esperando_datos_opcion_d');
           return {
             remitente,
@@ -86,7 +88,7 @@ export class StateEngine {
             enHorario: true,
             timestamp
           };
-        } else if (opcion === 'e') {
+        } else if (opcion === 'E') {
           await firestore.saveSesion(remitente, 'esperando_datos_opcion_e');
           return {
             remitente,
@@ -98,7 +100,8 @@ export class StateEngine {
         } else {
           return {
             remitente,
-            respuesta: MESSAGES.OPCION_INVALIDA,
+            respuesta: interactiveToPlainText(MENU_PRINCIPAL),
+            interactive: MENU_PRINCIPAL,
             estadoActual: 'esperando_opcion_principal',
             enHorario: true,
             timestamp
@@ -107,39 +110,21 @@ export class StateEngine {
       }
 
       case 'esperando_opcion_a_sub': {
-        const subOpcion = msgClean.charAt(0); // Tomar número (1, 2, 3)
-
-        if (subOpcion === '1') {
+        const sub = msgClean.charAt(0);
+        if (sub === '1') {
           await firestore.saveSesion(remitente, 'esperando_datos_a1');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_A1_ORL,
-            estadoActual: 'esperando_datos_a1',
-            enHorario: true,
-            timestamp
-          };
-        } else if (subOpcion === '2') {
+          return { remitente, respuesta: MESSAGES.PLANTILLA_A1_ORL, estadoActual: 'esperando_datos_a1', enHorario: true, timestamp };
+        } else if (sub === '2') {
           await firestore.saveSesion(remitente, 'esperando_datos_a2');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_A2_ESTUDIOS,
-            estadoActual: 'esperando_datos_a2',
-            enHorario: true,
-            timestamp
-          };
-        } else if (subOpcion === '3') {
+          return { remitente, respuesta: MESSAGES.PLANTILLA_A2_ESTUDIOS, estadoActual: 'esperando_datos_a2', enHorario: true, timestamp };
+        } else if (sub === '3') {
           await firestore.saveSesion(remitente, 'esperando_datos_a3');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_A3_CIRUGIAS,
-            estadoActual: 'esperando_datos_a3',
-            enHorario: true,
-            timestamp
-          };
+          return { remitente, respuesta: MESSAGES.PLANTILLA_A3_CIRUGIAS, estadoActual: 'esperando_datos_a3', enHorario: true, timestamp };
         } else {
           return {
             remitente,
-            respuesta: `⚠️ Opción no válida.\n\n${MESSAGES.SUBMENU_OPCION_A}`,
+            respuesta: interactiveToPlainText(SUBMENU_TURNOS),
+            interactive: SUBMENU_TURNOS,
             estadoActual: 'esperando_opcion_a_sub',
             enHorario: true,
             timestamp
@@ -147,7 +132,6 @@ export class StateEngine {
         }
       }
 
-      // Estados de Recolección de Datos Finales
       case 'esperando_datos_a1':
       case 'esperando_datos_a2':
       case 'esperando_datos_a3':
@@ -166,21 +150,21 @@ export class StateEngine {
         };
 
         const opcionElegida = opcionMap[sesion.estado] || 'Desconocido';
-        let imagenSubidaUrl: string | undefined = undefined;
-        let proveedorAlmacenamiento: string | undefined = undefined;
+        let imagenSubidaUrl: string | undefined;
+        let proveedorAlmacenamiento: string | undefined;
 
-        // Si el usuario adjuntó una imagen (pedido médico / carnet)
         if (imagenBase64) {
           try {
-            const uploadRes = await ImageUploadService.uploadImage(imagenBase64, imagenNombre || `${remitente}_${Date.now()}.jpg`, env);
+            const uploadRes = await ImageUploadService.uploadImage(
+              imagenBase64, imagenNombre || `${remitente}_${Date.now()}.jpg`, env
+            );
             imagenSubidaUrl = uploadRes.url;
             proveedorAlmacenamiento = uploadRes.provider;
           } catch (err) {
-            console.error('Error al procesar subida de imagen:', err);
+            console.error('Error al subir imagen:', err);
           }
         }
 
-        // Estructurar el objeto de datos recolectados
         const datosEstructurados = {
           tipoSolicitud: opcionElegida,
           contenidoMensaje: mensaje,
@@ -189,15 +173,14 @@ export class StateEngine {
           proveedorAlmacenamiento: proveedorAlmacenamiento || null
         };
 
-        // Guardar la consulta en la colección "consultas" en Firestore con estado "pendiente"
         await firestore.crearConsulta(remitente, opcionElegida, datosEstructurados);
-
-        // Resetear la sesión del paciente a 'inicio'
         await firestore.saveSesion(remitente, 'inicio');
 
         let confirmacionMsg = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
         if (imagenSubidaUrl) {
-          confirmacionMsg += `\n\n📷 *Imagen/Pedido adjuntado exitosamente en ${proveedorAlmacenamiento === 'google_drive' ? 'Google Drive' : proveedorAlmacenamiento === 'supabase' ? 'Supabase' : 'Almacenamiento'}:*\n[Ver Imagen](${imagenSubidaUrl})`;
+          const prov = proveedorAlmacenamiento === 'google_drive' ? 'Google Drive'
+            : proveedorAlmacenamiento === 'supabase' ? 'Supabase' : 'Almacenamiento';
+          confirmacionMsg += `\n\n📷 *Imagen adjuntada correctamente en ${prov}:*\n[Ver Imagen](${imagenSubidaUrl})`;
         }
 
         return {
@@ -214,7 +197,8 @@ export class StateEngine {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
-          respuesta: MESSAGES.SALUDO_BIENVENIDA,
+          respuesta: interactiveToPlainText(MENU_PRINCIPAL),
+          interactive: MENU_PRINCIPAL,
           estadoActual: 'esperando_opcion_principal',
           enHorario: true,
           timestamp

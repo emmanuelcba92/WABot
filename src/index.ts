@@ -61,7 +61,8 @@ app.post('/webhook', async (c) => {
       sender: 'bot',
       text: result.respuesta,
       timestamp: new Date().toISOString(),
-      imageUrl: result.imagenSubidaUrl
+      imageUrl: result.imagenSubidaUrl,
+      interactive: result.interactive  // Guardar menú interactivo para re-renderizar en el simulador
     });
 
     return c.json(result, 200);
