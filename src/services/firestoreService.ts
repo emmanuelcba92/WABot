@@ -58,9 +58,13 @@ export class FirestoreService {
   public async getSesion(remitente: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
+    // 1. Primero revisar siempre la memoria local activa
+    const sesionMem = FirestoreService.inMemorySessions.get(docId);
+    if (sesionMem) {
+      return sesionMem;
+    }
+
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      const sesionMem = FirestoreService.inMemorySessions.get(docId);
-      if (sesionMem) return sesionMem;
       return {
         remitente,
         estado: 'inicio',
@@ -74,18 +78,8 @@ export class FirestoreService {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${docId}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
       const res = await fetch(url);
 
-      if (res.status === 404) {
-        return {
-          remitente,
-          estado: 'inicio',
-          datosTemporales: {},
-          historialMensajes: [],
-          updatedAt: new Date().toISOString()
-        };
-      }
-
       if (!res.ok) {
-        return FirestoreService.inMemorySessions.get(docId) || {
+        return {
           remitente,
           estado: 'inicio',
           datosTemporales: {},
@@ -97,15 +91,19 @@ export class FirestoreService {
       const data: any = await res.json();
       const fields = this.fromFirestoreFields(data.fields || {});
 
-      return {
+      const sesionRecuperada: UserSession = {
         remitente,
         estado: (fields.estado as StateType) || 'inicio',
         datosTemporales: fields.datosTemporales || {},
         historialMensajes: fields.historialMensajes || [],
         updatedAt: fields.updatedAt || new Date().toISOString()
       };
+
+      // Cachear en memoria
+      FirestoreService.inMemorySessions.set(docId, sesionRecuperada);
+      return sesionRecuperada;
     } catch (err) {
-      return FirestoreService.inMemorySessions.get(docId) || {
+      return {
         remitente,
         estado: 'inicio',
         datosTemporales: {},
@@ -119,8 +117,8 @@ export class FirestoreService {
     const docId = encodeURIComponent(remitente.trim());
     const updatedAt = new Date().toISOString();
 
-    const sesionExistente = await this.getSesion(remitente);
-    const historialFinal = historialMensajes.length > 0 ? historialMensajes : (sesionExistente.historialMensajes || []);
+    const sesionMem = FirestoreService.inMemorySessions.get(docId);
+    const historialFinal = historialMensajes.length > 0 ? historialMensajes : (sesionMem?.historialMensajes || []);
 
     const sesionData: UserSession = {
       remitente,
@@ -130,6 +128,7 @@ export class FirestoreService {
       updatedAt
     };
 
+    // Actualizar cache local inmediatamente
     FirestoreService.inMemorySessions.set(docId, sesionData);
 
     if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
@@ -154,8 +153,8 @@ export class FirestoreService {
 
   public async agregarMensajeHistorial(remitente: string, msg: ChatMessage): Promise<void> {
     const sesion = await this.getSesion(remitente);
-    const historial = sesion.historialMensajes || [];
-    historial.push(msg);
+    const historial = [...(sesion.historialMensajes || []), msg];
+    // Preservar estado actual de la sesión sin revertirlo
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
   }
 
