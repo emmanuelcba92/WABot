@@ -112,52 +112,26 @@ async function pollSecretaryOutgoingMessages() {
   }
 }
 
-// Extractor instantáneo de Base64 de fotos desde el protocolo de WhatsApp
+// Extractor de Alta Resolución (HD Full Size) de fotos desde WhatsApp Web
 async function extractImageBase64(msg) {
-  // 1. Extraer miniatura Base64 nativa incluida en el paquete de WhatsApp
-  if (msg._data && msg._data.body) {
-    const rawBody = msg._data.body;
-    if (typeof rawBody === 'string' && rawBody.length > 50) {
-      if (rawBody.startsWith('data:image/')) return rawBody;
-      if (/^[A-Za-z0-9+/=]+$/.test(rawBody.replace(/[\r\n]/g, ''))) {
-        const mime = (msg._data.mimetype || msg.mimetype || 'image/jpeg');
-        return `data:${mime};base64,${rawBody}`;
-      }
-    }
-  }
-
-  // 2. Descarga oficial de whatsapp-web.js
-  try {
-    await msg.getChat().catch(() => {});
-    const media = await msg.downloadMedia().catch(() => null);
-    if (media && media.data) {
-      return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
-    }
-  } catch (e) {}
-
-  // 3. Fallback de extracción desde el contexto de Puppeteer
+  // 1. Descarga e inspección HD mediante la API interna de Puppeteer
   try {
     const msgIdSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
     if (msgIdSerialized && client.pupPage) {
-      const base64 = await client.pupPage.evaluate(async (serialized) => {
+      const fullBase64 = await client.pupPage.evaluate(async (serialized) => {
         try {
           const msgObj = window.Store.Msg.get(serialized);
           if (!msgObj) return null;
 
-          if (msgObj._data && msgObj._data.body && msgObj._data.body.length > 50) {
-            const raw = msgObj._data.body;
-            if (raw.startsWith('data:image/')) return raw;
-            return `data:image/jpeg;base64,${raw}`;
+          // Forzar la descarga del archivo en ALTA RESOLUCIÓN desde los servidores de WhatsApp
+          if (window.Store.MediaDownload && msgObj.mediaData && msgObj.mediaData.mediaStage !== 'RESOLVED') {
+            await window.Store.MediaDownload.downloadMedia({ msg: msgObj, chat: msgObj.chat, type: 'manual' }).catch(() => {});
           }
 
-          if (msgObj.mediaData && msgObj.mediaData.preview) {
-            const raw = typeof msgObj.mediaData.preview === 'string' ? msgObj.mediaData.preview : msgObj.mediaData.preview._b64;
-            if (typeof raw === 'string' && raw.length > 50) {
-              return raw.startsWith('data:image/') ? raw : `data:image/jpeg;base64,${raw}`;
-            }
-          }
+          await new Promise(r => setTimeout(r, 600));
 
-          const blobUrl = msgObj.mediaData?.renderableUrl || msgObj.mediaData?.preview?.url;
+          // Extraer la URL del blob HD desencriptado
+          const blobUrl = msgObj.mediaData?.renderableUrl || msgObj.mediaData?.fullUrl;
           if (blobUrl) {
             const response = await fetch(blobUrl);
             const blob = await response.blob();
@@ -172,11 +146,32 @@ async function extractImageBase64(msg) {
         return null;
       }, msgIdSerialized).catch(() => null);
 
-      if (base64 && base64.startsWith('data:image/')) {
-        return base64;
+      if (fullBase64 && fullBase64.length > 5000) {
+        return fullBase64;
       }
     }
   } catch (e) {}
+
+  // 2. Método oficial downloadMedia() de whatsapp-web.js (Full Size)
+  try {
+    await msg.getChat().catch(() => {});
+    const media = await msg.downloadMedia().catch(() => null);
+    if (media && media.data && media.data.length > 2000) {
+      return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
+    }
+  } catch (e) {}
+
+  // 3. Fallback de miniatura de protocolo si no se pudo descargar el archivo HD
+  if (msg._data && msg._data.body) {
+    const rawBody = msg._data.body;
+    if (typeof rawBody === 'string' && rawBody.length > 50) {
+      if (rawBody.startsWith('data:image/')) return rawBody;
+      if (/^[A-Za-z0-9+/=]+$/.test(rawBody.replace(/[\r\n]/g, ''))) {
+        const mime = (msg._data.mimetype || msg.mimetype || 'image/jpeg');
+        return `data:${mime};base64,${rawBody}`;
+      }
+    }
+  }
 
   return null;
 }
@@ -208,9 +203,9 @@ client.on('message', async (msg) => {
     imagenBase64 = await extractImageBase64(msg);
     if (imagenBase64) {
       imagenNombre = `foto_${Date.now()}.jpg`;
-      console.log(`📷 Foto/Imagen recibida y desencriptada en Base64 de ${remitente}`);
+      console.log(`📷 Foto/Imagen recibida y desencriptada en ALTA RESOLUCIÓN de ${remitente}`);
     } else {
-      console.warn(`⚠️ Foto recibida de ${remitente} (se notifica imagen adjunta al panel).`);
+      console.warn(`⚠️ Foto recibida de ${remitente} (notificando imagen adjunta al panel).`);
       const svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250" viewBox="0 0 400 250"><rect width="400" height="250" fill="#1e293b"/><text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="#34d399" font-size="18" font-weight="bold">Foto Adjunta de Pedido Medico</text><text x="50%" y="62%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-size="13">Recibido desde WhatsApp del paciente</text></svg>';
       imagenBase64 = `data:image/svg+xml;base64,${Buffer.from(svgStr).toString('base64')}`;
     }
