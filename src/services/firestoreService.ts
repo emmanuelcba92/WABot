@@ -9,7 +9,7 @@ export class FirestoreService {
   private static inMemoryConsultas: Array<Record<string, any>> = [];
 
   constructor(env?: Env) {
-    this.projectId = env?.FIREBASE_PROJECT_ID || CONFIG.DEFAULT_FIREBASE_PROJECT_ID;
+    this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
     this.apiKey = env?.FIREBASE_API_KEY;
   }
 
@@ -58,13 +58,13 @@ export class FirestoreService {
   public async getSesion(remitente: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
-    // 1. Primero revisar siempre la memoria local activa
+    // 1. Revisar siempre primero el cache local activo
     const sesionMem = FirestoreService.inMemorySessions.get(docId);
     if (sesionMem) {
       return sesionMem;
     }
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
+    if (!this.projectId) {
       return {
         remitente,
         estado: 'inicio',
@@ -99,7 +99,6 @@ export class FirestoreService {
         updatedAt: fields.updatedAt || new Date().toISOString()
       };
 
-      // Cachear en memoria
       FirestoreService.inMemorySessions.set(docId, sesionRecuperada);
       return sesionRecuperada;
     } catch (err) {
@@ -128,12 +127,9 @@ export class FirestoreService {
       updatedAt
     };
 
-    // Actualizar cache local inmediatamente
     FirestoreService.inMemorySessions.set(docId, sesionData);
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      return;
-    }
+    if (!this.projectId) return;
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${docId}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
@@ -154,7 +150,6 @@ export class FirestoreService {
   public async agregarMensajeHistorial(remitente: string, msg: ChatMessage): Promise<void> {
     const sesion = await this.getSesion(remitente);
     const historial = [...(sesion.historialMensajes || []), msg];
-    // Preservar estado actual de la sesión sin revertirlo
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
   }
 
@@ -178,9 +173,7 @@ export class FirestoreService {
 
     FirestoreService.inMemoryConsultas.push(payload);
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      return consultaId;
-    }
+    if (!this.projectId) return consultaId;
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?documentId=${consultaId}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -203,9 +196,7 @@ export class FirestoreService {
   public async getConsultas(estadoFilter?: string): Promise<Array<Record<string, any>>> {
     let items: Array<Record<string, any>> = [];
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      items = [...FirestoreService.inMemoryConsultas];
-    } else {
+    if (this.projectId) {
       try {
         const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
         const res = await fetch(url);
@@ -218,6 +209,10 @@ export class FirestoreService {
       } catch (e) {
         items = [...FirestoreService.inMemoryConsultas];
       }
+    }
+
+    if (items.length === 0 && FirestoreService.inMemoryConsultas.length > 0) {
+      items = [...FirestoreService.inMemoryConsultas];
     }
 
     if (estadoFilter && estadoFilter !== 'todos') {
@@ -233,9 +228,7 @@ export class FirestoreService {
       itemMem.estado = nuevoEstado;
     }
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      return true;
-    }
+    if (!this.projectId) return true;
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${id}?updateMask.fieldPaths=estado${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -258,9 +251,7 @@ export class FirestoreService {
     FirestoreService.inMemoryConsultas = [];
     FirestoreService.inMemorySessions.clear();
 
-    if (this.projectId === CONFIG.DEFAULT_FIREBASE_PROJECT_ID || !this.apiKey) {
-      return;
-    }
+    if (!this.projectId) return;
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
