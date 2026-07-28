@@ -487,12 +487,13 @@
 
   <script>
     let allConsultas = [];
-    let currentFilter = 'pendiente'; // Por defecto SOLO carga las pendientes para ahorrar lecturas y memoria
+    let currentFilter = 'pendiente';
     let draftResponses = {};
+    let lastRenderedSignature = '';
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchConsultas();
-      setInterval(fetchConsultas, 8000); // Auto-refresco optimizado
+      setInterval(fetchConsultas, 5000); // Polling suave cada 5s
     });
 
     function saveDraft(cardId, value) {
@@ -511,19 +512,17 @@
       modal.style.display = 'none';
     }
 
-    async function fetchConsultas() {
+    async function fetchConsultas(forceRedraw = false) {
       try {
-        // Enviar filtro ?estado= al servidor para descargar ÚNICAMENTE lo necesario
         const res = await fetch(`/api/consultas?estado=${encodeURIComponent(currentFilter)}`);
         const data = await res.json();
         allConsultas = data.consultas || [];
         
-        // Cargar también conteo general
         const resAll = await fetch('/api/consultas?estado=todos');
         const dataAll = await resAll.json();
         updateStats(dataAll.consultas || []);
 
-        renderConsultas();
+        renderConsultas(forceRedraw);
       } catch (err) {
         console.error('Error al cargar consultas:', err);
       }
@@ -576,7 +575,7 @@
       currentFilter = filter;
       document.querySelectorAll('.filters-bar .tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      fetchConsultas();
+      fetchConsultas(true);
     }
 
     function insertTemplate(cardId, templateText) {
@@ -587,13 +586,30 @@
       }
     }
 
-    function renderConsultas() {
+    function renderConsultas(forceRedraw = false) {
       const container = document.getElementById('consultasGrid');
 
+      // Guardar lo que la secretaria esté escribiendo actualmente
       document.querySelectorAll('.reply-box textarea').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
         draftResponses[cardId] = ta.value;
       });
+
+      // Detectar si el usuario está tipeando activamente en algún textarea
+      const activeEl = document.activeElement;
+      const activeId = (activeEl && activeEl.id && activeEl.id.startsWith('replyText_')) ? activeEl.id : null;
+      const selStart = activeId ? activeEl.selectionStart : null;
+      const selEnd = activeId ? activeEl.selectionEnd : null;
+
+      // Calcular firma única de los datos cargados para evitar re-renders innecesarios si no hay cambios
+      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp]));
+
+      // Si los datos no cambiaron y no se forzó el redibujado, NO tocar el DOM para cero interrupciones al tipear
+      if (!forceRedraw && currentSignature === lastRenderedSignature && container.children.length > 0) {
+        return;
+      }
+
+      lastRenderedSignature = currentSignature;
 
       if (allConsultas.length === 0) {
         container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 60px; text-align: center; background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border);">No hay consultas en esta sección. (${currentFilter === 'pendiente' ? '¡Bandeja de entrada limpia!' : 'Historial vacío'})</div>`;
@@ -665,6 +681,17 @@
           </div>
         `;
       }).reverse().join('');
+
+      // Restaurar foco y posición exacta del cursor si el usuario estaba tipeando
+      if (activeId) {
+        const restoredEl = document.getElementById(activeId);
+        if (restoredEl) {
+          restoredEl.focus();
+          if (selStart !== null && selEnd !== null) {
+            try { restoredEl.setSelectionRange(selStart, selEnd); } catch(e) {}
+          }
+        }
+      }
     }
 
     async function responderPorWhatsAppWeb(remitente, cardId) {
