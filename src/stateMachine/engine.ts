@@ -1,15 +1,20 @@
-import { Env, StateType, WebhookPayload, WebhookResponse } from '../types';
+import { WebhookPayload, WebhookResponse, StateType, UserSession, Env } from '../types';
 import { MESSAGES } from '../templates/messages';
-import { MENU_PRINCIPAL, SUBMENU_TURNOS, interactiveToPlainText } from '../templates/interactiveMenus';
-import { ScheduleService } from '../services/scheduleService';
+import { MENU_PRINCIPAL, SUBMENU_TURNOS, interactiveToPlainText } from '../templates/buttons';
 import { FirestoreService } from '../services/firestoreService';
+import { ScheduleService } from '../services/scheduleService';
 import { ImageUploadService } from '../services/imageUploadService';
 
 export class StateEngine {
   public static async processMessage(payload: WebhookPayload, env?: Env): Promise<WebhookResponse> {
-    const { remitente, mensaje, simulatedTime, imagenBase64, imagenNombre } = payload;
-    const firestore = new FirestoreService(env);
+    const remitente = payload.remitente.trim();
+    const mensaje = payload.mensaje.trim();
+    const simulatedTime = payload.simulatedTime;
+    const imagenBase64 = payload.imagenBase64;
+    const imagenNombre = payload.imagenNombre;
     const timestamp = new Date().toISOString();
+
+    const firestore = new FirestoreService(env);
 
     // 1. Control de Horario (Persistido en Firestore)
     const scheduleMode = await firestore.getScheduleMode();
@@ -24,18 +29,16 @@ export class StateEngine {
       };
     }
 
-    // 2. Obtener sesión
+    // 2. Obtener estado de sesión del paciente
     const sesion = await firestore.getSesion(remitente);
-    const msgClean = mensaje.trim().toLowerCase();
 
-    // Palabras clave de saludo o reinicio explícito
-    const saludos = ['hola', 'buen dia', 'buenas', 'buenos dias', 'buenas tardes',
-      'buenas noches', 'iniciar', 'menu', 'inicio', 'recomenzar', 'bot', 'ayuda', 'start'];
-    const esSaludoExplicit = saludos.some(s => msgClean === s || msgClean === s + ' ');
+    // Normalizar texto para palabras clave de reinicio o saludo
+    const msgClean = mensaje.toLowerCase().trim();
+    const esSaludoExplicit = ['hola', 'buen dia', 'buenas tardes', 'buenas noches', 'menu', 'inicio', 'volver', 'recomenzar'].includes(msgClean);
 
-    // 3. Manejo de estado esperando_atencion_humana (Bot Silenciado para Atención de Secretaría)
+    // 3. Si el paciente ya completó la solicitud y está esperando atención de secretaría
     if (sesion.estado === 'esperando_atencion_humana') {
-      if (esSaludoExplicit || msgClean === 'menu' || msgClean === 'inicio') {
+      if (esSaludoExplicit) {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
@@ -47,12 +50,12 @@ export class StateEngine {
         };
       }
 
-      // Si el bot está en silencio, actualizar la consulta con el nuevo mensaje o nueva foto del paciente
+      // Si el bot está en silencio, adjuntar la nueva foto o mensaje a la consulta existente
       await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
 
       return {
         remitente,
-        respuesta: '', // Cadena vacía = Bot en silencio
+        respuesta: '', // Cadena vacía = Bot en silencio sin spam
         estadoActual: 'esperando_atencion_humana',
         enHorario: true,
         timestamp
@@ -125,10 +128,6 @@ export class StateEngine {
             timestamp
           };
         } else {
-          if (mensaje.length > 15 || imagenBase64) {
-            return await this.guardarConsultaFinal(remitente, 'A1_Turno_ORL_9Datos', mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
-          }
-
           return {
             remitente,
             respuesta: interactiveToPlainText(MENU_PRINCIPAL),
@@ -208,6 +207,25 @@ export class StateEngine {
     timestamp: string,
     firestore: FirestoreService
   ): Promise<WebhookResponse> {
+    // Verificar si el paciente ya tiene una consulta activa sin atender
+    const consultasExistentes = await firestore.getConsultas();
+    const consultaActiva = consultasExistentes.find(c => c.remitente === remitente && c.estado === 'pendiente');
+
+    if (consultaActiva) {
+      // Adjuntar fotos/mensajes adicionales a la misma tarjeta existente
+      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
+      await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+
+      return {
+        remitente,
+        respuesta: '', // Silencio para no enviar confirmaciones duplicadas por cada foto
+        estadoActual: 'esperando_atencion_humana',
+        enHorario: true,
+        timestamp
+      };
+    }
+
+    // Si no existía consulta activa, crear la tarjeta única
     let imagenSubidaUrl: string | undefined;
     let proveedorAlmacenamiento: string | undefined;
 
@@ -229,6 +247,7 @@ export class StateEngine {
       lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
       imagenUrl: (proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') ? imagenSubidaUrl : null,
       imagenBase64: imagenBase64 || null,
+      imagenesAdjuntas: imagenBase64 ? [imagenBase64] : [],
       proveedorAlmacenamiento: proveedorAlmacenamiento || null,
       respuestasPaciente: []
     };
