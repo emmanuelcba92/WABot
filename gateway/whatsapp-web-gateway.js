@@ -113,32 +113,48 @@ async function pollSecretaryOutgoingMessages() {
   }
 }
 
-// Extractor de Alta Definición HD (1080p / 4K) esperando a que WhatsApp Web resuelva el Blob de CDN
+// Extractor de Alta Definición HD (1080p / 4K) forzando apertura del chat en el motor de WhatsApp Web
 async function extractImageBase64(msg) {
+  const remitente = msg.from;
+  const msgSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
+
+  // 1. Abrir activamente la conversación en el navegador Puppeteer para forzar a WhatsApp Web a descargar la foto HD original
   try {
-    const msgIdSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
-    if (msgIdSerialized && client.pupPage) {
-      const fullBase64 = await client.pupPage.evaluate(async (serialized) => {
+    if (client.pupPage && msgSerialized) {
+      await client.pupPage.evaluate(async (chatId, sId) => {
         try {
-          const msgObj = window.Store.Msg.get(serialized);
+          const chat = window.Store.Chat.get(chatId);
+          if (chat && window.Store.Cmd) {
+            await window.Store.Cmd.openChatAt(chat);
+          }
+          const msgObj = window.Store.Msg.get(sId);
+          if (msgObj && window.Store.MediaDownload) {
+            await window.Store.MediaDownload.downloadMedia({ msg: msgObj, chat, type: 'manual' }).catch(() => {});
+          }
+        } catch (e) {}
+      }, remitente, msgSerialized).catch(() => {});
+    }
+  } catch (e) {}
+
+  // Esperar 1.5 segundos a que WhatsApp Web desencripte y cargue la foto HD en la sesión
+  await new Promise(r => setTimeout(r, 1500));
+
+  // 2. Extraer el blob HD desencriptado desde renderableUrl / fullUrl en Puppeteer
+  try {
+    if (client.pupPage && msgSerialized) {
+      const fullBase64 = await client.pupPage.evaluate(async (sId) => {
+        try {
+          const msgObj = window.Store.Msg.get(sId);
           if (!msgObj) return null;
 
-          // 1. Iniciar la descarga del archivo HD desde los servidores CDN de WhatsApp
-          if (window.Store.MediaDownload) {
-            try {
-              await window.Store.MediaDownload.downloadMedia({ msg: msgObj, chat: msgObj.chat, type: 'manual' });
-            } catch (e) {}
-          }
-
-          // 2. Bucle de espera activo (hasta 4 segundos) a que el blob pase al estado 'RESOLVED'
-          for (let i = 0; i < 20; i++) {
+          // Esperar activamente si el mediaStage aún está descargando
+          for (let i = 0; i < 15; i++) {
             if (msgObj.mediaData && (msgObj.mediaData.mediaStage === 'RESOLVED' || msgObj.mediaData.renderableUrl)) {
               break;
             }
             await new Promise(r => setTimeout(r, 200));
           }
 
-          // 3. Extraer el blob HD desencriptado desde renderableUrl o fullUrl
           const blobUrl = msgObj.mediaData?.renderableUrl || msgObj.mediaData?.fullUrl;
           if (blobUrl) {
             const response = await fetch(blobUrl);
@@ -152,30 +168,32 @@ async function extractImageBase64(msg) {
           }
         } catch (err) {}
         return null;
-      }, msgIdSerialized).catch(() => null);
+      }, msgSerialized).catch(() => null);
 
-      if (fullBase64 && fullBase64.length > 8000) {
-        console.log(`📸 [HD Exitoso] Foto de alta resolución capturada (${fullBase64.length} bytes base64)`);
+      if (fullBase64 && fullBase64.length > 5000) {
+        console.log(`📸 [HD Éxito Total] Foto original capturada en Alta Definición (${fullBase64.length} bytes base64)`);
         return fullBase64;
       }
     }
   } catch (e) {}
 
-  // Fallback 1: downloadMedia() oficial de whatsapp-web.js
+  // 3. Método oficial downloadMedia() de whatsapp-web.js
   try {
-    await msg.getChat().catch(() => {});
-    const media = await msg.downloadMedia().catch(() => null);
+    const media = await msg.downloadMedia().catch((err) => {
+      console.error('Error interno downloadMedia:', err?.message || err);
+      return null;
+    });
     if (media && media.data && media.data.length > 5000) {
       console.log(`📸 [HD WWebJS] Foto descargada mediante API oficial (${media.data.length} bytes)`);
       return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
     }
   } catch (e) {}
 
-  // Fallback 2: miniatura de protocolo
+  // 4. Fallback de miniatura ligera de protocolo (Solo si falló la descarga HD)
   if (msg._data && msg._data.body) {
     const rawBody = msg._data.body;
     if (typeof rawBody === 'string' && rawBody.length > 50) {
-      console.log('⚠️ [Miniatura] Utilizando miniatura de respaldo.');
+      console.log('⚠️ [Miniatura] Se utilizó miniatura de respaldo (100px).');
       if (rawBody.startsWith('data:image/')) return rawBody;
       if (/^[A-Za-z0-9+/=]+$/.test(rawBody.replace(/[\r\n]/g, ''))) {
         const mime = (msg._data.mimetype || msg.mimetype || 'image/jpeg');
