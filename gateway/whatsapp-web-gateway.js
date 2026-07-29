@@ -113,97 +113,113 @@ async function pollSecretaryOutgoingMessages() {
   }
 }
 
-// Extractor infalible de imágenes en Alta Definición HD (1080p / 4K)
+// Extractor infalible HD abriendo la conversación en el DOM e inspeccionando elementos <img>
 async function extractImageBase64(msg) {
-  const remitente = msg.from;
+  const pupPage = client.pupPage;
   const msgSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
+  const remitente = msg.from;
 
-  // 1. Método Avanzado de Extracción HD por Store & DOM Canvas en Puppeteer
-  try {
-    if (client.pupPage && msgSerialized) {
-      const hdBase64 = await client.pupPage.evaluate(async (chatId, sId) => {
+  console.log(`🔍 [Extracción HD] Analizando mensaje de imagen (${msgSerialized})... (pupPage activo: ${!!pupPage})`);
+
+  // 1. Forzar apertura de la conversación en WhatsApp Web para gatillar la descarga HD del blob
+  if (pupPage) {
+    try {
+      await pupPage.evaluate(async (sId, sender) => {
         try {
-          // Buscar el mensaje en window.Store.Msg.models (compatible con WhatsApp Web 2.3000+)
-          const msgModels = window.Store.Msg?.models || [];
-          const msgObj = msgModels.find(m => (m.id && (m.id._serialized === sId || m.id.id === sId))) || window.Store.Msg.get(sId);
-          
-          const chatModels = window.Store.Chat?.models || [];
-          const chatObj = (msgObj && msgObj.chat) || chatModels.find(c => c.id && (c.id._serialized === chatId || c.id._serialized.includes(chatId.split('@')[0]))) || window.Store.Chat.get(chatId);
-
-          // Forzar a WhatsApp Web a abrir el chat y solicitar la descarga HD
-          if (chatObj && window.Store.Cmd) {
-            await window.Store.Cmd.openChatAt(chatObj).catch(() => {});
-          }
-
-          if (msgObj && window.Store.MediaDownload) {
-            await window.Store.MediaDownload.downloadMedia({ msg: msgObj, chat: chatObj, type: 'manual' }).catch(() => {});
-          }
-
-          // Esperar hasta 3.5 segundos a que WhatsApp desencripte el Blob HD de la red
-          for (let i = 0; i < 18; i++) {
-            if (msgObj && msgObj.mediaData && (msgObj.mediaData.mediaStage === 'RESOLVED' || msgObj.mediaData.renderableUrl)) {
-              break;
+          // A) Intentar abrir el chat desde la lista o mediante Store.Cmd
+          if (window.Store && window.Store.Cmd && window.Store.Chat) {
+            const chatModels = window.Store.Chat.models || [];
+            const targetChat = chatModels.find(c => c.id && c.id._serialized && c.id._serialized.includes(sender.replace('@lid','').replace('@c.us','')));
+            if (targetChat) {
+              await window.Store.Cmd.openChatAt(targetChat).catch(() => {});
             }
-            await new Promise(r => setTimeout(r, 200));
           }
 
-          // A) Intentar leer desde el blob URL desencriptado en memoria
-          const blobUrl = msgObj?.mediaData?.renderableUrl || msgObj?.mediaData?.fullUrl;
-          if (blobUrl) {
-            const response = await fetch(blobUrl);
-            const blob = await response.blob();
-            return new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.onerror = () => resolve(null);
-              reader.readAsDataURL(blob);
-            });
+          // B) Forzar la descarga del objeto media si existe
+          if (window.Store && window.Store.Msg) {
+            const msgModels = window.Store.Msg.models || [];
+            const targetMsg = msgModels.find(m => m.id && (m.id._serialized === sId || m.id.id === sId));
+            if (targetMsg && window.Store.MediaDownload) {
+              await window.Store.MediaDownload.downloadMedia({ msg: targetMsg, chat: targetMsg.chat, type: 'manual' }).catch(() => {});
+            }
+          }
+        } catch (e) {}
+      }, msgSerialized, remitente).catch(() => {});
+    } catch (e) {}
+
+    // Esperar 1.8 segundos a que WhatsApp Web renderice y desencripte la imagen en el DOM
+    await new Promise(r => setTimeout(r, 1800));
+
+    // 2. Extraer la foto HD renderizada en el DOM o en la memoria de la aplicación
+    try {
+      const resultBase64 = await pupPage.evaluate(async (sId) => {
+        try {
+          // Búsqueda 1: Blob URL en Store.Msg
+          if (window.Store && window.Store.Msg) {
+            const msgModels = window.Store.Msg.models || [];
+            const targetMsg = msgModels.find(m => m.id && (m.id._serialized === sId || m.id.id === sId));
+            const blobUrl = targetMsg?.mediaData?.renderableUrl || targetMsg?.mediaData?.fullUrl;
+            if (blobUrl) {
+              const res = await fetch(blobUrl);
+              const blob = await res.blob();
+              return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+              });
+            }
           }
 
-          // B) Fallback: Renderizar directamente desde el elemento <img> del DOM mediante HTML5 Canvas HD
-          const imgElements = Array.from(document.querySelectorAll('img'));
-          for (const img of imgElements) {
-            if (img.src && (img.src.startsWith('blob:') || img.src.startsWith('data:image/'))) {
-              const w = img.naturalWidth || img.width;
-              const h = img.naturalHeight || img.height;
+          // Búsqueda 2: Renderizado directo desde los elementos <img> en la vista del chat
+          const imgs = Array.from(document.querySelectorAll('img'));
+          for (const img of imgs) {
+            const src = img.src || '';
+            if (src.startsWith('blob:') || src.startsWith('data:image/')) {
+              const w = img.naturalWidth || img.width || 0;
+              const h = img.naturalHeight || img.height || 0;
+              // Si las dimensiones superan 200px, es la imagen HD completa y no la miniatura
               if (w > 200 && h > 200) {
                 const canvas = document.createElement('canvas');
                 canvas.width = w;
                 canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
-                const canvasDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-                if (canvasDataUrl.length > 10000) {
-                  return canvasDataUrl;
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                if (dataUrl.length > 15000) {
+                  return dataUrl;
                 }
               }
             }
           }
-        } catch (err) {}
+        } catch (e) {}
         return null;
-      }, remitente, msgSerialized).catch(() => null);
+      }, msgSerialized).catch(() => null);
 
-      if (hdBase64 && hdBase64.length > 8000) {
-        console.log(`📸 [HD ÉXITO CRISTALINO] Foto original capturada en Alta Definición HD (${hdBase64.length} bytes base64)`);
-        return hdBase64;
+      if (resultBase64 && resultBase64.length > 10000) {
+        console.log(`📸 [HD ÉXITO TOTAL] Foto capturada en Alta Definición HD (${resultBase64.length} bytes base64)`);
+        return resultBase64;
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
-  // 2. Método oficial downloadMedia() de whatsapp-web.js
+  // 3. Método oficial downloadMedia() de whatsapp-web.js
   try {
-    const media = await msg.downloadMedia().catch(() => null);
-    if (media && media.data && media.data.length > 8000) {
-      console.log(`📸 [HD WWebJS] Foto descargada mediante API oficial (${media.data.length} bytes)`);
+    const media = await msg.downloadMedia().catch(err => {
+      console.error('⚠️ downloadMedia err:', err?.message || err);
+      return null;
+    });
+    if (media && media.data && media.data.length > 10000) {
+      console.log(`📸 [HD API Oficial] Foto descargada (${media.data.length} bytes base64)`);
       return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
     }
   } catch (e) {}
 
-  // 3. Fallback de miniatura de protocolo (solo en caso extremo)
+  // 4. Respaldo final de miniatura (100px)
   if (msg._data && msg._data.body) {
     const rawBody = msg._data.body;
     if (typeof rawBody === 'string' && rawBody.length > 50) {
-      console.log('⚠️ [Miniatura] Se utilizó la miniatura de protocolo de 100px.');
+      console.log('⚠️ [Miniatura] Se utilizó la miniatura de protocolo de respaldo (100px).');
       if (rawBody.startsWith('data:image/')) return rawBody;
       if (/^[A-Za-z0-9+/=]+$/.test(rawBody.replace(/[\r\n]/g, ''))) {
         const mime = (msg._data.mimetype || msg.mimetype || 'image/jpeg');
