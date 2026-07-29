@@ -47,8 +47,8 @@ export class StateEngine {
         };
       }
 
-      // Si el bot está en silencio, actualizar la consulta con el nuevo mensaje del paciente (ej: "Si, perfecto!")
-      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje);
+      // Si el bot está en silencio, actualizar la consulta con el nuevo mensaje o nueva foto del paciente
+      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
 
       return {
         remitente,

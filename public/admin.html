@@ -800,19 +800,31 @@
               </div>
             ` : ''}
 
-            ${displayImg ? `
-              <div class="card-img-container" onclick="openLightbox('${displayImg}')" title="Clic para ampliar orden médica">
-                <img src="${displayImg}" class="card-img-preview" alt="Foto del pedido médico / carnet">
-                <div class="card-img-overlay">
-                  <span>🔍 Clic para ampliar</span>
-                  ${imgUrl ? `<a href="${imgUrl}" target="_blank" onclick="event.stopPropagation()" class="drive-link-btn">🔗 ${proveedor}</a>` : ''}
+            <!-- 📷 GALERÍA MULTI-FOTO DE PEDIDOS MÉDICOS ADJUNTOS -->
+            ${(() => {
+              const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+                ? datos.imagenesAdjuntas
+                : (displayImg ? [displayImg] : []);
+
+              if (listImagenes.length === 0 && !imgUrl) return '';
+
+              return `
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length || 1}):</span>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                    ${listImagenes.map((imgSrc, idx) => `
+                      <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
+                        <img src="${imgSrc}" class="card-img-preview" alt="Foto ${idx + 1}">
+                        <div class="card-img-overlay">
+                          <span>🔍 Foto ${idx + 1}</span>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  ${imgUrl ? `<a href="${imgUrl}" target="_blank" class="drive-link-btn">📷 Ver Enlace ${proveedor}</a>` : ''}
                 </div>
-              </div>
-            ` : (imgUrl ? `
-              <a href="${imgUrl}" target="_blank" class="drive-link-btn">
-                📷 Ver Foto Pedido / Carnet (${proveedor})
-              </a>
-            ` : '')}
+              `;
+            })()}
 
             <div class="reply-box">
               <label>💬 Escribir Respuesta al Paciente (Presioná Enter para Enviar):</label>

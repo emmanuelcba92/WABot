@@ -202,15 +202,25 @@ export class FirestoreService {
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
   }
 
-  public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string): Promise<void> {
+  public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string, imagenBase64?: string): Promise<void> {
     const consultas = await this.getConsultas();
     const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
       const respAnteriores = datos.respuestasPaciente || [];
+      
+      let imagenesAdjuntas = datos.imagenesAdjuntas || [];
+      if (datos.imagenBase64 && !imagenesAdjuntas.includes(datos.imagenBase64)) {
+        imagenesAdjuntas.unshift(datos.imagenBase64);
+      }
+      if (imagenBase64) {
+        imagenesAdjuntas.push(imagenBase64);
+      }
+      datos.imagenesAdjuntas = imagenesAdjuntas;
+
       const nuevaResp = {
-        texto: textoMensaje,
+        texto: textoMensaje || (imagenBase64 ? '📷 (Foto de pedido médico adjuntada)' : ''),
         timestamp: new Date().toISOString()
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
@@ -363,10 +373,6 @@ export class FirestoreService {
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?documentId=${consultaId}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-      const firestoreBody = {
-        fields: this.toFirestoreFields(payload)
-      };
-
       await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -38,7 +38,8 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ]
   }
 });
@@ -112,27 +113,59 @@ async function pollSecretaryOutgoingMessages() {
   }
 }
 
-// Extractor de Alta Resolución (Full HD) con reintentos para dar tiempo a la descarga completa de WhatsApp CDN
+// Extractor de Alta Resolución (Full HD) de fotos desde WhatsApp Web
 async function extractImageBase64(msg) {
-  // 1. Reintentar la descarga oficial en ALTA RESOLUCIÓN mediante whatsapp-web.js
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const media = await msg.downloadMedia();
-      if (media && media.data && media.data.length > 5000) {
-        console.log(`✅ [HD] Foto original recibida y desencriptada correctamente (${media.data.length} bytes base64)`);
-        return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
-      }
-    } catch (e) {
-      console.warn(`⏳ [HD] Intento ${attempt}/3 de descarga de foto en alta resolución en proceso...`);
-    }
-    await new Promise(r => setTimeout(r, 1000));
-  }
+  // Esperar 1.2 segundos para asegurar recepción completa de los paquetes multimedia de WhatsApp
+  await new Promise(r => setTimeout(r, 1200));
 
-  // 2. Fallback de miniatura ligera de protocolo si fallaron los reintentos HD
+  // 1. Descarga oficial Full HD de whatsapp-web.js
+  try {
+    const media = await msg.downloadMedia().catch(() => null);
+    if (media && media.data && media.data.length > 5000) {
+      console.log(`📸 [HD] Foto original en Alta Definición capturada (${media.data.length} bytes base64)`);
+      return `data:${media.mimetype || 'image/jpeg'};base64,${media.data}`;
+    }
+  } catch (e) {}
+
+  // 2. Extraer mediante evaluación de Blob en Puppeteer
+  try {
+    const msgIdSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
+    if (msgIdSerialized && client.pupPage) {
+      const fullBase64 = await client.pupPage.evaluate(async (serialized) => {
+        try {
+          const msgObj = window.Store.Msg.get(serialized);
+          if (!msgObj) return null;
+
+          if (window.Store.MediaDownload) {
+            await window.Store.MediaDownload.downloadMedia({ msg: msgObj, chat: msgObj.chat, type: 'manual' }).catch(() => {});
+          }
+
+          const blobUrl = msgObj.mediaData?.renderableUrl || msgObj.mediaData?.fullUrl;
+          if (blobUrl) {
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (err) {}
+        return null;
+      }, msgIdSerialized).catch(() => null);
+
+      if (fullBase64 && fullBase64.length > 5000) {
+        console.log(`📸 [HD Blob] Foto extraída en alta definición (${fullBase64.length} bytes)`);
+        return fullBase64;
+      }
+    }
+  } catch (e) {}
+
+  // 3. Fallback de miniatura ligera si el archivo HD aún se está descargando
   if (msg._data && msg._data.body) {
     const rawBody = msg._data.body;
     if (typeof rawBody === 'string' && rawBody.length > 50) {
-      console.log('⚠️ [Miniatura] Se utilizará la miniatura del protocolo como respaldo.');
       if (rawBody.startsWith('data:image/')) return rawBody;
       if (/^[A-Za-z0-9+/=]+$/.test(rawBody.replace(/[\r\n]/g, ''))) {
         const mime = (msg._data.mimetype || msg.mimetype || 'image/jpeg');
