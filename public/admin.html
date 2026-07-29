@@ -588,14 +588,14 @@
 
       <!-- NAVEGACIÓN POR SUB-PESTAÑAS DE CONFIGURACIÓN -->
       <div class="sub-nav-tabs">
-        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención</button>
+        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención & Mensajes Automáticos</button>
         <button class="sub-nav-btn" id="subTabTreeBtn" onclick="switchSettingsSubTab('tree')">📱 2. Constructor No-Code de Menú & Opciones</button>
         <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
         <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
         <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
       </div>
 
-      <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJE FUERA DE HORARIO -->
+      <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
       <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
         <h3 style="font-size: 1.1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
         <p style="font-size: 0.86rem; color: var(--muted);">Define si el bot responde automáticamente según el horario oficial de la clínica (Lun-Vie 8-20h) o si forzamos la atención abierta o cerrada.</p>
@@ -610,16 +610,25 @@
           🟢 Estado Actual: Cargando...
         </div>
 
+        <!-- EDITOR MENSAJE FUERA DE HORARIO -->
         <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px;">
           <h4 style="font-size: 1rem; color: #38bdf8;">🌙 Mensaje Automático de Fuera de Horario</h4>
           <p style="font-size: 0.84rem; color: var(--muted);">Este texto se le envía automáticamente al paciente cuando escribe fuera del horario de atención.</p>
 
-          <textarea id="cfgFueraDeHorario" style="min-height: 110px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de fuera de horario..."></textarea>
-
-          <button class="btn" style="align-self: flex-start; padding: 10px 20px; font-size: 0.9rem; margin-top: 4px;" onclick="saveFueraDeHorarioConfig()">
-            💾 Guardar Mensaje de Fuera de Horario
-          </button>
+          <textarea id="cfgFueraDeHorario" style="min-height: 100px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de fuera de horario..."></textarea>
         </div>
+
+        <!-- EDITOR MENSAJE DE FINALIZACIÓN / CIERRE -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px; display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 1rem; color: #34d399;">✅ Mensaje Automático de Finalización / Cierre de Atención</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Este mensaje le llega al paciente por WhatsApp cuando la secretaria hace clic en "Marcar Atendido / Finalizar Chat".</p>
+
+          <textarea id="cfgConfirmacionCierre" style="min-height: 110px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de cierre de atención..."></textarea>
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 8px;" onclick="saveScheduleMessagesConfig()">
+          💾 Guardar Mensajes de Horario y Cierre
+        </button>
       </div>
 
       <!-- SUB-SECCIÓN 2: NO-CODE MENU BUILDER & LIVE SIMULATOR -->
@@ -826,23 +835,29 @@
         const data = await res.json();
         const cfg = data.config || {};
         if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
+        if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
       } catch (e) {}
     }
 
-    async function saveFueraDeHorarioConfig() {
+    async function saveScheduleMessagesConfig() {
       try {
-        const val = document.getElementById('cfgFueraDeHorario').value;
+        const fuera = document.getElementById('cfgFueraDeHorario').value;
+        const cierre = document.getElementById('cfgConfirmacionCierre').value;
+
         const res = await fetch('/api/bot-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fueraDeHorario: val })
+          body: JSON.stringify({
+            fueraDeHorario: fuera,
+            confirmacionCierre: cierre
+          })
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ Mensaje de fuera de horario guardado exitosamente.');
+          alert('✅ Mensajes de horario y finalización guardados exitosamente.');
         }
       } catch (e) {
-        alert('Error al guardar mensaje de fuera de horario.');
+        alert('Error al guardar mensajes.');
       }
     }
 
@@ -1428,7 +1443,6 @@
       const container = document.getElementById('consultasGrid');
 
       // PROTECCIÓN 100% CONTRA PÉRDIDA DE FOCO AL ESCRIBIR:
-      // Si la secretaria está escribiendo en un textarea o input de una tarjeta, pausar la regeneración del DOM en segundo plano.
       if (!forceRedraw && document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) {
         return;
       }
