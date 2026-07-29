@@ -434,15 +434,49 @@
       color: #38bdf8;
     }
 
-    .settings-group textarea {
+    .settings-group textarea, .settings-group input, .settings-group select {
       background: #0f172a;
       border: 1px solid var(--border);
       color: var(--text);
       padding: 12px;
       border-radius: 10px;
       font-size: 0.9rem;
-      min-height: 90px;
       outline: none;
+    }
+
+    .tree-builder-card {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .whatsapp-preview-phone {
+      background: #0b141a;
+      border: 12px solid #1f2c34;
+      border-radius: 36px;
+      width: 100%;
+      max-width: 360px;
+      min-height: 480px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      position: sticky;
+      top: 20px;
+    }
+
+    .whatsapp-chat-bubble {
+      background: #202c33;
+      color: #e9edef;
+      padding: 12px;
+      border-radius: 8px 8px 8px 0;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
   </style>
 </head>
@@ -522,11 +556,12 @@
 
     </div>
 
-    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN DE BOT & HORARIOS -->
+    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN DE BOT & CONSTRUCTOR DE MENÚ NO-CODE -->
     <div id="viewSettings" class="settings-panel" style="display: none;">
 
-      <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--text);">⚙️ Configuración del Bot & Control de Horarios</h2>
+      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text);">⚙️ Configuración del Bot & Control de Horarios</h2>
 
+      <!-- HORARIO CONTROL -->
       <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
         <h3 style="font-size: 1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
         <p style="font-size: 0.84rem; color: var(--muted);">Define si el bot responde automáticamente según el horario de clínica (Lun-Vie 8-20h) o si forzamos la atención.</p>
@@ -542,43 +577,55 @@
         </div>
       </div>
 
-      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px;">
-        <h3 style="font-size: 1rem; color: #38bdf8;">✏️ Editor de Mensajes & Respuestas del Bot</h3>
-        <p style="font-size: 0.84rem; color: var(--muted);">Podes personalizar los mensajes automáticos que el bot le envía al paciente en WhatsApp.</p>
+      <!-- NO-CODE MENU BUILDER & LIVE SIMULATOR -->
+      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start;">
 
-        <div class="settings-group">
-          <label>👋 Mensaje de Bienvenida / Menú Principal:</label>
-          <textarea id="cfgSaludoBienvenida" placeholder="Cargando mensaje de bienvenida..."></textarea>
+        <!-- CONSTRUCTOR DE OPCIONES -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #00a884; font-weight: 700;">📱 Constructor No-Code de Menú & Opciones</h3>
+            <p style="font-size: 0.84rem; color: var(--muted);">Crea, edita o elimina cualquier letra (A, B, C, D, F...) o sub-opción del bot en tiempo real.</p>
+          </div>
+
+          <div class="settings-group">
+            <label>👋 Encabezado / Saludo de Bienvenida:</label>
+            <textarea id="menuWelcomeMsg" oninput="updateLivePreview()" placeholder="Ej: 🏥 ¡Hola! Bienvenido/a a la Clínica Médica..."></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px;">
+            <h4 style="font-size: 0.95rem; color: #f8fafc;">📋 Lista de Opciones del Menú Principal:</h4>
+            <button class="btn" style="padding: 6px 12px; font-size: 0.82rem;" onclick="addNewMenuOption()">➕ Agregar Nueva Opción</button>
+          </div>
+
+          <div id="menuItemsContainer" style="display: flex; flex-direction: column; gap: 14px;">
+            <!-- Opciones dinámicas generadas en JS -->
+          </div>
+
+          <button class="btn" style="align-self: flex-start; padding: 14px 28px; font-size: 1rem; margin-top: 10px;" onclick="saveMenuTree()">
+            💾 Guardar y Publicar Menú Completo
+          </button>
         </div>
 
-        <div class="settings-group">
-          <label>🌙 Mensaje de Fuera de Horario:</label>
-          <textarea id="cfgFueraDeHorario" placeholder="Cargando mensaje de fuera de horario..."></textarea>
+        <!-- SIMULADOR VIVO DE WHATSAPP -->
+        <div class="whatsapp-preview-phone">
+          <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 14px;">
+            <div style="width: 36px; height: 36px; background: #00a884; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🏥</div>
+            <div>
+              <div style="font-size: 0.9rem; font-weight: 700; color: #e9edef;">Clínica Médica Bot</div>
+              <div style="font-size: 0.7rem; color: #00a884;">en línea</div>
+            </div>
+          </div>
+
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;">
+            <div style="align-self: flex-end; background: #005c4b; color: #e9edef; padding: 8px 12px; border-radius: 8px 8px 0 8px; font-size: 0.82rem;">
+              Hola
+            </div>
+            <div class="whatsapp-chat-bubble" id="whatsappLiveBubble">
+              Cargando simulación...
+            </div>
+          </div>
         </div>
 
-        <div class="settings-group">
-          <label>📋 Plantilla Solicitud de Turno ORL:</label>
-          <textarea id="cfgPlantillaA1" placeholder="Cargando plantilla A1..."></textarea>
-        </div>
-
-        <div class="settings-group">
-          <label>📋 Plantilla Solicitud de Estudios Médicos:</label>
-          <textarea id="cfgPlantillaA2" placeholder="Cargando plantilla A2..."></textarea>
-        </div>
-
-        <div class="settings-group">
-          <label>📋 Plantilla Autorización de Estudios / Órdenes:</label>
-          <textarea id="cfgPlantillaB" placeholder="Cargando plantilla B..."></textarea>
-        </div>
-
-        <div class="settings-group">
-          <label>✅ Mensaje de Confirmación al Finalizar Chat:</label>
-          <textarea id="cfgConfirmacionCierre" placeholder="Cargando mensaje de cierre..."></textarea>
-        </div>
-
-        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem;" onclick="saveBotConfig()">
-          💾 Guardar Configuración de Mensajes
-        </button>
       </div>
 
     </div>
@@ -602,6 +649,11 @@
     let customPdfNames = {};
     let currentScheduleMode = 'auto';
 
+    let currentMenuTree = {
+      welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
+      items: []
+    };
+
     const TAG_DEFINITIONS = {
       'turno_confirmado': { label: '🟢 Turno Dado', color: '#059669', bg: 'rgba(5, 150, 105, 0.2)' },
       'falta_foto': { label: '🟡 Falta Foto', color: '#d97706', bg: 'rgba(217, 119, 6, 0.2)' },
@@ -619,7 +671,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
-      fetchBotConfig();
+      fetchMenuTree();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
       setInterval(fetchScheduleConfig, 10000);
@@ -694,43 +746,161 @@
       }
     }
 
-    async function fetchBotConfig() {
+    async function fetchMenuTree() {
       try {
-        const res = await fetch('/api/bot-config');
+        const res = await fetch('/api/menu-tree');
         if (!res.ok) return;
         const data = await res.json();
-        const cfg = data.config || {};
-        if (cfg.saludoBienvenida) document.getElementById('cfgSaludoBienvenida').value = cfg.saludoBienvenida;
-        if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
-        if (cfg.plantillaA1) document.getElementById('cfgPlantillaA1').value = cfg.plantillaA1;
-        if (cfg.plantillaA2) document.getElementById('cfgPlantillaA2').value = cfg.plantillaA2;
-        if (cfg.plantillaB) document.getElementById('cfgPlantillaB').value = cfg.plantillaB;
-        if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
+        if (data.tree && data.tree.items) {
+          currentMenuTree = data.tree;
+          renderMenuTreeEditor();
+        }
       } catch (e) {}
     }
 
-    async function saveBotConfig() {
-      try {
-        const payload = {
-          saludoBienvenida: document.getElementById('cfgSaludoBienvenida').value,
-          fueraDeHorario: document.getElementById('cfgFueraDeHorario').value,
-          plantillaA1: document.getElementById('cfgPlantillaA1').value,
-          plantillaA2: document.getElementById('cfgPlantillaA2').value,
-          plantillaB: document.getElementById('cfgPlantillaB').value,
-          confirmacionCierre: document.getElementById('cfgConfirmacionCierre').value
-        };
+    function renderMenuTreeEditor() {
+      document.getElementById('menuWelcomeMsg').value = currentMenuTree.welcomeMessage || '';
+      const container = document.getElementById('menuItemsContainer');
 
-        const res = await fetch('/api/bot-config', {
+      if (!currentMenuTree.items || currentMenuTree.items.length === 0) {
+        container.innerHTML = '<div style="color: var(--muted); padding: 10px;">No hay opciones configuradas. Haz clic en "Agregar Nueva Opción".</div>';
+        updateLivePreview();
+        return;
+      }
+
+      let html = '';
+      currentMenuTree.items.forEach((item, index) => {
+        html += `
+          <div class="tree-builder-card">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${item.key.toUpperCase()}" onchange="updateItemKey(${index}, this.value)" style="width: 50px; text-align: center; font-weight: 700; color: #00a884; font-size: 1rem;">
+              <input type="text" value="${item.label}" onchange="updateItemLabel(${index}, this.value)" placeholder="Título de la opción..." style="flex: 1; font-weight: 600;">
+              <select onchange="updateItemType(${index}, this.value)" style="width: 140px;">
+                <option value="form" ${item.type === 'form' ? 'selected' : ''}>Formulario</option>
+                <option value="submenu" ${item.type === 'submenu' ? 'selected' : ''}>Sub-Menú</option>
+                <option value="info" ${item.type === 'info' ? 'selected' : ''}>Info Directa</option>
+              </select>
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeMenuOption(${index})">🗑️</button>
+            </div>
+
+            ${item.type !== 'submenu' ? `
+              <div style="margin-top: 4px;">
+                <label style="font-size: 0.78rem; color: var(--muted); font-weight: 600;">Respuesta / Plantilla para el paciente:</label>
+                <textarea onchange="updateItemTemplate(${index}, this.value)" style="width: 100%; min-height: 60px; margin-top: 4px; font-size: 0.82rem;">${item.responseTemplate || ''}</textarea>
+              </div>
+            ` : `
+              <div style="background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--border); padding: 10px; border-radius: 8px; margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Sub-Opciones de (${item.key.toUpperCase()}):</span>
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="addSubOption(${index})">➕ Agregar Sub-Opción</button>
+                </div>
+                ${(item.subItems || []).map((sub, sIdx) => `
+                  <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center;">
+                    <input type="text" value="${sub.key}" onchange="updateSubKey(${index}, ${sIdx}, this.value)" style="width: 40px; text-align: center; font-size: 0.8rem;">
+                    <input type="text" value="${sub.label}" onchange="updateSubLabel(${index}, ${sIdx}, this.value)" placeholder="Título sub-opción..." style="flex: 1; font-size: 0.8rem;">
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem;" onclick="removeSubOption(${index}, ${sIdx})">✕</button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      updateLivePreview();
+    }
+
+    function updateLivePreview() {
+      const welcome = document.getElementById('menuWelcomeMsg').value || '';
+      let text = welcome + '\n\n';
+      (currentMenuTree.items || []).forEach(item => {
+        text += `*${item.key.toUpperCase()})* ${item.label}\n`;
+      });
+      document.getElementById('whatsappLiveBubble').innerText = text.trim();
+    }
+
+    function addNewMenuOption() {
+      const nextChar = String.fromCharCode(65 + (currentMenuTree.items ? currentMenuTree.items.length : 0));
+      currentMenuTree.items.push({
+        key: nextChar.toLowerCase(),
+        label: `Nueva Opción ${nextChar}`,
+        type: 'form',
+        responseTemplate: 'Por favor responde con tus datos.'
+      });
+      renderMenuTreeEditor();
+    }
+
+    function removeMenuOption(index) {
+      currentMenuTree.items.splice(index, 1);
+      renderMenuTreeEditor();
+    }
+
+    function updateItemKey(index, val) {
+      currentMenuTree.items[index].key = val.toLowerCase().trim();
+      renderMenuTreeEditor();
+    }
+
+    function updateItemLabel(index, val) {
+      currentMenuTree.items[index].label = val.trim();
+      updateLivePreview();
+    }
+
+    function updateItemType(index, val) {
+      currentMenuTree.items[index].type = val;
+      if (val === 'submenu' && !currentMenuTree.items[index].subItems) {
+        currentMenuTree.items[index].subItems = [
+          { key: '1', label: 'Opción 1', type: 'form', responseTemplate: 'Ingresa los datos para la opción 1.' }
+        ];
+      }
+      renderMenuTreeEditor();
+    }
+
+    function updateItemTemplate(index, val) {
+      currentMenuTree.items[index].responseTemplate = val;
+    }
+
+    function addSubOption(parentIndex) {
+      if (!currentMenuTree.items[parentIndex].subItems) {
+        currentMenuTree.items[parentIndex].subItems = [];
+      }
+      const nextNum = (currentMenuTree.items[parentIndex].subItems.length + 1).toString();
+      currentMenuTree.items[parentIndex].subItems.push({
+        key: nextNum,
+        label: `Sub-Opción ${nextNum}`,
+        type: 'form',
+        responseTemplate: 'Por favor ingresa los datos solicitados.'
+      });
+      renderMenuTreeEditor();
+    }
+
+    function removeSubOption(parentIndex, subIndex) {
+      currentMenuTree.items[parentIndex].subItems.splice(subIndex, 1);
+      renderMenuTreeEditor();
+    }
+
+    function updateSubKey(parentIndex, subIndex, val) {
+      currentMenuTree.items[parentIndex].subItems[subIndex].key = val.trim();
+    }
+
+    function updateSubLabel(parentIndex, subIndex, val) {
+      currentMenuTree.items[parentIndex].subItems[subIndex].label = val.trim();
+    }
+
+    async function saveMenuTree() {
+      try {
+        currentMenuTree.welcomeMessage = document.getElementById('menuWelcomeMsg').value;
+        const res = await fetch('/api/menu-tree', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ tree: currentMenuTree })
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ Configuración de mensajes guardada exitosamente.');
+          alert('✅ ¡Árbol de Menú y Opciones guardado y publicado exitosamente en WhatsApp!');
         }
       } catch (e) {
-        alert('Error al guardar configuración de mensajes.');
+        alert('Error al guardar el menú del bot.');
       }
     }
 
@@ -871,7 +1041,6 @@
         const fecha = new Date(c.timestamp || c.createdAt).toLocaleString();
         const displayImg = datos.imagenBase64 || datos.imagenUrl;
         const imgUrl = datos.imagenUrl;
-        const proveedor = datos.proveedorAlmacenamiento || 'Directo';
 
         const draftValue = draftResponses[c.id] || '';
         const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
@@ -1005,7 +1174,6 @@
 
       container.innerHTML = html;
 
-      // Re-vincular atajo Enter a los textareas
       filtered.forEach(c => {
         const ta = document.getElementById(`replyText_${c.id}`);
         if (ta) {

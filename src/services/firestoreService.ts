@@ -1,6 +1,7 @@
-import { Env, StateType, UserSession, ChatMessage } from '../types';
+import { Env, StateType, UserSession, ChatMessage, MenuTreeConfig, MenuItemOption } from '../types';
 import { CONFIG } from '../config';
 import { ScheduleMode } from './scheduleService';
+import { MESSAGES } from '../templates/messages';
 
 export interface PendingOutgoingMsg {
   id: string;
@@ -21,6 +22,27 @@ export interface BotConfigMessages {
   confirmacionCierre?: string;
 }
 
+export const DEFAULT_MENU_TREE: MenuTreeConfig = {
+  welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*
+Por favor, responde con la letra de la opción que necesitas:`,
+  items: [
+    {
+      key: 'a',
+      label: 'Solicitar Turno (Consultas, Estudios o Cirugías)',
+      type: 'submenu',
+      subItems: [
+        { key: '1', label: 'Médico ORL (Otorrinolaringología)', type: 'form', responseTemplate: MESSAGES.PLANTILLA_A1_ORL },
+        { key: '2', label: 'Estudios Médicos', type: 'form', responseTemplate: MESSAGES.PLANTILLA_A2_ESTUDIOS },
+        { key: '3', label: 'Cirugías', type: 'form', responseTemplate: MESSAGES.PLANTILLA_A3_CIRUGIAS }
+      ]
+    },
+    { key: 'b', label: 'Autorización de Estudios / Órdenes Médicas', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_B },
+    { key: 'c', label: 'Consultas Generales / Ayuda', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_C },
+    { key: 'd', label: 'Atenciones Afiliados PAMI', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_D },
+    { key: 'e', label: 'Reprogramación o Cancelación de Turno', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_E }
+  ]
+};
+
 export class FirestoreService {
   private projectId: string;
   private apiKey?: string;
@@ -30,6 +52,7 @@ export class FirestoreService {
   private static pendingOutgoingMemory: PendingOutgoingMsg[] = [];
   private static globalScheduleMode: ScheduleMode = 'auto';
   private static globalBotConfig: BotConfigMessages = {};
+  private static globalMenuTree: MenuTreeConfig | null = null;
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -112,6 +135,45 @@ export class FirestoreService {
       });
     } catch (e) {
       console.error('Error al guardar scheduleMode en Firestore:', e);
+    }
+  }
+
+  public async getMenuTree(): Promise<MenuTreeConfig> {
+    if (FirestoreService.globalMenuTree) return FirestoreService.globalMenuTree;
+    if (!this.projectId) return DEFAULT_MENU_TREE;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/bot_menu_tree${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          const config = fields as unknown as MenuTreeConfig;
+          FirestoreService.globalMenuTree = config;
+          return config;
+        }
+      }
+    } catch (e) {}
+
+    return DEFAULT_MENU_TREE;
+  }
+
+  public async saveMenuTree(tree: MenuTreeConfig): Promise<void> {
+    FirestoreService.globalMenuTree = tree;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/bot_menu_tree${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ ...tree, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar bot_menu_tree en Firestore:', e);
     }
   }
 
@@ -208,7 +270,7 @@ export class FirestoreService {
     }
   }
 
-  public async saveSesion(remitente: string, estado: StateType, datosTemporales: Record<string, any> = {}, historialMensajes: ChatMessage[] = []): Promise<void> {
+  public async saveSesion(remitente: string, estado: StateType | string, datosTemporales: Record<string, any> = {}, historialMensajes: ChatMessage[] = []): Promise<void> {
     const docId = encodeURIComponent(remitente.trim());
     const updatedAt = new Date().toISOString();
 
@@ -217,7 +279,7 @@ export class FirestoreService {
 
     const sesionData: UserSession = {
       remitente,
-      estado,
+      estado: estado as StateType,
       datosTemporales,
       historialMensajes: historialFinal,
       updatedAt

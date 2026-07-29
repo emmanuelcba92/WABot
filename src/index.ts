@@ -53,6 +53,27 @@ app.post('/api/schedule-config', async (c) => {
   }
 });
 
+app.get('/api/menu-tree', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const tree = await firestore.getMenuTree();
+  return c.json({ tree });
+});
+
+app.post('/api/menu-tree', async (c) => {
+  try {
+    const body = await c.req.json();
+    const tree = body.tree || body;
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveMenuTree(tree);
+    return c.json({
+      success: true,
+      mensaje: 'Árbol de menú y opciones actualizado exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar el árbol de menú', details: e?.message }, 500);
+  }
+});
+
 app.get('/api/bot-config', async (c) => {
   const firestore = new FirestoreService(c.env);
   const config = await firestore.getBotConfig();

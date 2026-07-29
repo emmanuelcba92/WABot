@@ -33,7 +33,7 @@ export interface ChatMessage {
 
 export interface UserSession {
   remitente: string;
-  estado: StateType;
+  estado: StateType | string;
   datosTemporales?: Record<string, any>;
   historialMensajes?: ChatMessage[];
   updatedAt: string;
@@ -83,8 +83,21 @@ export interface WebhookResponse {
   remitente: string;
   respuesta: string;
   interactive?: InteractiveMessage;
-  estadoActual: StateType;
+  estadoActual: StateType | string;
   enHorario: boolean;
   timestamp: string;
   imagenSubidaUrl?: string;
+}
+
+export interface MenuItemOption {
+  key: string;           // ej: 'a', 'b', '1', '2'
+  label: string;         // ej: 'Solicitud de Turnos'
+  type: 'submenu' | 'form' | 'info';
+  responseTemplate?: string;
+  subItems?: MenuItemOption[];
+}
+
+export interface MenuTreeConfig {
+  welcomeMessage: string;
+  items: MenuItemOption[];
 }

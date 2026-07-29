@@ -1,10 +1,21 @@
-import { WebhookPayload, WebhookResponse, StateType, UserSession, Env } from '../types';
+import { WebhookPayload, WebhookResponse, StateType, UserSession, Env, MenuTreeConfig, MenuItemOption } from '../types';
 import { MESSAGES } from '../templates/messages';
 import { FirestoreService } from '../services/firestoreService';
 import { ScheduleService } from '../services/scheduleService';
 import { ImageUploadService } from '../services/imageUploadService';
 
 export class StateEngine {
+  public static buildWelcomeMenu(tree: MenuTreeConfig): string {
+    let msg = tree.welcomeMessage || '🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:';
+    msg += '\n\n';
+    if (tree.items && Array.isArray(tree.items)) {
+      tree.items.forEach(item => {
+        msg += `*${item.key.toUpperCase()})* ${item.label}\n`;
+      });
+    }
+    return msg.trim();
+  }
+
   public static async processMessage(payload: WebhookPayload, env?: Env): Promise<WebhookResponse> {
     const remitente = payload.remitente.trim();
     const mensaje = payload.mensaje.trim();
@@ -15,12 +26,10 @@ export class StateEngine {
 
     const firestore = new FirestoreService(env);
     const botConfig = await firestore.getBotConfig();
+    const menuTree = await firestore.getMenuTree();
 
-    const saludoBienvenidaMsg = botConfig.saludoBienvenida || MESSAGES.SALUDO_BIENVENIDA;
+    const saludoBienvenidaMsg = this.buildWelcomeMenu(menuTree);
     const fueraDeHorarioMsg = botConfig.fueraDeHorario || MESSAGES.FUERA_DE_HORARIO;
-    const plantillaA1Msg = botConfig.plantillaA1 || MESSAGES.PLANTILLA_A1_ORL;
-    const plantillaA2Msg = botConfig.plantillaA2 || MESSAGES.PLANTILLA_A2_ESTUDIOS;
-    const plantillaBMsg = botConfig.plantillaB || MESSAGES.PLANTILLA_OPCION_B;
 
     // 1. Control de Horario (Persistido en Firestore)
     const scheduleMode = await firestore.getScheduleMode();
@@ -79,122 +88,95 @@ export class StateEngine {
       };
     }
 
-    // 5. Máquina de estados
-    switch (sesion.estado) {
+    // 5. EVALUACIÓN DINÁMICA DE OPCIONES CONFIGURADAS POR EL ADMIN
+    if (sesion.estado === 'esperando_opcion_principal') {
+      const input = msgClean.replace(/[^a-z0-9]/g, '');
 
-      case 'esperando_opcion_principal': {
-        const input = msgClean.replace(/[^a-z0-9]/g, '');
+      // Buscar si coincide con alguna opción principal (A, B, C, D, E, F...)
+      const itemMatch = (menuTree.items || []).find(item => item.key.toLowerCase() === input);
 
-        if (input === 'a' || input === '1' || input.includes('turno') || input.includes('solicitar')) {
-          await firestore.saveSesion(remitente, 'esperando_opcion_a_sub');
+      if (itemMatch) {
+        if (itemMatch.type === 'info') {
+          await firestore.saveSesion(remitente, 'esperando_atencion_humana');
           return {
             remitente,
-            respuesta: MESSAGES.SUBMENU_OPCION_A,
-            estadoActual: 'esperando_opcion_a_sub',
+            respuesta: itemMatch.responseTemplate || 'Gracias por comunicarte con nosotros.',
+            estadoActual: 'esperando_atencion_humana',
             enHorario: true,
             timestamp
           };
-        } else if (input === 'b' || input === '2' || input.includes('autoriz')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_opcion_b');
+        } else if (itemMatch.type === 'submenu' && itemMatch.subItems && itemMatch.subItems.length > 0) {
+          await firestore.saveSesion(remitente, `esperando_sub_${itemMatch.key}`);
+          let subMsg = `📋 *${itemMatch.label}*\nPor favor responde con el número de la opción elegida:\n\n`;
+          itemMatch.subItems.forEach(sub => {
+            subMsg += `*${sub.key})* ${sub.label}\n`;
+          });
           return {
             remitente,
-            respuesta: plantillaBMsg,
-            estadoActual: 'esperando_datos_opcion_b',
-            enHorario: true,
-            timestamp
-          };
-        } else if (input === 'c' || input === '3' || input.includes('consulta') || input.includes('ayuda')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_opcion_c');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_OPCION_C,
-            estadoActual: 'esperando_datos_opcion_c',
-            enHorario: true,
-            timestamp
-          };
-        } else if (input === 'd' || input === '4' || input.includes('pami')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_opcion_d');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_OPCION_D,
-            estadoActual: 'esperando_datos_opcion_d',
-            enHorario: true,
-            timestamp
-          };
-        } else if (input === 'e' || input === '5' || input.includes('reprogram') || input.includes('cancel')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_opcion_e');
-          return {
-            remitente,
-            respuesta: MESSAGES.PLANTILLA_OPCION_E,
-            estadoActual: 'esperando_datos_opcion_e',
+            respuesta: subMsg.trim(),
+            estadoActual: `esperando_sub_${itemMatch.key}`,
             enHorario: true,
             timestamp
           };
         } else {
+          await firestore.saveSesion(remitente, `esperando_datos_${itemMatch.key}`);
           return {
             remitente,
-            respuesta: saludoBienvenidaMsg,
-            estadoActual: 'esperando_opcion_principal',
+            respuesta: itemMatch.responseTemplate || MESSAGES.PLANTILLA_OPCION_B,
+            estadoActual: `esperando_datos_${itemMatch.key}`,
             enHorario: true,
             timestamp
           };
         }
       }
 
-      case 'esperando_opcion_a_sub': {
+      // Si no coincide con ninguna opción, repetir menú principal
+      return {
+        remitente,
+        respuesta: saludoBienvenidaMsg,
+        estadoActual: 'esperando_opcion_principal',
+        enHorario: true,
+        timestamp
+      };
+    }
+
+    // 6. EVALUACIÓN DINÁMICA DE SUB-MENÚS (ej: 'esperando_sub_a')
+    if (typeof sesion.estado === 'string' && sesion.estado.startsWith('esperando_sub_')) {
+      const parentKey = sesion.estado.replace('esperando_sub_', '');
+      const parentMatch = (menuTree.items || []).find(item => item.key.toLowerCase() === parentKey.toLowerCase());
+
+      if (parentMatch && parentMatch.subItems) {
         const subInput = msgClean.replace(/[^a-z0-9]/g, '');
-        if (subInput === '1' || subInput.includes('orl') || subInput.includes('medico')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_a1');
-          return { remitente, respuesta: plantillaA1Msg, estadoActual: 'esperando_datos_a1', enHorario: true, timestamp };
-        } else if (subInput === '2' || subInput.includes('estudio')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_a2');
-          return { remitente, respuesta: plantillaA2Msg, estadoActual: 'esperando_datos_a2', enHorario: true, timestamp };
-        } else if (subInput === '3' || subInput.includes('cirugia')) {
-          await firestore.saveSesion(remitente, 'esperando_datos_a3');
-          return { remitente, respuesta: MESSAGES.PLANTILLA_A3_CIRUGIAS, estadoActual: 'esperando_datos_a3', enHorario: true, timestamp };
-        } else {
+        const subMatch = parentMatch.subItems.find(sub => sub.key.toLowerCase() === subInput);
+
+        if (subMatch) {
+          await firestore.saveSesion(remitente, `esperando_datos_${parentMatch.key}_${subMatch.key}`);
           return {
             remitente,
-            respuesta: MESSAGES.SUBMENU_OPCION_A,
-            estadoActual: 'esperando_opcion_a_sub',
+            respuesta: subMatch.responseTemplate || MESSAGES.PLANTILLA_A1_ORL,
+            estadoActual: `esperando_datos_${parentMatch.key}_${subMatch.key}`,
             enHorario: true,
             timestamp
           };
         }
-      }
-
-      case 'esperando_datos_a1':
-      case 'esperando_datos_a2':
-      case 'esperando_datos_a3':
-      case 'esperando_datos_opcion_b':
-      case 'esperando_datos_opcion_c':
-      case 'esperando_datos_opcion_d':
-      case 'esperando_datos_opcion_e': {
-        const opcionMap: Record<string, string> = {
-          esperando_datos_a1: 'A1_Turno_ORL_9Datos',
-          esperando_datos_a2: 'A2_Turno_Estudios_7Datos_Foto',
-          esperando_datos_a3: 'A3_Turno_Cirugias_6Datos_Foto',
-          esperando_datos_opcion_b: 'B_Autorizacion_Estudios_Ordenes',
-          esperando_datos_opcion_c: 'C_Consultas_Generales_Ayuda',
-          esperando_datos_opcion_d: 'D_Afiliados_PAMI_3Datos',
-          esperando_datos_opcion_e: 'E_Reprogramacion_Cancelacion'
-        };
-
-        const opcionElegida = opcionMap[sesion.estado] || 'A1_Turno_ORL_9Datos';
-        return await this.guardarConsultaFinal(remitente, opcionElegida, mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
-      }
-
-      default: {
-        await firestore.saveSesion(remitente, 'esperando_opcion_principal');
-        return {
-          remitente,
-          respuesta: saludoBienvenidaMsg,
-          estadoActual: 'esperando_opcion_principal',
-          enHorario: true,
-          timestamp
-        };
       }
     }
+
+    // 7. RECEPCIÓN DE DATOS / FOTOS FINAL DE LA SOLICITUD
+    if (typeof sesion.estado === 'string' && (sesion.estado.startsWith('esperando_datos_') || sesion.estado.startsWith('esperando_datos'))) {
+      const opcionElegida = sesion.estado.replace('esperando_datos_', '').toUpperCase();
+      return await this.guardarConsultaFinal(remitente, opcionElegida, mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
+    }
+
+    // Fallback al menú principal
+    await firestore.saveSesion(remitente, 'esperando_opcion_principal');
+    return {
+      remitente,
+      respuesta: saludoBienvenidaMsg,
+      estadoActual: 'esperando_opcion_principal',
+      enHorario: true,
+      timestamp
+    };
   }
 
   private static async guardarConsultaFinal(
@@ -207,25 +189,22 @@ export class StateEngine {
     timestamp: string,
     firestore: FirestoreService
   ): Promise<WebhookResponse> {
-    // Verificar si el paciente ya tiene una consulta activa sin atender
     const consultasExistentes = await firestore.getConsultas();
     const consultaActiva = consultasExistentes.find(c => c.remitente === remitente && c.estado === 'pendiente');
 
     if (consultaActiva) {
-      // Adjuntar fotos/mensajes adicionales a la misma tarjeta existente
       await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
       await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
       return {
         remitente,
-        respuesta: '', // Silencio para no enviar confirmaciones duplicadas por cada foto
+        respuesta: '', // Silencio para no enviar confirmaciones duplicadas
         estadoActual: 'esperando_atencion_humana',
         enHorario: true,
         timestamp
       };
     }
 
-    // Si no existía consulta activa, crear la tarjeta única
     let imagenSubidaUrl: string | undefined;
     let proveedorAlmacenamiento: string | undefined;
 
