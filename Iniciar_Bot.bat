@@ -6,5 +6,5 @@ echo   INICIANDO CONECTOR DE WHATSAPP WEB - CLÍNICA MÉDICA
 echo ============================================================
 echo.
 cd /d "%~dp0gateway"
-npm start
+call npm.cmd start
 pause
