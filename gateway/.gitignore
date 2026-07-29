@@ -1,10 +1,7 @@
 node_modules
-.wrangler
-dist
 .env
 *.log
 .wwebjs_auth
 .wwebjs_cache
 baileys_auth
-gateway/baileys_auth
 package-lock.json
