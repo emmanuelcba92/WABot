@@ -638,6 +638,34 @@
     <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
   </div>
 
+  <!-- MODAL PARA EDITAR PLANTILLA DE SUB-OPCIÓN (ELEGANTE POPUP DENTRO DE LA PÁGINA) -->
+  <div id="subOptionModal" class="lightbox-modal" style="display: none;" onclick="closeSubOptionModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;" id="subModalTitle">✏️ Configurar Plantilla de Sub-Opción</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeSubOptionModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>Comportamiento de esta Sub-Opción:</label>
+        <select id="subModalType" onchange="handleSubModalTypeChange(this.value)">
+          <option value="form">📋 Formulario de Datos (Paciente debe enviar información/foto)</option>
+          <option value="info">💬 Respuesta Informativa Directa (Mensaje automático inmediato)</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Texto / Plantilla enviada al paciente:</label>
+        <textarea id="subModalTemplate" style="min-height: 130px; font-size: 0.9rem;" placeholder="Escribe aquí las instrucciones o plantilla que recibirá el paciente al elegir esta sub-opción..."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeSubOptionModal()">Cancelar</button>
+        <button class="btn" onclick="saveSubOptionModal()">✅ Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allConsultas = [];
     let currentFilter = 'pendiente';
@@ -648,6 +676,8 @@
     let customPdfBase64 = {};
     let customPdfNames = {};
     let currentScheduleMode = 'auto';
+
+    let activeSubEdit = { parentIndex: -1, subIndex: -1 };
 
     let currentMenuTree = {
       welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
@@ -798,6 +828,7 @@
                   <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center;">
                     <input type="text" value="${sub.key}" onchange="updateSubKey(${index}, ${sIdx}, this.value)" style="width: 40px; text-align: center; font-size: 0.8rem;">
                     <input type="text" value="${sub.label}" onchange="updateSubLabel(${index}, ${sIdx}, this.value)" placeholder="Título sub-opción..." style="flex: 1; font-size: 0.8rem;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.76rem;" onclick="openSubOptionModal(${index}, ${sIdx})" title="Editar la respuesta de esta sub-opción">✏️ Configurar Texto</button>
                     <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem;" onclick="removeSubOption(${index}, ${sIdx})">✕</button>
                   </div>
                 `).join('')}
@@ -810,6 +841,34 @@
       container.innerHTML = html;
       updateLivePreview();
     }
+
+    function openSubOptionModal(parentIndex, subIndex) {
+      activeSubEdit = { parentIndex, subIndex };
+      const sub = currentMenuTree.items[parentIndex].subItems[subIndex];
+
+      document.getElementById('subModalTitle').innerText = `✏️ Configurar Sub-Opción (${sub.key}) - ${sub.label}`;
+      document.getElementById('subModalType').value = sub.type || 'form';
+      document.getElementById('subModalTemplate').value = sub.responseTemplate || '';
+
+      document.getElementById('subOptionModal').style.display = 'flex';
+    }
+
+    function closeSubOptionModal() {
+      document.getElementById('subOptionModal').style.display = 'none';
+    }
+
+    function saveSubOptionModal() {
+      const { parentIndex, subIndex } = activeSubEdit;
+      if (parentIndex >= 0 && subIndex >= 0) {
+        const sub = currentMenuTree.items[parentIndex].subItems[subIndex];
+        sub.type = document.getElementById('subModalType').value;
+        sub.responseTemplate = document.getElementById('subModalTemplate').value;
+      }
+      closeSubOptionModal();
+      alert('✅ Plantilla de la sub-opción actualizada temporalmente. Haz clic en "Guardar y Publicar Menú Completo" para aplicar.');
+    }
+
+    function handleSubModalTypeChange(val) {}
 
     function updateLivePreview() {
       const welcome = document.getElementById('menuWelcomeMsg').value || '';
