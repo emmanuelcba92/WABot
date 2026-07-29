@@ -22,9 +22,22 @@ export interface BotConfigMessages {
   confirmacionCierre?: string;
 }
 
+export interface TagDefinition {
+  key: string;
+  label: string;
+  color: string;
+}
+
+export const DEFAULT_TAGS: Record<string, TagDefinition> = {
+  'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
+  'falta_foto': { key: 'falta_foto', label: '🟡 Falta Foto', color: '#d97706' },
+  'urgente': { key: 'urgente', label: '🔴 Urgente', color: '#dc2626' },
+  'pami': { key: 'pami', label: '🟣 PAMI', color: '#7c3aed' },
+  'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
+};
+
 export const DEFAULT_MENU_TREE: MenuTreeConfig = {
-  welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*
-Por favor, responde con la letra de la opción que necesitas:`,
+  welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
   items: [
     {
       key: 'a',
@@ -53,6 +66,7 @@ export class FirestoreService {
   private static globalScheduleMode: ScheduleMode = 'auto';
   private static globalBotConfig: BotConfigMessages = {};
   private static globalMenuTree: MenuTreeConfig | null = null;
+  private static globalTags: Record<string, TagDefinition> | null = null;
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -99,6 +113,44 @@ export class FirestoreService {
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
+  }
+
+  public async getTagConfig(): Promise<Record<string, TagDefinition>> {
+    if (FirestoreService.globalTags) return FirestoreService.globalTags;
+    if (!this.projectId) return DEFAULT_TAGS;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/tag_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.tags) {
+          FirestoreService.globalTags = fields.tags as Record<string, TagDefinition>;
+          return fields.tags as Record<string, TagDefinition>;
+        }
+      }
+    } catch (e) {}
+
+    return DEFAULT_TAGS;
+  }
+
+  public async saveTagConfig(tags: Record<string, TagDefinition>): Promise<void> {
+    FirestoreService.globalTags = tags;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/tag_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ tags, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar tag_config en Firestore:', e);
+    }
   }
 
   public async getScheduleMode(): Promise<ScheduleMode> {

@@ -53,6 +53,27 @@ app.post('/api/schedule-config', async (c) => {
   }
 });
 
+app.get('/api/tag-config', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const tags = await firestore.getTagConfig();
+  return c.json({ tags });
+});
+
+app.post('/api/tag-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const tags = body.tags || body;
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveTagConfig(tags);
+    return c.json({
+      success: true,
+      mensaje: 'Configuración de etiquetas y colores actualizada exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar etiquetas', details: e?.message }, 500);
+  }
+});
+
 app.get('/api/menu-tree', async (c) => {
   const firestore = new FirestoreService(c.env);
   const tree = await firestore.getMenuTree();

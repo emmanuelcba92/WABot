@@ -86,6 +86,34 @@
       color: #fff;
     }
 
+    .sub-nav-tabs {
+      display: flex;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      width: fit-content;
+    }
+
+    .sub-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sub-nav-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
     .container {
       max-width: 1400px;
       width: 100%;
@@ -542,12 +570,9 @@
         <button class="tab-btn" id="filterTodos" onclick="setFilter('todos', this)">📋 Ver Todas</button>
 
         <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700; margin-left: 12px;">Etiquetas:</span>
-        <button class="tag-filter-chip active" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>
-        <button class="tag-filter-chip" style="color: #34d399;" onclick="setTagFilter('turno_confirmado', this)">🟢 Turno Dado</button>
-        <button class="tag-filter-chip" style="color: #fbbf24;" onclick="setTagFilter('falta_foto', this)">🟡 Falta Foto</button>
-        <button class="tag-filter-chip" style="color: #f87171;" onclick="setTagFilter('urgente', this)">🔴 Urgente</button>
-        <button class="tag-filter-chip" style="color: #c084fc;" onclick="setTagFilter('pami', this)">🟣 PAMI</button>
-        <button class="tag-filter-chip" style="color: #60a5fa;" onclick="setTagFilter('en_revision', this)">🔵 En Revisión</button>
+        <div id="topTagFiltersContainer" style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="tag-filter-chip active" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>
+        </div>
       </div>
 
       <div class="consultas-grid" id="consultasGrid" style="margin-top: 16px;">
@@ -556,29 +581,36 @@
 
     </div>
 
-    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN DE BOT & CONSTRUCTOR DE MENÚ NO-CODE -->
+    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN CON SUB-MENÚS MODULARES -->
     <div id="viewSettings" class="settings-panel" style="display: none;">
 
-      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text);">⚙️ Configuración del Bot & Control de Horarios</h2>
+      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text);">⚙️ Centro de Configuración</h2>
 
-      <!-- HORARIO CONTROL -->
-      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
-        <h3 style="font-size: 1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
-        <p style="font-size: 0.84rem; color: var(--muted);">Define si el bot responde automáticamente según el horario de clínica (Lun-Vie 8-20h) o si forzamos la atención.</p>
+      <!-- NAVEGACIÓN POR SUB-PESTAÑAS DE CONFIGURACIÓN -->
+      <div class="sub-nav-tabs">
+        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención</button>
+        <button class="sub-nav-btn" id="subTabTreeBtn" onclick="switchSettingsSubTab('tree')">📱 2. Constructor No-Code de Menú & Opciones</button>
+        <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
+      </div>
 
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <!-- SUB-SECCIÓN 1: HORARIO CONTROL -->
+      <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+        <h3 style="font-size: 1.1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
+        <p style="font-size: 0.86rem; color: var(--muted);">Define si el bot responde automáticamente según el horario oficial de la clínica (Lun-Vie 8-20h) o si forzamos la atención abierta o cerrada.</p>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px;">
           <button class="btn btn-secondary" id="schedAuto" onclick="setScheduleMode('auto')">⏰ Automático (8-20h)</button>
           <button class="btn btn-secondary" id="schedOpen" onclick="setScheduleMode('always_open')">🟢 Forzar Abierto (24/7)</button>
           <button class="btn btn-secondary" id="schedClosed" onclick="setScheduleMode('always_closed')">🌙 Forzar Cerrado</button>
         </div>
 
-        <div id="settingsScheduleBadge" style="font-size: 0.85rem; font-weight: 700; color: #34d399; margin-top: 4px;">
+        <div id="settingsScheduleBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399; margin-top: 8px;">
           🟢 Estado Actual: Cargando...
         </div>
       </div>
 
-      <!-- NO-CODE MENU BUILDER & LIVE SIMULATOR -->
-      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start;">
+      <!-- SUB-SECCIÓN 2: NO-CODE MENU BUILDER & LIVE SIMULATOR -->
+      <div id="subSettingsTree" style="display: none; grid-template-columns: 1fr 380px; gap: 24px; align-items: start;">
 
         <!-- CONSTRUCTOR DE OPCIONES -->
         <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
@@ -626,6 +658,25 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- SUB-SECCIÓN 3: GESTIÓN DE ETIQUETAS Y COLORES -->
+      <div id="subSettingsTags" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #c084fc; font-weight: 700;">🏷️ Gestión de Etiquetas & Colores</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Crea, edita o elimina las etiquetas que las secretarias asignan a las solicitudes.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewTag()">➕ Crear Nueva Etiqueta</button>
+        </div>
+
+        <div id="tagEditorList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;">
+          <!-- Lista de etiquetas dinámicas -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveTagsConfig()">
+          💾 Guardar Configuración de Etiquetas
+        </button>
       </div>
 
     </div>
@@ -679,17 +730,17 @@
 
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
 
+    let tagDefinitions = {
+      'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
+      'falta_foto': { key: 'falta_foto', label: '🟡 Falta Foto', color: '#d97706' },
+      'urgente': { key: 'urgente', label: '🔴 Urgente', color: '#dc2626' },
+      'pami': { key: 'pami', label: '🟣 PAMI', color: '#7c3aed' },
+      'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
+    };
+
     let currentMenuTree = {
       welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
       items: []
-    };
-
-    const TAG_DEFINITIONS = {
-      'turno_confirmado': { label: '🟢 Turno Dado', color: '#059669', bg: 'rgba(5, 150, 105, 0.2)' },
-      'falta_foto': { label: '🟡 Falta Foto', color: '#d97706', bg: 'rgba(217, 119, 6, 0.2)' },
-      'urgente': { label: '🔴 Urgente', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.2)' },
-      'pami': { label: '🟣 PAMI', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.2)' },
-      'en_revision': { label: '🔵 En Revisión', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.2)' }
     };
 
     const PREDEFINED_PDFS = {
@@ -701,6 +752,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
+      fetchTagConfig();
       fetchMenuTree();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
@@ -723,6 +775,123 @@
         viewS.style.display = 'none';
         btnC.classList.add('active');
         btnS.classList.remove('active');
+      }
+    }
+
+    function switchSettingsSubTab(subTab) {
+      const secSched = document.getElementById('subSettingsSchedule');
+      const secTree = document.getElementById('subSettingsTree');
+      const secTags = document.getElementById('subSettingsTags');
+
+      const btnSched = document.getElementById('subTabSchedBtn');
+      const btnTree = document.getElementById('subTabTreeBtn');
+      const btnTags = document.getElementById('subTabTagsBtn');
+
+      [btnSched, btnTree, btnTags].forEach(b => b.classList.remove('active'));
+
+      if (subTab === 'tree') {
+        secSched.style.display = 'none';
+        secTree.style.display = 'grid';
+        secTags.style.display = 'none';
+        btnTree.classList.add('active');
+      } else if (subTab === 'tags') {
+        secSched.style.display = 'none';
+        secTree.style.display = 'none';
+        secTags.style.display = 'flex';
+        btnTags.classList.add('active');
+        renderTagEditor();
+      } else {
+        secSched.style.display = 'flex';
+        secTree.style.display = 'none';
+        secTags.style.display = 'none';
+        btnSched.classList.add('active');
+      }
+    }
+
+    async function fetchTagConfig() {
+      try {
+        const res = await fetch('/api/tag-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.tags) {
+          tagDefinitions = data.tags;
+          renderTopTagFilters();
+        }
+      } catch (e) {}
+    }
+
+    function renderTopTagFilters() {
+      const container = document.getElementById('topTagFiltersContainer');
+      let html = `<button class="tag-filter-chip ${currentTagFilter === 'all' ? 'active' : ''}" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>`;
+
+      Object.entries(tagDefinitions).forEach(([key, tag]) => {
+        html += `<button class="tag-filter-chip ${currentTagFilter === key ? 'active' : ''}" style="color: ${tag.color};" onclick="setTagFilter('${key}', this)">${tag.label}</button>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderTagEditor() {
+      const container = document.getElementById('tagEditorList');
+      let html = '';
+
+      Object.entries(tagDefinitions).forEach(([key, tag]) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" value="${tag.color}" onchange="updateTagColor('${key}', this.value)" style="width: 38px; height: 38px; border: none; border-radius: 6px; cursor: pointer; background: transparent;">
+              <input type="text" value="${tag.label}" onchange="updateTagLabel('${key}', this.value)" style="flex: 1; font-weight: 600; font-size: 0.9rem;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.78rem;" onclick="removeTag('${key}')">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function updateTagLabel(key, val) {
+      if (tagDefinitions[key]) {
+        tagDefinitions[key].label = val.trim();
+      }
+    }
+
+    function updateTagColor(key, val) {
+      if (tagDefinitions[key]) {
+        tagDefinitions[key].color = val;
+      }
+    }
+
+    function addNewTag() {
+      const newKey = `tag_${Date.now()}`;
+      tagDefinitions[newKey] = {
+        key: newKey,
+        label: '🏷️ Nueva Etiqueta',
+        color: '#34d399'
+      };
+      renderTagEditor();
+    }
+
+    function removeTag(key) {
+      delete tagDefinitions[key];
+      renderTagEditor();
+    }
+
+    async function saveTagsConfig() {
+      try {
+        const res = await fetch('/api/tag-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tags: tagDefinitions })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderTopTagFilters();
+          renderConsultas(true);
+          alert('✅ Configuración de etiquetas y colores guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar etiquetas.');
       }
     }
 
@@ -1126,15 +1295,15 @@
               <!-- ETIQUETAS Y ETIQUETADOR -->
               <div style="margin-top: 4px;">
                 ${etiquetas.map(t => {
-                  const def = TAG_DEFINITIONS[t];
+                  const def = tagDefinitions[t];
                   if (!def) return '';
-                  return `<span class="tag-badge" style="background:${def.bg}; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
+                  return `<span class="tag-badge" style="background: ${def.color}33; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
                 }).join('')}
               </div>
 
               <div class="tag-selector">
                 <span style="font-size: 0.7rem; color: var(--muted); font-weight: 600; align-self: center;">Etiquetar:</span>
-                ${Object.entries(TAG_DEFINITIONS).map(([key, def]) => {
+                ${Object.entries(tagDefinitions).map(([key, def]) => {
                   const isSel = etiquetas.includes(key);
                   return `<button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color};` : ''}" onclick="toggleTag('${c.id}', '${key}')">${def.label}</button>`;
                 }).join('')}
@@ -1318,7 +1487,7 @@
 
       allConsultas.forEach(c => {
         const datos = c.datos || {};
-        const tags = (datos.etiquetas || []).join('; ');
+        const tags = (datos.etiquetas || []).map(t => tagDefinitions[t] ? tagDefinitions[t].label : t).join('; ');
         const msg = (datos.contenidoMensaje || datos.mensajeRaw || '').replace(/"/g, '""');
         rows.push([
           c.id,
