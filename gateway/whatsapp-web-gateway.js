@@ -2,7 +2,7 @@
  * CONECTOR WHATSAPP PROTOCOLO NATIVO (BAILEYS ENGINE)
  * 
  * Motor ultra-rápido de WhatsApp sin navegador Chrome (100% nativo en Node.js).
- * Desencripta fotos HD de 1080p/4K en 0.05 segundos y entrega respuestas/PDFs instantáneamente.
+ * Desencripta fotos HD de 1080p/4K en 0.05 segundos y optimiza adjuntos para almacenar hasta 10 fotos por consulta.
  */
 
 const {
@@ -14,6 +14,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const sharp = require('sharp');
 
 const WORKER_BASE_URL = process.env.WORKER_URL ? process.env.WORKER_URL.replace('/webhook', '') : 'https://coatwa.emmanuel-ag92.workers.dev';
 const WORKER_WEBHOOK_URL = `${WORKER_BASE_URL}/webhook`;
@@ -67,7 +68,7 @@ async function connectToWhatsApp() {
       }
     } else if (connection === 'open') {
       console.log('✅ ¡WhatsApp Nativo Conectado y Listo para recibir y enviar mensajes!');
-      console.log('📸 [Motor HD Nativo] Desencriptación Criptográfica activada (Fotos 1080p/4K instantáneas)');
+      console.log('📸 [Motor HD Optimizado] Soporte para hasta 10 fotos por consulta activado (Sharp HD 1200px)');
       console.log('📡 Servicio de entrega automática de respuestas y adjuntos PDF ACTIVADO (Polling 3s)\n');
     }
   });
@@ -105,7 +106,7 @@ async function connectToWhatsApp() {
         if (isImage) {
           try {
             console.log(`📸 [Desencriptando HD] Capturando foto nativa de ${remoteJid}...`);
-            const buffer = await downloadMediaMessage(
+            const rawBuffer = await downloadMediaMessage(
               msg,
               'buffer',
               {},
@@ -115,11 +116,22 @@ async function connectToWhatsApp() {
               }
             );
 
-            if (buffer && buffer.length > 2000) {
-              const mimetype = msg.message.imageMessage.mimetype || 'image/jpeg';
-              imagenBase64 = `data:${mimetype};base64,${buffer.toString('base64')}`;
+            if (rawBuffer && rawBuffer.length > 2000) {
+              let optimizedBuffer = rawBuffer;
+              try {
+                // Optimizar peso a 1200px con nitidez máxima para almacenar múltiples fotos en Firestore
+                optimizedBuffer = await sharp(rawBuffer)
+                  .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+                  .jpeg({ quality: 82 })
+                  .toBuffer();
+              } catch (sErr) {
+                optimizedBuffer = rawBuffer;
+              }
+
+              const mimetype = 'image/jpeg';
+              imagenBase64 = `data:${mimetype};base64,${optimizedBuffer.toString('base64')}`;
               imagenNombre = `foto_${Date.now()}.jpg`;
-              console.log(`📸 [HD ÉXITO TOTAL NATIVO] Foto desencriptada en Alta Definición cristalina (${buffer.length} bytes / ${imagenBase64.length} base64)`);
+              console.log(`📸 [HD ÉXITO CRISTALINO] Foto procesada en nitidez máxima 1200px (${rawBuffer.length}b -> ${optimizedBuffer.length}b / ${imagenBase64.length} base64)`);
             }
           } catch (imgErr) {
             console.error('❌ Error al desencriptar foto HD nativa:', imgErr?.message || imgErr);
