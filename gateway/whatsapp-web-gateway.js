@@ -113,81 +113,53 @@ async function pollSecretaryOutgoingMessages() {
   }
 }
 
-// Extractor de Alta Definición HD (1080p / 4K) usando DownloadManager nativo
+// Extractor de Alta Definición HD (1080p / 4K) inyectando los parámetros del mensaje en DownloadManager
 async function extractImageBase64(msg) {
   const pupPage = client.pupPage;
-  const msgSerialized = msg.id ? (msg.id._serialized || msg.id.id) : null;
-  const remitente = msg.from;
 
-  console.log(`🔍 [Extracción HD] Procesando imagen (${msgSerialized})...`);
-
-  // 1. Extracción en tiempo real con DownloadManager.downloadAndMaybeDecrypt en Puppeteer
-  if (pupPage && msgSerialized) {
+  // 1. Extracción directa pasando las llaves criptográficas de msg._data a DownloadManager en Chrome
+  if (pupPage && msg._data && msg._data.directPath && msg._data.mediaKey) {
     try {
-      const hdBase64 = await pupPage.evaluate(async (sId, sender) => {
+      const payload = {
+        directPath: msg._data.directPath,
+        encFilehash: msg._data.encFilehash,
+        filehash: msg._data.filehash,
+        mediaKey: msg._data.mediaKey,
+        mediaKeyTimestamp: msg._data.mediaKeyTimestamp,
+        type: msg._data.type || msg.type || 'image',
+        mimetype: msg._data.mimetype || msg.mimetype || 'image/jpeg'
+      };
+
+      console.log(`🔍 [Extracción Directa HD] Desencriptando foto usando DownloadManager nativo de WhatsApp...`);
+
+      const hdBase64 = await pupPage.evaluate(async (data) => {
         try {
-          const msgModels = window.Store.Msg?.models || [];
-          const msgObj = msgModels.find(m => m.id && (m.id._serialized === sId || m.id.id === sId)) || window.Store.Msg?.get(sId);
-          
-          if (msgObj) {
-            // A) Descarga y desencriptado nativo con DownloadManager
-            if (window.Store.DownloadManager && typeof window.Store.DownloadManager.downloadAndMaybeDecrypt === 'function') {
-              try {
-                const decrypted = await window.Store.DownloadManager.downloadAndMaybeDecrypt({
-                  directPath: msgObj.directPath,
-                  encFilehash: msgObj.encFilehash,
-                  filehash: msgObj.filehash,
-                  mediaKey: msgObj.mediaKey,
-                  mediaKeyTimestamp: msgObj.mediaKeyTimestamp,
-                  type: msgObj.type,
-                  signal: (new AbortController()).signal
-                });
-                if (decrypted) {
-                  const blob = new Blob([decrypted], { type: msgObj.mimetype || 'image/jpeg' });
-                  return new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = () => resolve(null);
-                    reader.readAsDataURL(blob);
-                  });
-                }
-              } catch (dmErr) {}
-            }
-
-            // B) Disparar método downloadMedia si existe en mediaData
-            if (msgObj.mediaData && typeof msgObj.mediaData.downloadMedia === 'function') {
-              await msgObj.mediaData.downloadMedia().catch(() => {});
-            }
-
-            // C) Forzar apertura de chat si Cmd existe
-            const chatModels = window.Store.Chat?.models || [];
-            const targetChat = msgObj.chat || chatModels.find(c => c.id && c.id._serialized && c.id._serialized.includes(sender.replace('@lid','').replace('@c.us','')));
-            if (targetChat && window.Store.Cmd) {
-              await window.Store.Cmd.openChatAt(targetChat).catch(() => {});
-            }
-
-            // Esperar 1.2s si el blob se está generando en memoria
-            for (let i = 0; i < 10; i++) {
-              const bUrl = msgObj.mediaData?.renderableUrl || msgObj.mediaData?.fullUrl;
-              if (bUrl) {
-                const res = await fetch(bUrl);
-                const blob = await res.blob();
-                return new Promise(resolve => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result);
-                  reader.onerror = () => resolve(null);
-                  reader.readAsDataURL(blob);
-                });
-              }
-              await new Promise(r => setTimeout(r, 150));
+          if (window.Store && window.Store.DownloadManager && typeof window.Store.DownloadManager.downloadAndMaybeDecrypt === 'function') {
+            const decrypted = await window.Store.DownloadManager.downloadAndMaybeDecrypt({
+              directPath: data.directPath,
+              encFilehash: data.encFilehash,
+              filehash: data.filehash,
+              mediaKey: data.mediaKey,
+              mediaKeyTimestamp: data.mediaKeyTimestamp,
+              type: data.type,
+              signal: (new AbortController()).signal
+            });
+            if (decrypted) {
+              const blob = new Blob([decrypted], { type: data.mimetype });
+              return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+              });
             }
           }
-        } catch (err) {}
+        } catch (e) {}
         return null;
-      }, msgSerialized, remitente).catch(() => null);
+      }, payload).catch(() => null);
 
       if (hdBase64 && typeof hdBase64 === 'string' && hdBase64.length > 10000) {
-        console.log(`📸 [HD ÉXITO TOTAL] Foto desencriptada en Alta Definición HD (${hdBase64.length} bytes base64)`);
+        console.log(`📸 [HD ÉXITO DIRECTO!] Foto original desencriptada en Alta Definición (${hdBase64.length} bytes base64)`);
         return hdBase64;
       }
     } catch (e) {}
