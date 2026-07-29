@@ -4,13 +4,14 @@
   "description": "Conector de WhatsApp Web para el Bot de Clínica Médica",
   "main": "whatsapp-web-gateway.js",
   "scripts": {
-    "start": "node whatsapp-web-gateway.js"
+    "start": "node whatsapp-web-gateway.js",
+    "logout": "node -e \"require('fs').rmSync('./baileys_auth', { recursive: true, force: true }); console.log('✅ Sesión de WhatsApp cerrada exitosamente. Al ejecutar npm start se mostrará un nuevo código QR.');\""
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
-    "pino": "^10.3.1",
+    "pino": "^9.6.0",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.35.3",
+    "sharp": "^0.33.5",
     "whatsapp-web.js": "^1.26.0"
   }
 }
