@@ -43,12 +43,12 @@ export const SUBMENU_TURNOS: InteractiveButtonMessage = {
 // ─────────────────────────────────────────────────────────────────
 export function interactiveToPlainText(msg: InteractiveMessage): string {
   if (msg.type === 'button') {
-    const opciones = msg.buttons.map(b => `${b.emoji || ''} *${b.id})* ${b.title}`).join('\n');
-    return `${msg.bodyText}\n\n${opciones}`;
+    const opciones = (msg.buttons || []).map(b => `${b.emoji || ''} *${b.id})* ${b.title}`).join('\n');
+    return `${msg.bodyText || ''}\n\n${opciones}`;
   }
   // list
-  const rows = msg.sections.flatMap(s =>
+  const rows = (msg.sections || []).flatMap(s =>
     s.rows.map(r => `*${r.id})* ${r.title}${r.description ? `\n   _${r.description}_` : ''}`)
   );
-  return `${msg.bodyText}\n\n${rows.join('\n')}`;
+  return `${msg.bodyText || ''}\n\n${rows.join('\n')}`;
 }
