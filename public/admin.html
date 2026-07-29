@@ -558,9 +558,14 @@
           <input type="text" id="searchInput" placeholder="Buscar por Nombre, DNI, Teléfono o Mensaje..." oninput="handleSearch()">
         </div>
 
-        <button class="btn btn-excel" onclick="exportToCsv()">
-          📊 Exportar a Excel (CSV)
-        </button>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-excel" onclick="exportToCsv()">
+            📊 Exportar a Excel (CSV)
+          </button>
+          <button class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
+            🗑️ Limpiar Todo (Pruebas)
+          </button>
+        </div>
       </div>
 
       <div class="filters-bar" style="margin-top: 12px;">
@@ -835,6 +840,21 @@
         }
       });
     });
+
+    async function limpiarTodasConsultas() {
+      if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
+        try {
+          const res = await fetch('/api/clear-consultas', { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            alert('🧹 Se han borrado todas las solicitudes de prueba.');
+            fetchConsultas(true);
+          }
+        } catch (e) {
+          alert('Error al limpiar solicitudes.');
+        }
+      }
+    }
 
     async function fetchBotConfig() {
       try {
