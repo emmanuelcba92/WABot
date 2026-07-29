@@ -53,6 +53,35 @@ app.post('/api/schedule-config', async (c) => {
   }
 });
 
+app.get('/api/bot-config', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const config = await firestore.getBotConfig();
+  return c.json({
+    config: {
+      saludoBienvenida: config.saludoBienvenida || MESSAGES.SALUDO_BIENVENIDA,
+      fueraDeHorario: config.fueraDeHorario || MESSAGES.FUERA_DE_HORARIO,
+      plantillaA1: config.plantillaA1 || MESSAGES.PLANTILLA_A1_ORL,
+      plantillaA2: config.plantillaA2 || MESSAGES.PLANTILLA_A2_ESTUDIOS,
+      plantillaB: config.plantillaB || MESSAGES.PLANTILLA_OPCION_B,
+      confirmacionCierre: config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO
+    }
+  });
+});
+
+app.post('/api/bot-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveBotConfig(body);
+    return c.json({
+      success: true,
+      mensaje: 'Configuración de mensajes del bot actualizada exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al actualizar configuración del bot', details: e?.message }, 500);
+  }
+});
+
 app.post('/webhook', async (c) => {
   try {
     let body: Partial<WebhookPayload>;
@@ -122,6 +151,21 @@ app.get('/api/consultas', async (c) => {
   });
 });
 
+app.patch('/api/consultas/:id/etiquetas', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const etiquetas = body.etiquetas || [];
+
+  const firestore = new FirestoreService(c.env);
+  const ok = await firestore.actualizarEtiquetasConsulta(id, etiquetas);
+
+  if (ok) {
+    return c.json({ success: true, id, etiquetas });
+  } else {
+    return c.json({ error: 'No se pudo actualizar las etiquetas de la consulta' }, 500);
+  }
+});
+
 app.patch('/api/consultas/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
@@ -131,11 +175,14 @@ app.patch('/api/consultas/:id', async (c) => {
   const ok = await firestore.actualizarEstadoConsulta(id, nuevoEstado);
 
   if (ok && nuevoEstado === 'atendido') {
+    const config = await firestore.getBotConfig();
+    const closingMsg = config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO;
+
     const consultas = await firestore.getConsultas();
     const target = consultas.find(item => item.id === id);
     if (target && target.remitente) {
       await firestore.saveSesion(target.remitente, 'inicio');
-      await firestore.addPendingOutgoing(target.remitente, MESSAGES.CONFIRMACION_CHAT_FINALIZADO, id);
+      await firestore.addPendingOutgoing(target.remitente, closingMsg, id);
     }
   }
 

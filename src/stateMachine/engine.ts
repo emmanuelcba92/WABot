@@ -14,6 +14,13 @@ export class StateEngine {
     const timestamp = new Date().toISOString();
 
     const firestore = new FirestoreService(env);
+    const botConfig = await firestore.getBotConfig();
+
+    const saludoBienvenidaMsg = botConfig.saludoBienvenida || MESSAGES.SALUDO_BIENVENIDA;
+    const fueraDeHorarioMsg = botConfig.fueraDeHorario || MESSAGES.FUERA_DE_HORARIO;
+    const plantillaA1Msg = botConfig.plantillaA1 || MESSAGES.PLANTILLA_A1_ORL;
+    const plantillaA2Msg = botConfig.plantillaA2 || MESSAGES.PLANTILLA_A2_ESTUDIOS;
+    const plantillaBMsg = botConfig.plantillaB || MESSAGES.PLANTILLA_OPCION_B;
 
     // 1. Control de Horario (Persistido en Firestore)
     const scheduleMode = await firestore.getScheduleMode();
@@ -21,7 +28,7 @@ export class StateEngine {
     if (!scheduleCheck.isWithinHours) {
       return {
         remitente,
-        respuesta: MESSAGES.FUERA_DE_HORARIO,
+        respuesta: fueraDeHorarioMsg,
         estadoActual: 'inicio',
         enHorario: false,
         timestamp
@@ -41,7 +48,7 @@ export class StateEngine {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
-          respuesta: MESSAGES.SALUDO_BIENVENIDA,
+          respuesta: saludoBienvenidaMsg,
           estadoActual: 'esperando_opcion_principal',
           enHorario: true,
           timestamp
@@ -65,7 +72,7 @@ export class StateEngine {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
         remitente,
-        respuesta: MESSAGES.SALUDO_BIENVENIDA,
+        respuesta: saludoBienvenidaMsg,
         estadoActual: 'esperando_opcion_principal',
         enHorario: true,
         timestamp
@@ -91,7 +98,7 @@ export class StateEngine {
           await firestore.saveSesion(remitente, 'esperando_datos_opcion_b');
           return {
             remitente,
-            respuesta: MESSAGES.PLANTILLA_OPCION_B,
+            respuesta: plantillaBMsg,
             estadoActual: 'esperando_datos_opcion_b',
             enHorario: true,
             timestamp
@@ -126,7 +133,7 @@ export class StateEngine {
         } else {
           return {
             remitente,
-            respuesta: MESSAGES.SALUDO_BIENVENIDA,
+            respuesta: saludoBienvenidaMsg,
             estadoActual: 'esperando_opcion_principal',
             enHorario: true,
             timestamp
@@ -138,10 +145,10 @@ export class StateEngine {
         const subInput = msgClean.replace(/[^a-z0-9]/g, '');
         if (subInput === '1' || subInput.includes('orl') || subInput.includes('medico')) {
           await firestore.saveSesion(remitente, 'esperando_datos_a1');
-          return { remitente, respuesta: MESSAGES.PLANTILLA_A1_ORL, estadoActual: 'esperando_datos_a1', enHorario: true, timestamp };
+          return { remitente, respuesta: plantillaA1Msg, estadoActual: 'esperando_datos_a1', enHorario: true, timestamp };
         } else if (subInput === '2' || subInput.includes('estudio')) {
           await firestore.saveSesion(remitente, 'esperando_datos_a2');
-          return { remitente, respuesta: MESSAGES.PLANTILLA_A2_ESTUDIOS, estadoActual: 'esperando_datos_a2', enHorario: true, timestamp };
+          return { remitente, respuesta: plantillaA2Msg, estadoActual: 'esperando_datos_a2', enHorario: true, timestamp };
         } else if (subInput === '3' || subInput.includes('cirugia')) {
           await firestore.saveSesion(remitente, 'esperando_datos_a3');
           return { remitente, respuesta: MESSAGES.PLANTILLA_A3_CIRUGIAS, estadoActual: 'esperando_datos_a3', enHorario: true, timestamp };
@@ -181,7 +188,7 @@ export class StateEngine {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
-          respuesta: MESSAGES.SALUDO_BIENVENIDA,
+          respuesta: saludoBienvenidaMsg,
           estadoActual: 'esperando_opcion_principal',
           enHorario: true,
           timestamp

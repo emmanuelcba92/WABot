@@ -12,6 +12,15 @@ export interface PendingOutgoingMsg {
   pdfBase64?: string;
 }
 
+export interface BotConfigMessages {
+  saludoBienvenida?: string;
+  fueraDeHorario?: string;
+  plantillaA1?: string;
+  plantillaA2?: string;
+  plantillaB?: string;
+  confirmacionCierre?: string;
+}
+
 export class FirestoreService {
   private projectId: string;
   private apiKey?: string;
@@ -20,6 +29,7 @@ export class FirestoreService {
   private static inMemoryConsultas: Array<Record<string, any>> = [];
   private static pendingOutgoingMemory: PendingOutgoingMsg[] = [];
   private static globalScheduleMode: ScheduleMode = 'auto';
+  private static globalBotConfig: BotConfigMessages = {};
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -102,6 +112,43 @@ export class FirestoreService {
       });
     } catch (e) {
       console.error('Error al guardar scheduleMode en Firestore:', e);
+    }
+  }
+
+  public async getBotConfig(): Promise<BotConfigMessages> {
+    if (!this.projectId) return FirestoreService.globalBotConfig;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/bot_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields) {
+          FirestoreService.globalBotConfig = fields as BotConfigMessages;
+          return fields as BotConfigMessages;
+        }
+      }
+    } catch (e) {}
+
+    return FirestoreService.globalBotConfig;
+  }
+
+  public async saveBotConfig(config: BotConfigMessages): Promise<void> {
+    FirestoreService.globalBotConfig = { ...FirestoreService.globalBotConfig, ...config };
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/bot_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ ...config, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar bot_config en Firestore:', e);
     }
   }
 
@@ -215,12 +262,10 @@ export class FirestoreService {
         imagenesAdjuntas.push(datos.imagenBase64);
       }
 
-      // Agregar cada foto recibida sin descartar repeticiones de prueba
       if (imagenBase64) {
         imagenesAdjuntas.push(imagenBase64);
       }
 
-      // Permitir guardar hasta 10 fotos por consulta
       if (imagenesAdjuntas.length > 10) {
         imagenesAdjuntas = imagenesAdjuntas.slice(-10);
       }
@@ -256,6 +301,32 @@ export class FirestoreService {
         }
       }
     }
+  }
+
+  public async actualizarEtiquetasConsulta(id: string, etiquetas: string[]): Promise<boolean> {
+    const consultas = await this.getConsultas();
+    const target = consultas.find(c => c.id === id);
+    if (target) {
+      const datos = target.datos || {};
+      datos.etiquetas = etiquetas;
+      target.datos = datos;
+
+      if (this.projectId) {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          const res = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+          });
+          return res.ok;
+        } catch (e) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
   }
 
   public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string): Promise<void> {

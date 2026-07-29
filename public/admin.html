@@ -60,6 +60,32 @@
       font-size: 22px;
     }
 
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
     .container {
       max-width: 1400px;
       width: 100%;
@@ -99,26 +125,54 @@
       color: var(--accent);
     }
 
-    .filters-bar {
+    .toolbar {
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+      justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
       background: var(--card-bg);
+      border: 1px solid var(--border);
       padding: 14px 20px;
       border-radius: 14px;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.6);
       border: 1px solid var(--border);
-      justify-content: space-between;
+      border-radius: 10px;
+      padding: 8px 14px;
+      gap: 8px;
+      flex: 1;
+      max-width: 450px;
+    }
+
+    .search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    .filters-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
     }
 
     .tab-btn {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border);
       color: var(--muted);
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 0.88rem;
+      font-size: 0.82rem;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -129,36 +183,21 @@
       border-color: var(--accent);
     }
 
-    .btn-seed {
-      background: linear-gradient(135deg, #8b5cf6, #6366f1);
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    .btn-seed:hover {
-      opacity: 0.9;
-    }
-
-    .btn-clear {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.85rem;
+    .tag-filter-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.78rem;
       cursor: pointer;
       transition: all 0.2s;
     }
 
-    .btn-clear:hover {
-      background: rgba(239, 68, 68, 0.3);
+    .tag-filter-chip.active {
+      border-color: currentColor;
+      background: rgba(255, 255, 255, 0.15);
     }
 
     .consultas-grid {
@@ -167,7 +206,7 @@
       gap: 20px;
     }
 
-    .card-consulta {
+    .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -176,72 +215,53 @@
       flex-direction: column;
       gap: 14px;
       position: relative;
-      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     }
 
     .card-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 10px;
-    }
-
-    .opcion-tag {
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 700;
-    }
-
-    .status-tag {
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-
-    .status-pendiente {
-      background: rgba(245, 158, 11, 0.2);
-      color: #fbbf24;
-    }
-
-    .status-atendido {
-      background: rgba(16, 185, 129, 0.2);
-      color: #34d399;
-    }
-
-    .status-novedad {
-      background: rgba(16, 185, 129, 0.35);
-      color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.6);
+      align-items: flex-start;
+      gap: 10px;
     }
 
     .patient-info {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      font-size: 0.9rem;
+      gap: 4px;
     }
 
-    .phone-link {
-      color: #34d399;
-      text-decoration: none;
-      font-weight: 600;
+    .tag-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-right: 4px;
+      margin-top: 4px;
     }
 
-    .raw-msg {
-      background: rgba(15, 23, 42, 0.6);
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      white-space: pre-wrap;
-      max-height: 140px;
-      overflow-y: auto;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+    .tag-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .tag-chip-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tag-chip-btn.selected {
+      color: white;
+      border-color: transparent;
     }
 
     .card-img-container {
@@ -286,7 +306,7 @@
     .lightbox-modal {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.88);
       backdrop-filter: blur(8px);
       z-index: 1000;
       display: flex;
@@ -294,7 +314,6 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      animation: fadeIn 0.2s ease-out;
     }
 
     .lightbox-img {
@@ -313,55 +332,68 @@
     .lightbox-close {
       position: absolute;
       top: 20px;
-      right: 24px;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
+      right: 30px;
+      background: rgba(255, 255, 255, 0.1);
       border: none;
-      width: 40px;
-      height: 40px;
+      color: white;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      font-size: 1.4rem;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
     }
 
-    .lightbox-close:hover {
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    .btn-danger {
       background: #ef4444;
+      color: white;
+    }
+
+    .btn-excel {
+      background: #10b981;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .reply-box {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-    }
-
-    .reply-box label {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #94a3b8;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.4);
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
     }
 
     .reply-box textarea {
+      width: 100%;
       background: #0f172a;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 10px;
+      border: 1px solid var(--border);
       color: var(--text);
+      padding: 10px;
+      border-radius: 8px;
       font-size: 0.88rem;
       resize: vertical;
-      min-height: 65px;
+      min-height: 70px;
       outline: none;
-    }
-
-    .reply-box textarea:focus {
-      border-color: var(--accent);
     }
 
     .quick-reply-chips {
@@ -370,90 +402,47 @@
       flex-wrap: wrap;
     }
 
-    .chip {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #cbd5e1;
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.75rem;
       padding: 4px 8px;
       border-radius: 6px;
-      font-size: 0.72rem;
       cursor: pointer;
-      transition: all 0.2s;
     }
 
-    .chip:hover {
-      background: rgba(0, 168, 132, 0.2);
-      color: #34d399;
-    }
-
-    .btn-submit-main {
-      background: linear-gradient(135deg, #00a884, #059669);
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: opacity 0.2s, transform 0.1s;
-      width: 100%;
-    }
-
-    .btn-submit-main:hover {
-      opacity: 0.95;
-    }
-
-    .btn-submit-main:active {
-      transform: scale(0.99);
-    }
-
-    .pdf-select-box {
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 8px;
+    .settings-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 20px;
     }
 
-    .pdf-select-box select {
-      background: #0f172a;
-      color: #cbd5e1;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 0.8rem;
-      outline: none;
-    }
-
-    .drive-link-btn {
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      padding: 6px 10px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: 0.75rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      justify-content: center;
-    }
-
-    .schedule-control-bar {
+    .settings-group {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 8px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 6px 12px;
+    }
+
+    .settings-group label {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #38bdf8;
+    }
+
+    .settings-group textarea {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
       border-radius: 10px;
+      font-size: 0.9rem;
+      min-height: 90px;
+      outline: none;
     }
   </style>
 </head>
@@ -461,70 +450,142 @@
 
   <header>
     <div class="brand">
-      <div class="brand-icon">📋</div>
+      <div class="brand-icon">🏥</div>
       <div>
-        <h1 style="font-size: 1.2rem;">Panel de Recepción / Secretarias</h1>
-        <div style="font-size: 0.8rem; color: var(--muted);">Gestión y Respuesta Directa a Consultas de WhatsApp</div>
+        <h1 style="font-size: 1.25rem; font-weight: 700;">Recepción & Secretarías</h1>
+        <p style="font-size: 0.78rem; color: var(--muted);">Panel de Gestión de Turnos y Mensajería de WhatsApp</p>
       </div>
     </div>
 
-    <!-- ⏰ CONTROL MANUAL DE HORARIO DE ATENCIÓN -->
-    <div class="schedule-control-bar">
-      <span style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">⏰ Horario Bot:</span>
-      <button id="schedAuto" onclick="setScheduleMode('auto')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem;" title="Lunes a Viernes 08:00 a 20:00 hs">
-        ⏰ Automático (8-20h)
-      </button>
-      <button id="schedOpen" onclick="setScheduleMode('always_open')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem; border-color: rgba(52, 211, 153, 0.5); color: #34d399;" title="Permite que las secretarias atiendan fuera de horario (Sábados/Noches)">
-        🟢 Forzar Abierto (24/7)
-      </button>
-      <button id="schedClosed" onclick="setScheduleMode('always_closed')" class="tab-btn" style="padding: 4px 10px; font-size: 0.76rem; border-color: rgba(239, 68, 68, 0.5); color: #ef4444;" title="Activa el mensaje automático de fuera de horario de inmediato">
-        🌙 Forzar Cerrado
-      </button>
+    <div class="nav-tabs">
+      <button class="nav-tab-btn active" id="tabMainBtn" onclick="switchMainTab('consultas')">📥 Solicitudes (<span id="countBadge">0</span>)</button>
+      <button class="nav-tab-btn" id="tabSettingsBtn" onclick="switchMainTab('settings')">⚙️ Configuración del Bot & Horarios</button>
     </div>
 
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <button onclick="generar70Pruebas(event)" class="btn-seed">⚡ Generar 70 Consultas de Prueba</button>
-      <button onclick="limpiarTodasPruebas()" class="btn-clear" title="Vaciar todas las consultas y chats de prueba">🗑️ Limpiar Todo</button>
-      <button onclick="fetchConsultas()" class="tab-btn" style="background: rgba(255,255,255,0.05);">🔄 Actualizar</button>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div id="connectorStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 5px 12px; border-radius: 20px;">
+        🟢 Conector WhatsApp En Línea
+      </div>
+      <button class="btn btn-secondary" onclick="fetchConsultas(true)">🔄 Actualizar</button>
     </div>
   </header>
 
   <div class="container">
 
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-title">Consultas Pendientes (Activas)</div>
-        <div class="stat-num" id="numPendientes">0</div>
+    <!-- SECCIÓN 1: VISTA DE SOLICITUDES -->
+    <div id="viewConsultas">
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-title">Pendientes (Bandeja Entrada)</div>
+          <div class="stat-num" id="numPendientes">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Atendidas / Archivadas</div>
+          <div class="stat-num" id="numAtendidas" style="color: #60a5fa;">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Total Registradas</div>
+          <div class="stat-num" id="numTotal" style="color: #a78bfa;">0</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-title">Atendidas / Archivadas</div>
-        <div class="stat-num" id="numAtendidas" style="color: #60a5fa;">0</div>
+
+      <div class="toolbar" style="margin-top: 16px;">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Buscar por Nombre, DNI, Teléfono o Mensaje..." oninput="handleSearch()">
+        </div>
+
+        <button class="btn btn-excel" onclick="exportToCsv()">
+          📊 Exportar a Excel (CSV)
+        </button>
       </div>
-      <div class="stat-card">
-        <div class="stat-title">Total Registradas</div>
-        <div class="stat-num" id="numTotal" style="color: #a78bfa;">0</div>
+
+      <div class="filters-bar" style="margin-top: 12px;">
+        <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700;">Estado:</span>
+        <button class="tab-btn active" id="filterPendiente" onclick="setFilter('pendiente', this)">⏳ Pendientes</button>
+        <button class="tab-btn" id="filterAtendido" onclick="setFilter('atendido', this)">📁 Atendidas</button>
+        <button class="tab-btn" id="filterTodos" onclick="setFilter('todos', this)">📋 Ver Todas</button>
+
+        <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700; margin-left: 12px;">Etiquetas:</span>
+        <button class="tag-filter-chip active" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>
+        <button class="tag-filter-chip" style="color: #34d399;" onclick="setTagFilter('turno_confirmado', this)">🟢 Turno Dado</button>
+        <button class="tag-filter-chip" style="color: #fbbf24;" onclick="setTagFilter('falta_foto', this)">🟡 Falta Foto</button>
+        <button class="tag-filter-chip" style="color: #f87171;" onclick="setTagFilter('urgente', this)">🔴 Urgente</button>
+        <button class="tag-filter-chip" style="color: #c084fc;" onclick="setTagFilter('pami', this)">🟣 PAMI</button>
+        <button class="tag-filter-chip" style="color: #60a5fa;" onclick="setTagFilter('en_revision', this)">🔵 En Revisión</button>
       </div>
+
+      <div class="consultas-grid" id="consultasGrid" style="margin-top: 16px;">
+        <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando solicitudes...</div>
+      </div>
+
     </div>
 
-    <div class="filters-bar">
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <span style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">Sección Principal:</span>
-        <button class="tab-btn active" onclick="setFilter('pendiente', this)">⏳ Pendientes (Bandeja Entrada)</button>
-        <button class="tab-btn" onclick="setFilter('atendido', this)">📁 Historial Archivo (Atendidas)</button>
-        <button class="tab-btn" onclick="setFilter('todos', this)">📋 Ver Todas</button>
+    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN DE BOT & HORARIOS -->
+    <div id="viewSettings" class="settings-panel" style="display: none;">
+
+      <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--text);">⚙️ Configuración del Bot & Control de Horarios</h2>
+
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <h3 style="font-size: 1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
+        <p style="font-size: 0.84rem; color: var(--muted);">Define si el bot responde automáticamente según el horario de clínica (Lun-Vie 8-20h) o si forzamos la atención.</p>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" id="schedAuto" onclick="setScheduleMode('auto')">⏰ Automático (8-20h)</button>
+          <button class="btn btn-secondary" id="schedOpen" onclick="setScheduleMode('always_open')">🟢 Forzar Abierto (24/7)</button>
+          <button class="btn btn-secondary" id="schedClosed" onclick="setScheduleMode('always_closed')">🌙 Forzar Cerrado</button>
+        </div>
+
+        <div id="settingsScheduleBadge" style="font-size: 0.85rem; font-weight: 700; color: #34d399; margin-top: 4px;">
+          🟢 Estado Actual: Cargando...
+        </div>
       </div>
 
-      <div id="scheduleStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 4px 10px; border-radius: 20px;">
-        🟢 Horario Activo: Automático (Lun-Vie 8-20h)
-      </div>
-    </div>
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px;">
+        <h3 style="font-size: 1rem; color: #38bdf8;">✏️ Editor de Mensajes & Respuestas del Bot</h3>
+        <p style="font-size: 0.84rem; color: var(--muted);">Podes personalizar los mensajes automáticos que el bot le envía al paciente en WhatsApp.</p>
 
-    <div class="consultas-grid" id="consultasGrid">
-      <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando consultas...</div>
+        <div class="settings-group">
+          <label>👋 Mensaje de Bienvenida / Menú Principal:</label>
+          <textarea id="cfgSaludoBienvenida" placeholder="Cargando mensaje de bienvenida..."></textarea>
+        </div>
+
+        <div class="settings-group">
+          <label>🌙 Mensaje de Fuera de Horario:</label>
+          <textarea id="cfgFueraDeHorario" placeholder="Cargando mensaje de fuera de horario..."></textarea>
+        </div>
+
+        <div class="settings-group">
+          <label>📋 Plantilla Solicitud de Turno ORL:</label>
+          <textarea id="cfgPlantillaA1" placeholder="Cargando plantilla A1..."></textarea>
+        </div>
+
+        <div class="settings-group">
+          <label>📋 Plantilla Solicitud de Estudios Médicos:</label>
+          <textarea id="cfgPlantillaA2" placeholder="Cargando plantilla A2..."></textarea>
+        </div>
+
+        <div class="settings-group">
+          <label>📋 Plantilla Autorización de Estudios / Órdenes:</label>
+          <textarea id="cfgPlantillaB" placeholder="Cargando plantilla B..."></textarea>
+        </div>
+
+        <div class="settings-group">
+          <label>✅ Mensaje de Confirmación al Finalizar Chat:</label>
+          <textarea id="cfgConfirmacionCierre" placeholder="Cargando mensaje de cierre..."></textarea>
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem;" onclick="saveBotConfig()">
+          💾 Guardar Configuración de Mensajes
+        </button>
+      </div>
+
     </div>
 
   </div>
 
+  <!-- LIGHTBOX MODAL PARA FOTOS EN ALTA DEFINICIÓN HD -->
   <div id="lightboxModal" class="lightbox-modal" style="display: none;" onclick="closeLightbox()">
     <button class="lightbox-close" onclick="closeLightbox()">✕</button>
     <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
@@ -533,12 +594,21 @@
   <script>
     let allConsultas = [];
     let currentFilter = 'pendiente';
+    let currentTagFilter = 'all';
+    let searchQuery = '';
     let draftResponses = {};
     let selectedPdfs = {};
     let customPdfBase64 = {};
     let customPdfNames = {};
-    let lastRenderedSignature = '';
     let currentScheduleMode = 'auto';
+
+    const TAG_DEFINITIONS = {
+      'turno_confirmado': { label: '🟢 Turno Dado', color: '#059669', bg: 'rgba(5, 150, 105, 0.2)' },
+      'falta_foto': { label: '🟡 Falta Foto', color: '#d97706', bg: 'rgba(217, 119, 6, 0.2)' },
+      'urgente': { label: '🔴 Urgente', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.2)' },
+      'pami': { label: '🟣 PAMI', color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.2)' },
+      'en_revision': { label: '🔵 En Revisión', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.2)' }
+    };
 
     const PREDEFINED_PDFS = {
       'sangre': { name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf', title: '📄 Preparación Análisis de Sangre / Laboratorio' },
@@ -549,10 +619,30 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
+      fetchBotConfig();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
       setInterval(fetchScheduleConfig, 10000);
     });
+
+    function switchMainTab(tab) {
+      const viewC = document.getElementById('viewConsultas');
+      const viewS = document.getElementById('viewSettings');
+      const btnC = document.getElementById('tabMainBtn');
+      const btnS = document.getElementById('tabSettingsBtn');
+
+      if (tab === 'settings') {
+        viewC.style.display = 'none';
+        viewS.style.display = 'flex';
+        btnC.classList.remove('active');
+        btnS.classList.add('active');
+      } else {
+        viewC.style.display = 'block';
+        viewS.style.display = 'none';
+        btnC.classList.add('active');
+        btnS.classList.remove('active');
+      }
+    }
 
     async function fetchScheduleConfig() {
       try {
@@ -581,97 +671,79 @@
 
     function updateScheduleUI(data) {
       const mode = data.mode || 'auto';
-      const isWithin = data.scheduleInfo ? data.scheduleInfo.isWithinHours : true;
-
       const autoBtn = document.getElementById('schedAuto');
       const openBtn = document.getElementById('schedOpen');
       const closedBtn = document.getElementById('schedClosed');
-      const badge = document.getElementById('scheduleStatusBadge');
+      const badgeSettings = document.getElementById('settingsScheduleBadge');
 
       if (autoBtn) autoBtn.style.background = mode === 'auto' ? 'rgba(59, 130, 246, 0.4)' : 'transparent';
       if (openBtn) openBtn.style.background = mode === 'always_open' ? 'rgba(52, 211, 153, 0.4)' : 'transparent';
       if (closedBtn) closedBtn.style.background = mode === 'always_closed' ? 'rgba(239, 68, 68, 0.4)' : 'transparent';
 
-      if (badge) {
+      if (badgeSettings) {
         if (mode === 'always_open') {
-          badge.innerText = '🟢 Horario Activo: FORZADO ABIERTO 24/7 (Atendiendo)';
-          badge.style.color = '#34d399';
-          badge.style.background = 'rgba(52, 211, 153, 0.2)';
+          badgeSettings.innerText = '🟢 Horario Activo: FORZADO ABIERTO 24/7 (Atendiendo)';
+          badgeSettings.style.color = '#34d399';
         } else if (mode === 'always_closed') {
-          badge.innerText = '🌙 Horario Activo: FORZADO CERRADO (Respuesta Fuera de Horario)';
-          badge.style.color = '#f87171';
-          badge.style.background = 'rgba(239, 68, 68, 0.2)';
+          badgeSettings.innerText = '🌙 Horario Activo: FORZADO CERRADO';
+          badgeSettings.style.color = '#ef4444';
         } else {
-          badge.innerText = isWithin ? '⏰ Horario Activo: Automático (En Horario Laboral)' : '🌙 Horario Activo: Automático (Fuera de Horario)';
-          badge.style.color = isWithin ? '#34d399' : '#fbbf24';
-          badge.style.background = isWithin ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+          badgeSettings.innerText = '⏰ Horario Activo: AUTOMÁTICO (Lun-Vie 8-20h)';
+          badgeSettings.style.color = '#60a5fa';
         }
       }
     }
 
-    function saveDraft(cardId, value) {
-      draftResponses[cardId] = value;
+    async function fetchBotConfig() {
+      try {
+        const res = await fetch('/api/bot-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cfg = data.config || {};
+        if (cfg.saludoBienvenida) document.getElementById('cfgSaludoBienvenida').value = cfg.saludoBienvenida;
+        if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
+        if (cfg.plantillaA1) document.getElementById('cfgPlantillaA1').value = cfg.plantillaA1;
+        if (cfg.plantillaA2) document.getElementById('cfgPlantillaA2').value = cfg.plantillaA2;
+        if (cfg.plantillaB) document.getElementById('cfgPlantillaB').value = cfg.plantillaB;
+        if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
+      } catch (e) {}
     }
 
-    function openLightbox(imgSrc) {
-      const modal = document.getElementById('lightboxModal');
-      const img = document.getElementById('lightboxImg');
-      img.src = imgSrc;
-      modal.style.display = 'flex';
-    }
+    async function saveBotConfig() {
+      try {
+        const payload = {
+          saludoBienvenida: document.getElementById('cfgSaludoBienvenida').value,
+          fueraDeHorario: document.getElementById('cfgFueraDeHorario').value,
+          plantillaA1: document.getElementById('cfgPlantillaA1').value,
+          plantillaA2: document.getElementById('cfgPlantillaA2').value,
+          plantillaB: document.getElementById('cfgPlantillaB').value,
+          confirmacionCierre: document.getElementById('cfgConfirmacionCierre').value
+        };
 
-    function closeLightbox() {
-      const modal = document.getElementById('lightboxModal');
-      modal.style.display = 'none';
+        const res = await fetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Configuración de mensajes guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar configuración de mensajes.');
+      }
     }
 
     async function fetchConsultas(forceRedraw = false) {
       try {
-        const res = await fetch(`/api/consultas?estado=${encodeURIComponent(currentFilter)}`);
+        const res = await fetch('/api/consultas');
+        if (!res.ok) return;
         const data = await res.json();
         allConsultas = data.consultas || [];
-        
-        const resAll = await fetch('/api/consultas?estado=todos');
-        const dataAll = await resAll.json();
-        updateStats(dataAll.consultas || []);
-
+        updateStats(allConsultas);
         renderConsultas(forceRedraw);
       } catch (err) {
         console.error('Error al cargar consultas:', err);
-      }
-    }
-
-    async function generar70Pruebas(evt) {
-      const btn = evt ? evt.target : document.querySelector('.btn-seed');
-      btn.innerText = '⏳ Generando...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/seed-consultas', { method: 'POST' });
-        const data = await res.json();
-        alert(`✅ ${data.mensaje || '70 consultas generadas exitosamente'}`);
-        fetchConsultas(true);
-      } catch (e) {
-        alert('Error al generar datos de prueba.');
-      } finally {
-        btn.innerText = '⚡ Generar 70 Consultas de Prueba';
-        btn.disabled = false;
-      }
-    }
-
-    async function limpiarTodasPruebas() {
-      if (!confirm('⚠️ ¿Estás seguro de que deseas vaciar y eliminar todas las consultas y chats de prueba?')) {
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/clear-consultas', { method: 'POST' });
-        const data = await res.json();
-        draftResponses = {};
-        alert('🗑️ ' + (data.mensaje || 'Consultas eliminadas correctamente.'));
-        fetchConsultas(true);
-      } catch (e) {
-        alert('Error al vaciar consultas.');
       }
     }
 
@@ -682,13 +754,52 @@
       document.getElementById('numPendientes').innerText = pendientes;
       document.getElementById('numAtendidas').innerText = atendidas;
       document.getElementById('numTotal').innerText = totalArray.length;
+      document.getElementById('countBadge').innerText = pendientes;
     }
 
     function setFilter(filter, btn) {
       currentFilter = filter;
       document.querySelectorAll('.filters-bar .tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      fetchConsultas(true);
+      renderConsultas(true);
+    }
+
+    function setTagFilter(tag, btn) {
+      currentTagFilter = tag;
+      document.querySelectorAll('.tag-filter-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderConsultas(true);
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+      renderConsultas(true);
+    }
+
+    async function toggleTag(cardId, tagKey) {
+      const target = allConsultas.find(c => c.id === cardId);
+      if (!target) return;
+
+      const datos = target.datos || {};
+      let tags = datos.etiquetas || [];
+
+      if (tags.includes(tagKey)) {
+        tags = tags.filter(t => t !== tagKey);
+      } else {
+        tags.push(tagKey);
+      }
+
+      datos.etiquetas = tags;
+      target.datos = datos;
+      renderConsultas(true);
+
+      try {
+        await fetch(`/api/consultas/${cardId}/etiquetas`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ etiquetas: tags })
+        });
+      } catch (e) {}
     }
 
     function insertTemplate(cardId, templateText) {
@@ -727,59 +838,90 @@
         }
       });
 
-      const activeEl = document.activeElement;
-      const activeId = (activeEl && activeEl.id && activeEl.id.startsWith('replyText_')) ? activeEl.id : null;
-      const selStart = activeId ? activeEl.selectionStart : null;
-      const selEnd = activeId ? activeEl.selectionEnd : null;
+      let filtered = allConsultas;
 
-      const currentSignature = currentFilter + '_' + JSON.stringify(allConsultas.map(c => [c.id, c.estado, c.timestamp, (c.datos && c.datos.respuestasPaciente ? c.datos.respuestasPaciente.length : 0), (c.datos && c.datos.respuestasSecretaria ? c.datos.respuestasSecretaria.length : 0)]));
+      if (currentFilter !== 'todos') {
+        filtered = filtered.filter(c => (c.estado || 'pendiente') === currentFilter);
+      }
 
-      if (!forceRedraw && currentSignature === lastRenderedSignature && container.children.length > 0) {
+      if (currentTagFilter !== 'all') {
+        filtered = filtered.filter(c => c.datos && c.datos.etiquetas && c.datos.etiquetas.includes(currentTagFilter));
+      }
+
+      if (searchQuery) {
+        filtered = filtered.filter(c => {
+          const rem = (c.remitente || '').toLowerCase();
+          const msg = (c.datos && c.datos.contenidoMensaje ? c.datos.contenidoMensaje : '').toLowerCase();
+          return rem.includes(searchQuery) || msg.includes(searchQuery);
+        });
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">No hay solicitudes en esta sección. (¡Bandeja al día!)</div>`;
         return;
       }
 
-      lastRenderedSignature = currentSignature;
+      let html = '';
 
-      if (allConsultas.length === 0) {
-        container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 60px; text-align: center; background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border);">No hay consultas en esta sección. (${currentFilter === 'pendiente' ? '¡Bandeja de entrada limpia!' : 'Historial vacío'})</div>`;
-        return;
-      }
-
-      container.innerHTML = allConsultas.map(c => {
-        const isPendiente = (c.estado || 'pendiente') === 'pendiente';
-        const cleanPhone = (c.remitente || '').replace(/\D/g, '');
-        const fecha = new Date(c.timestamp || c.createdAt || Date.now()).toLocaleString('es-AR');
-
+      filtered.forEach(c => {
         const datos = c.datos || {};
-        const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '';
-        const imgUrl = datos.imagenUrl;
-        const imgBase64 = datos.imagenBase64;
-        const proveedor = datos.proveedorAlmacenamiento || 'Drive';
-        const currentDraft = draftResponses[c.id] || '';
-
-        const displayImg = imgBase64 || (imgUrl && !imgUrl.includes('drive.google.com/file/d/demo_drive_') ? imgUrl : null);
-        const respuestasPaciente = datos.respuestasPaciente || [];
         const respuestasSecretaria = datos.respuestasSecretaria || [];
+        const respuestasPaciente = datos.respuestasPaciente || [];
+        const etiquetas = datos.etiquetas || [];
+        const fecha = new Date(c.timestamp || c.createdAt).toLocaleString();
+        const displayImg = datos.imagenBase64 || datos.imagenUrl;
+        const imgUrl = datos.imagenUrl;
+        const proveedor = datos.proveedorAlmacenamiento || 'Directo';
 
-        return `
-          <div class="card-consulta">
+        const draftValue = draftResponses[c.id] || '';
+        const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+          ? datos.imagenesAdjuntas
+          : (displayImg ? [displayImg] : []);
+
+        const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
+
+        html += `
+          <div class="card" id="card_${c.id}">
             <div class="card-header">
-              <span class="opcion-tag">${c.opcion || 'Consulta'}</span>
-              <span class="status-tag ${isPendiente ? (respuestasPaciente.length > 0 ? 'status-novedad' : 'status-pendiente') : 'status-atendido'}">${isPendiente ? (respuestasPaciente.length > 0 ? '🔔 Novedad / Paciente Respondió' : '⏳ Pendiente') : '✅ Finalizado'}</span>
+              <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
+                ${c.opcion || 'Consulta'}
+              </span>
+              <span class="tab-btn" style="background: ${c.estado === 'atendido' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(251, 191, 36, 0.2)'}; color: ${c.estado === 'atendido' ? '#34d399' : '#fbbf24'}; border: none; font-size: 0.75rem;">
+                ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
+              </span>
             </div>
 
             <div class="patient-info">
-              <div><strong>Paciente:</strong> <span class="phone-link">📱 ${c.remitente}</span></div>
+              <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${c.remitente}</span></div>
               <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
+
+              <!-- ETIQUETAS Y ETIQUETADOR -->
+              <div style="margin-top: 4px;">
+                ${etiquetas.map(t => {
+                  const def = TAG_DEFINITIONS[t];
+                  if (!def) return '';
+                  return `<span class="tag-badge" style="background:${def.bg}; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
+                }).join('')}
+              </div>
+
+              <div class="tag-selector">
+                <span style="font-size: 0.7rem; color: var(--muted); font-weight: 600; align-self: center;">Etiquetar:</span>
+                ${Object.entries(TAG_DEFINITIONS).map(([key, def]) => {
+                  const isSel = etiquetas.includes(key);
+                  return `<button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color};` : ''}" onclick="toggleTag('${c.id}', '${key}')">${def.label}</button>`;
+                }).join('')}
+              </div>
             </div>
 
             <!-- 📥 Solicitud Inicial del Paciente -->
-            <div class="raw-msg" title="Datos enviados por el paciente">${contenidoMsg}</div>
+            <div style="background: #0f172a; padding: 10px; border-radius: 8px; font-size: 0.85rem; color: #cbd5e1; white-space: pre-wrap; border: 1px solid var(--border);">
+              ${contenidoMsg}
+            </div>
 
-            <!-- 👩‍⚕️ Historial de Ofertas / Respuestas de Secretaría -->
+            <!-- 👩‍⚕️ Historial de Respuestas de Secretaría -->
             ${respuestasSecretaria.length > 0 ? `
               <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
-                <strong style="color: #60a5fa;">👩‍⚕️ Ofrecido Anteriormente por Secretaría:</strong>
+                <strong style="color: #60a5fa;">👩‍⚕️ Enviado por Secretaría:</strong>
                 ${respuestasSecretaria.map(r => `
                   <div style="margin-top: 4px; color: #e2e8f0;">
                     💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
@@ -788,9 +930,9 @@
               </div>
             ` : ''}
 
-            <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE (ALTA VISIBILIDAD) -->
+            <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE -->
             ${respuestasPaciente.length > 0 ? `
-              <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem; box-shadow: 0 4px 15px rgba(0, 230, 153, 0.2);">
+              <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem;">
                 <strong style="color: #00e699; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">💬 Respuesta del Paciente en Vivo:</strong>
                 ${respuestasPaciente.map(r => `
                   <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
@@ -802,15 +944,10 @@
 
             <!-- 📷 GALERÍA MULTI-FOTO DE PEDIDOS MÉDICOS ADJUNTOS -->
             ${(() => {
-              const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
-                ? datos.imagenesAdjuntas
-                : (displayImg ? [displayImg] : []);
-
               if (listImagenes.length === 0 && !imgUrl) return '';
-
               return `
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length || 1}):</span>
+                  <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length}):</span>
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
                     ${listImagenes.map((imgSrc, idx) => `
                       <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
@@ -821,113 +958,81 @@
                       </div>
                     `).join('')}
                   </div>
-                  ${imgUrl ? `<a href="${imgUrl}" target="_blank" class="drive-link-btn">📷 Ver Enlace ${proveedor}</a>` : ''}
                 </div>
               `;
             })()}
 
             <div class="reply-box">
-              <label>💬 Escribir Respuesta al Paciente (Presioná Enter para Enviar):</label>
+              <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
 
               <div class="quick-reply-chips">
-                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu turno ha sido agendado exitosamente para el día [Fecha] a las [Hora] hs. Te esperamos.')">✅ Confirmar Turno</span>
-                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Por favor envíanos una foto más legible de tu pedido médico u orden para procesar tu solicitud.')">📷 Pedir Foto Legible</span>
-                <span class="chip" onclick="insertTemplate('${c.id}', '¡Hola! Tu solicitud PAMI fue ingresada correctamente. Nos comunicaremos cuando la orden esté emitida.')">🩺 Estado PAMI</span>
+                <button class="chip-btn" onclick="insertTemplate('${c.id}', '✅ ¡Hola! Tu turno fue agendado con éxito.')">✅ Confirmar Turno</button>
+                <button class="chip-btn" onclick="insertTemplate('${c.id}', '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.')">📷 Pedir Foto Legible</button>
+                <button class="chip-btn" onclick="insertTemplate('${c.id}', '⚕️ Tu solicitud de PAMI fue recibida y enviada a auditoría médica.')">🩺 Estado PAMI</button>
               </div>
 
-              <textarea id="replyText_${c.id}" oninput="saveDraft('${c.id}', this.value)" onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); responderViaApi('${c.remitente}', '${c.id}'); }" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${currentDraft}</textarea>
+              <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${draftValue}</textarea>
 
-              <!-- 📄 ADJUNTAR INDICACIONES PDF -->
-              <div class="pdf-select-box">
-                <label>📄 Adjuntar Indicaciones de Estudio (PDF):</label>
-                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)">
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                <label style="font-size: 0.78rem; color: #38bdf8; font-weight: 600;">📄 Adjuntar Indicaciones de Estudio (PDF):</label>
+                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.8rem;">
                   <option value="">-- Sin Archivo Adjunto --</option>
-                  <option value="sangre">📄 Indicaciones Análisis de Sangre / Laboratorio</option>
-                  <option value="ecografia">📄 Indicaciones Ecografía / Tomografía (Ayuno 8hs)</option>
+                  <option value="sangre">📄 Preparación Análisis de Sangre (Laboratorio)</option>
+                  <option value="ecografia">📄 Preparación Ecografía / Tomografía (Ayuno 8hs)</option>
                   <option value="cirugia">📄 Cuidados Post-Cirugía y Reposo</option>
-                  <option value="orl">📄 Instructivo Preparación Estudios ORL</option>
+                  <option value="orl">📄 Instructivo Estudios ORL</option>
                 </select>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                  <span style="font-size: 0.72rem; color: var(--muted);">O subir PDF personalizado:</span>
-                  <input type="file" accept="application/pdf" style="font-size: 0.7rem; color: #94a3b8;" onchange="handleCustomPdfUpload('${c.id}', this)">
+                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                  O subir PDF personalizado:
+                  <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
                 </div>
               </div>
 
-              <!-- BOTÓN PRINCIPAL ÚNICO "ENVIAR" -->
-              <button type="button" class="btn-submit-main" onclick="responderViaApi('${c.remitente}', '${c.id}')">
-                📤 Enviar Respuesta
+              <button class="btn" style="margin-top: 8px; width: 100%; font-size: 0.95rem;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
+                📤 Enviar Respuesta por WhatsApp
               </button>
+            </div>
 
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--muted);">
-                <a href="#" onclick="responderPorWhatsAppWeb('${c.remitente}', '${c.id}'); return false;" style="color: #60a5fa; text-decoration: underline;">🌐 Abrir conversación en WhatsApp Web</a>
-                <span>Presioná <strong>Enter</strong> para enviar</span>
-              </div>
-
-              ${isPendiente ? `
-                <button type="button" onclick="marcarAtendido('${c.id}')" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 8px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; margin-top: 4px;">
-                  ✅ Marcar Atendido / Finalizar Chat
-                </button>
-              ` : ''}
+            <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+              <button class="btn btn-secondary" style="font-size: 0.78rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
+                ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
+              </button>
             </div>
           </div>
         `;
-      }).reverse().join('');
+      });
 
-      if (activeId) {
-        const restoredEl = document.getElementById(activeId);
-        if (restoredEl) {
-          restoredEl.focus();
-          if (selStart !== null && selEnd !== null) {
-            try { restoredEl.setSelectionRange(selStart, selEnd); } catch(e) {}
-          }
+      container.innerHTML = html;
+
+      // Re-vincular atajo Enter a los textareas
+      filtered.forEach(c => {
+        const ta = document.getElementById(`replyText_${c.id}`);
+        if (ta) {
+          ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              responderViaApi(c.id, c.remitente);
+            }
+          });
         }
-      }
+      });
     }
 
-    async function responderPorWhatsAppWeb(remitente, cardId) {
-      const textarea = document.getElementById(`replyText_${cardId}`);
-      const texto = textarea ? textarea.value.trim() : (draftResponses[cardId] || '');
+    async function responderViaApi(idConsulta, remitente) {
+      const textarea = document.getElementById(`replyText_${idConsulta}`);
+      const respuestaText = textarea ? textarea.value.trim() : '';
 
-      const cleanPhone = remitente.replace(/\D/g, '');
-      const encodedMsg = encodeURIComponent(texto || '¡Hola! Nos comunicamos desde la Secretaría de la Clínica Médica.');
-      const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
+      const pdfKey = selectedPdfs[idConsulta] || '';
+      let pdfBase64ToSend = customPdfBase64[idConsulta] || null;
+      let pdfNombreToSend = customPdfNames[idConsulta] || null;
 
-      window.open(waUrl, '_blank');
-
-      if (texto) {
-        await fetch('/api/send-message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ remitente, respuesta: texto, idConsulta: cardId })
-        });
-      } else {
-        await marcarAtendido(cardId);
+      if (!pdfBase64ToSend && pdfKey && PREDEFINED_PDFS[pdfKey]) {
+        pdfNombreToSend = PREDEFINED_PDFS[pdfKey].name;
       }
 
-      delete draftResponses[cardId];
-      if (textarea) textarea.value = '';
-      fetchConsultas(true);
-    }
-
-    async function responderViaApi(remitente, cardId) {
-      const textarea = document.getElementById(`replyText_${cardId}`);
-      const respuesta = textarea ? textarea.value.trim() : (draftResponses[cardId] || '');
-
-      const pdfKey = selectedPdfs[cardId];
-      let pdfBase64 = null;
-      let pdfNombre = null;
-
-      if (pdfKey && pdfKey !== 'custom' && PREDEFINED_PDFS[pdfKey]) {
-        pdfNombre = PREDEFINED_PDFS[pdfKey].name;
-        pdfBase64 = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4gZW5kb2JqCjQgMCBvYmogPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+IGVuZG9iago1IDAgb2JqIDw8IC9MZW5ndGggMTMwID4+CnN0cmVhbQpCVAovRjEgMjAgVGYKNTAgNzAwIFRkCihJTkRJQ0FDSU9ORVMgTUVESUNBUyAtIENMSU5JQ0EgTUVESUNBKSBUagowIC0zMCBUZAovRjEgMTIgVGYKKEYgZmF2b3Igc2lndWEgYXRlbnRhbWVudGUgZXN0YXMgaW5zdHJ1Y2Npb25lcyBhbnRlcyBkZSBzdSBlc3R1ZGlvLikgVGoKRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDYgMDAwMDAgbiAKMDAwMDAwMDMxOCAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjUwMAolJUVPRg==';
-      } else if (pdfKey === 'custom' && customPdfBase64[cardId]) {
-        pdfBase64 = customPdfBase64[cardId];
-        pdfNombre = customPdfNames[cardId] || 'Indicaciones.pdf';
-      }
-
-      if (!respuesta && !pdfBase64) {
-        alert('Por favor escribe un mensaje o adjunta un documento PDF antes de enviar.');
+      if (!respuestaText && !pdfKey) {
+        alert('Por favor escribe un mensaje o selecciona un documento PDF para enviar.');
         return;
       }
 
@@ -937,42 +1042,91 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             remitente,
-            respuesta,
-            idConsulta: cardId,
-            pdfNombre,
-            pdfBase64
+            respuesta: respuestaText,
+            idConsulta,
+            pdfKey: pdfKey !== 'custom' ? pdfKey : undefined,
+            pdfNombre: pdfNombreToSend,
+            pdfBase64: pdfBase64ToSend
           })
         });
 
         const data = await res.json();
         if (data.success) {
-          delete draftResponses[cardId];
-          delete selectedPdfs[cardId];
-          delete customPdfBase64[cardId];
-          delete customPdfNames[cardId];
+          delete draftResponses[idConsulta];
+          delete selectedPdfs[idConsulta];
+          delete customPdfBase64[idConsulta];
+          delete customPdfNames[idConsulta];
           if (textarea) textarea.value = '';
           fetchConsultas(true);
         } else {
-          alert(`❌ Error: ${data.error || 'No se pudo enviar'}`);
+          alert('Error al enviar mensaje: ' + (data.error || 'Desconocido'));
         }
       } catch (err) {
-        alert('Error al conectar con el servidor.');
+        alert('Error de conexión al enviar mensaje.');
       }
     }
 
-    async function marcarAtendido(id) {
+    async function marcarEstado(id, nuevoEstado) {
       try {
         const res = await fetch(`/api/consultas/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ estado: 'atendido' })
+          body: JSON.stringify({ estado: nuevoEstado })
         });
         if (res.ok) {
-          delete draftResponses[id];
           fetchConsultas(true);
         }
-      } catch (err) {
-        console.error('Error al actualizar estado:', err);
+      } catch (e) {}
+    }
+
+    function exportToCsv() {
+      if (allConsultas.length === 0) {
+        alert('No hay solicitudes para exportar.');
+        return;
+      }
+
+      const rows = [
+        ['ID Consulta', 'Paciente / Teléfono', 'Tipo Solicitud', 'Estado', 'Fecha', 'Etiquetas', 'Contenido Mensaje']
+      ];
+
+      allConsultas.forEach(c => {
+        const datos = c.datos || {};
+        const tags = (datos.etiquetas || []).join('; ');
+        const msg = (datos.contenidoMensaje || datos.mensajeRaw || '').replace(/"/g, '""');
+        rows.push([
+          c.id,
+          c.remitente,
+          c.opcion || 'Consulta',
+          c.estado || 'pendiente',
+          new Date(c.timestamp || c.createdAt).toLocaleString(),
+          tags,
+          `"${msg}"`
+        ]);
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Solicitudes_Clinica_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openLightbox(src) {
+      const modal = document.getElementById('lightboxModal');
+      const img = document.getElementById('lightboxImg');
+      if (modal && img) {
+        img.src = src;
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightboxModal');
+      if (modal) {
+        modal.style.display = 'none';
       }
     }
   </script>
