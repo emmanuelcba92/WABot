@@ -211,14 +211,16 @@ export class FirestoreService {
       const respAnteriores = datos.respuestasPaciente || [];
       
       let imagenesAdjuntas = Array.isArray(datos.imagenesAdjuntas) ? [...datos.imagenesAdjuntas] : [];
-      if (datos.imagenBase64 && !imagenesAdjuntas.includes(datos.imagenBase64)) {
-        imagenesAdjuntas.unshift(datos.imagenBase64);
+      if (datos.imagenBase64 && imagenesAdjuntas.length === 0) {
+        imagenesAdjuntas.push(datos.imagenBase64);
       }
-      if (imagenBase64 && !imagenesAdjuntas.includes(imagenBase64)) {
+
+      // Agregar cada foto recibida sin descartar repeticiones de prueba
+      if (imagenBase64) {
         imagenesAdjuntas.push(imagenBase64);
       }
 
-      // Permitir guardar hasta 10 fotos por consulta sin restricciones
+      // Permitir guardar hasta 10 fotos por consulta
       if (imagenesAdjuntas.length > 10) {
         imagenesAdjuntas = imagenesAdjuntas.slice(-10);
       }
