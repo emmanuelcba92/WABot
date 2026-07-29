@@ -588,24 +588,35 @@
 
       <!-- NAVEGACIÓN POR SUB-PESTAÑAS DE CONFIGURACIÓN -->
       <div class="sub-nav-tabs">
-        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención</button>
+        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención & Mensaje Fuera de Horario</button>
         <button class="sub-nav-btn" id="subTabTreeBtn" onclick="switchSettingsSubTab('tree')">📱 2. Constructor No-Code de Menú & Opciones</button>
         <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
       </div>
 
-      <!-- SUB-SECCIÓN 1: HORARIO CONTROL -->
-      <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+      <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJE FUERA DE HORARIO -->
+      <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
         <h3 style="font-size: 1.1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
         <p style="font-size: 0.86rem; color: var(--muted);">Define si el bot responde automáticamente según el horario oficial de la clínica (Lun-Vie 8-20h) o si forzamos la atención abierta o cerrada.</p>
 
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
           <button class="btn btn-secondary" id="schedAuto" onclick="setScheduleMode('auto')">⏰ Automático (8-20h)</button>
           <button class="btn btn-secondary" id="schedOpen" onclick="setScheduleMode('always_open')">🟢 Forzar Abierto (24/7)</button>
           <button class="btn btn-secondary" id="schedClosed" onclick="setScheduleMode('always_closed')">🌙 Forzar Cerrado</button>
         </div>
 
-        <div id="settingsScheduleBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399; margin-top: 8px;">
+        <div id="settingsScheduleBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
           🟢 Estado Actual: Cargando...
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 1rem; color: #38bdf8;">🌙 Mensaje Automático de Fuera de Horario</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Este texto se le envía automáticamente al paciente cuando escribe fuera del horario de atención.</p>
+
+          <textarea id="cfgFueraDeHorario" style="min-height: 110px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de fuera de horario..."></textarea>
+
+          <button class="btn" style="align-self: flex-start; padding: 10px 20px; font-size: 0.9rem; margin-top: 4px;" onclick="saveFueraDeHorarioConfig()">
+            💾 Guardar Mensaje de Fuera de Horario
+          </button>
         </div>
       </div>
 
@@ -752,12 +763,40 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
+      fetchBotConfig();
       fetchTagConfig();
       fetchMenuTree();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
       setInterval(fetchScheduleConfig, 10000);
     });
+
+    async function fetchBotConfig() {
+      try {
+        const res = await fetch('/api/bot-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cfg = data.config || {};
+        if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
+      } catch (e) {}
+    }
+
+    async function saveFueraDeHorarioConfig() {
+      try {
+        const val = document.getElementById('cfgFueraDeHorario').value;
+        const res = await fetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fueraDeHorario: val })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Mensaje de fuera de horario guardado exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar mensaje de fuera de horario.');
+      }
+    }
 
     function switchMainTab(tab) {
       const viewC = document.getElementById('viewConsultas');
@@ -933,13 +972,13 @@
 
       if (badgeSettings) {
         if (mode === 'always_open') {
-          badgeSettings.innerText = '🟢 Horario Activo: FORZADO ABIERTO 24/7 (Atendiendo)';
+          badgeSettings.innerText = '🟢 Estado Actual: FORZADO ABIERTO 24/7 (Atendiendo)';
           badgeSettings.style.color = '#34d399';
         } else if (mode === 'always_closed') {
-          badgeSettings.innerText = '🌙 Horario Activo: FORZADO CERRADO';
+          badgeSettings.innerText = '🌙 Estado Actual: FORZADO CERRADO';
           badgeSettings.style.color = '#ef4444';
         } else {
-          badgeSettings.innerText = '⏰ Horario Activo: AUTOMÁTICO (Lun-Vie 8-20h)';
+          badgeSettings.innerText = '⏰ Estado Actual: AUTOMÁTICO (Lun-Vie 8-20h)';
           badgeSettings.style.color = '#60a5fa';
         }
       }
