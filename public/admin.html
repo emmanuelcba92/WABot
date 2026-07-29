@@ -88,22 +88,22 @@
 
     .sub-nav-tabs {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       background: rgba(15, 23, 42, 0.6);
       padding: 6px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      width: fit-content;
+      flex-wrap: wrap;
     }
 
     .sub-nav-btn {
       background: transparent;
       border: none;
       color: var(--muted);
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -588,9 +588,11 @@
 
       <!-- NAVEGACIÓN POR SUB-PESTAÑAS DE CONFIGURACIÓN -->
       <div class="sub-nav-tabs">
-        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención & Mensaje Fuera de Horario</button>
+        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención</button>
         <button class="sub-nav-btn" id="subTabTreeBtn" onclick="switchSettingsSubTab('tree')">📱 2. Constructor No-Code de Menú & Opciones</button>
         <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
+        <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
+        <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJE FUERA DE HORARIO -->
@@ -690,6 +692,44 @@
         </button>
       </div>
 
+      <!-- SUB-SECCIÓN 4: RESPUESTAS RÁPIDAS -->
+      <div id="subSettingsQuick" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⚡ Gestión de Respuestas Rápidas</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura los botones de respuesta rápida que las secretarias pueden insertar en 1 clic.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewQuickReply()">➕ Crear Respuesta Rápida</button>
+        </div>
+
+        <div id="quickReplyEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de respuestas rápidas dinámicas -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveQuickRepliesConfig()">
+          💾 Guardar Respuestas Rápidas
+        </button>
+      </div>
+
+      <!-- SUB-SECCIÓN 5: PDFS PREDETERMINADOS -->
+      <div id="subSettingsPdf" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">📄 Gestión de PDFs Predeterminados</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Agrega o modifica los documentos PDF que las secretarias adjuntan en los envíos.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewPdfItem()">➕ Agregar Documento PDF</button>
+        </div>
+
+        <div id="pdfEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de PDFs dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="savePdfItemsConfig()">
+          💾 Guardar Lista de PDFs
+        </button>
+      </div>
+
     </div>
 
   </div>
@@ -749,22 +789,30 @@
       'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
     };
 
+    let quickRepliesList = [
+      { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
+      { id: 'qr_2', title: '📷 Pedir Foto Legible', text: '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.' },
+      { id: 'qr_3', title: '🩺 Estado PAMI', text: '⚕️ Tu solicitud de PAMI fue recibida y enviada a auditoría médica.' }
+    ];
+
+    let predefinedPdfsList = [
+      { id: 'sangre', title: '📄 Preparación Análisis de Sangre (Laboratorio)', name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf' },
+      { id: 'ecografia', title: '📄 Preparación Ecografía / Tomografía (Ayuno 8hs)', name: 'Indicaciones_Ecografia_Tomografia_Ayuno.pdf' },
+      { id: 'cirugia', title: '📄 Cuidados Post-Cirugía y Reposo', name: 'Indicaciones_Post_Cirugia_Cuidados.pdf' },
+      { id: 'orl', title: '📄 Instructivo Estudios ORL', name: 'Instructivo_Estudios_ORL.pdf' }
+    ];
+
     let currentMenuTree = {
       welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
       items: []
-    };
-
-    const PREDEFINED_PDFS = {
-      'sangre': { name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf', title: '📄 Preparación Análisis de Sangre / Laboratorio' },
-      'ecografia': { name: 'Indicaciones_Ecografia_Tomografia_Ayuno.pdf', title: '📄 Preparación Ecografía / Tomografía (Ayuno 8hs)' },
-      'cirugia': { name: 'Indicaciones_Post_Cirugia_Cuidados.pdf', title: '📄 Cuidados Post-Cirugía y Reposo' },
-      'orl': { name: 'Instructivo_Estudios_ORL.pdf', title: '📄 Instructivo Preparación Estudios ORL' }
     };
 
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
       fetchBotConfig();
       fetchTagConfig();
+      fetchQuickRepliesConfig();
+      fetchPdfItemsConfig();
       fetchMenuTree();
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
@@ -798,6 +846,109 @@
       }
     }
 
+    async function fetchQuickRepliesConfig() {
+      try {
+        const res = await fetch('/api/quick-replies');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items) {
+          quickRepliesList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderQuickRepliesEditor() {
+      const container = document.getElementById('quickReplyEditorList');
+      let html = '';
+      quickRepliesList.forEach((qr, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${qr.title}" onchange="updateQuickTitle(${idx}, this.value)" placeholder="Título del Botón (ej: ✅ Confirmar Turno)..." style="font-weight: 700; flex: 1;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeQuickReply(${idx})">🗑️</button>
+            </div>
+            <textarea onchange="updateQuickText(${idx}, this.value)" style="width: 100%; min-height: 60px; font-size: 0.85rem;" placeholder="Texto que se insertará al hacer clic...">${qr.text}</textarea>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateQuickTitle(idx, val) { quickRepliesList[idx].title = val.trim(); }
+    function updateQuickText(idx, val) { quickRepliesList[idx].text = val.trim(); }
+    function addNewQuickReply() {
+      quickRepliesList.push({ id: `qr_${Date.now()}`, title: '⚡ Nueva Respuesta', text: 'Texto de la respuesta rápida...' });
+      renderQuickRepliesEditor();
+    }
+    function removeQuickReply(idx) { quickRepliesList.splice(idx, 1); renderQuickRepliesEditor(); }
+
+    async function saveQuickRepliesConfig() {
+      try {
+        const res = await fetch('/api/quick-replies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: quickRepliesList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Respuestas rápidas guardadas exitosamente.');
+        }
+      } catch (e) { alert('Error al guardar respuestas rápidas.'); }
+    }
+
+    async function fetchPdfItemsConfig() {
+      try {
+        const res = await fetch('/api/pdf-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items) {
+          predefinedPdfsList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderPdfEditor() {
+      const container = document.getElementById('pdfEditorList');
+      let html = '';
+      predefinedPdfsList.forEach((pdf, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${pdf.title}" onchange="updatePdfTitle(${idx}, this.value)" placeholder="Título del PDF en desplegable..." style="font-weight: 700; flex: 1;">
+              <input type="text" value="${pdf.name}" onchange="updatePdfName(${idx}, this.value)" placeholder="Nombre del archivo.pdf..." style="width: 250px;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removePdfItem(${idx})">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updatePdfTitle(idx, val) { predefinedPdfsList[idx].title = val.trim(); }
+    function updatePdfName(idx, val) { predefinedPdfsList[idx].name = val.trim(); }
+    function addNewPdfItem() {
+      const id = `pdf_${Date.now()}`;
+      predefinedPdfsList.push({ id, title: '📄 Nuevo Instructivo PDF', name: 'Documento_Instrucciones.pdf' });
+      renderPdfEditor();
+    }
+    function removePdfItem(idx) { predefinedPdfsList.splice(idx, 1); renderPdfEditor(); }
+
+    async function savePdfItemsConfig() {
+      try {
+        const res = await fetch('/api/pdf-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: predefinedPdfsList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Lista de PDFs predeterminados guardada exitosamente.');
+        }
+      } catch (e) { alert('Error al guardar PDFs.'); }
+    }
+
     function switchMainTab(tab) {
       const viewC = document.getElementById('viewConsultas');
       const viewS = document.getElementById('viewSettings');
@@ -821,28 +972,36 @@
       const secSched = document.getElementById('subSettingsSchedule');
       const secTree = document.getElementById('subSettingsTree');
       const secTags = document.getElementById('subSettingsTags');
+      const secQuick = document.getElementById('subSettingsQuick');
+      const secPdf = document.getElementById('subSettingsPdf');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
       const btnTags = document.getElementById('subTabTagsBtn');
+      const btnQuick = document.getElementById('subTabQuickBtn');
+      const btnPdf = document.getElementById('subTabPdfBtn');
 
-      [btnSched, btnTree, btnTags].forEach(b => b.classList.remove('active'));
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf].forEach(b => b.classList.remove('active'));
+
+      [secSched, secTree, secTags, secQuick, secPdf].forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
-        secSched.style.display = 'none';
         secTree.style.display = 'grid';
-        secTags.style.display = 'none';
         btnTree.classList.add('active');
       } else if (subTab === 'tags') {
-        secSched.style.display = 'none';
-        secTree.style.display = 'none';
         secTags.style.display = 'flex';
         btnTags.classList.add('active');
         renderTagEditor();
+      } else if (subTab === 'quick') {
+        secQuick.style.display = 'flex';
+        btnQuick.classList.add('active');
+        renderQuickRepliesEditor();
+      } else if (subTab === 'pdf') {
+        secPdf.style.display = 'flex';
+        btnPdf.classList.add('active');
+        renderPdfEditor();
       } else {
         secSched.style.display = 'flex';
-        secTree.style.display = 'none';
-        secTags.style.display = 'none';
         btnSched.classList.add('active');
       }
     }
@@ -1268,6 +1427,12 @@
     function renderConsultas(forceRedraw = false) {
       const container = document.getElementById('consultasGrid');
 
+      // PROTECCIÓN 100% CONTRA PÉRDIDA DE FOCO AL ESCRIBIR:
+      // Si la secretaria está escribiendo en un textarea o input de una tarjeta, pausar la regeneración del DOM en segundo plano.
+      if (!forceRedraw && document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) {
+        return;
+      }
+
       document.querySelectorAll('.reply-box textarea').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
         if (ta.value.trim().length > 0) {
@@ -1401,22 +1566,23 @@
             <div class="reply-box">
               <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
 
+              <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS -->
               <div class="quick-reply-chips">
-                <button class="chip-btn" onclick="insertTemplate('${c.id}', '✅ ¡Hola! Tu turno fue agendado con éxito.')">✅ Confirmar Turno</button>
-                <button class="chip-btn" onclick="insertTemplate('${c.id}', '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.')">📷 Pedir Foto Legible</button>
-                <button class="chip-btn" onclick="insertTemplate('${c.id}', '⚕️ Tu solicitud de PAMI fue recibida y enviada a auditoría médica.')">🩺 Estado PAMI</button>
+                ${quickRepliesList.map(qr => `
+                  <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
+                `).join('')}
               </div>
 
               <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${draftValue}</textarea>
 
               <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
                 <label style="font-size: 0.78rem; color: #38bdf8; font-weight: 600;">📄 Adjuntar Indicaciones de Estudio (PDF):</label>
+                <!-- DESPLEGABLE DINÁMICO DE PDFS PREDETERMINADOS -->
                 <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.8rem;">
                   <option value="">-- Sin Archivo Adjunto --</option>
-                  <option value="sangre">📄 Preparación Análisis de Sangre (Laboratorio)</option>
-                  <option value="ecografia">📄 Preparación Ecografía / Tomografía (Ayuno 8hs)</option>
-                  <option value="cirugia">📄 Cuidados Post-Cirugía y Reposo</option>
-                  <option value="orl">📄 Instructivo Estudios ORL</option>
+                  ${predefinedPdfsList.map(pdf => `
+                    <option value="${pdf.id}">${pdf.title}</option>
+                  `).join('')}
                 </select>
 
                 <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
@@ -1462,8 +1628,11 @@
       let pdfBase64ToSend = customPdfBase64[idConsulta] || null;
       let pdfNombreToSend = customPdfNames[idConsulta] || null;
 
-      if (!pdfBase64ToSend && pdfKey && PREDEFINED_PDFS[pdfKey]) {
-        pdfNombreToSend = PREDEFINED_PDFS[pdfKey].name;
+      if (!pdfBase64ToSend && pdfKey) {
+        const found = predefinedPdfsList.find(p => p.id === pdfKey);
+        if (found) {
+          pdfNombreToSend = found.name;
+        }
       }
 
       if (!respuestaText && !pdfKey) {

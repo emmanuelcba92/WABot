@@ -28,6 +28,32 @@ export interface TagDefinition {
   color: string;
 }
 
+export interface QuickReplyItem {
+  id: string;
+  title: string;
+  text: string;
+}
+
+export interface PredefinedPdfItem {
+  id: string;
+  title: string;
+  name: string;
+  base64?: string;
+}
+
+export const DEFAULT_QUICK_REPLIES: QuickReplyItem[] = [
+  { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
+  { id: 'qr_2', title: '📷 Pedir Foto Legible', text: '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.' },
+  { id: 'qr_3', title: '🩺 Estado PAMI', text: '⚕️ Tu solicitud de PAMI fue recibida y enviada a auditoría médica.' }
+];
+
+export const DEFAULT_PREDEFINED_PDFS: PredefinedPdfItem[] = [
+  { id: 'sangre', title: '📄 Preparación Análisis de Sangre (Laboratorio)', name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf' },
+  { id: 'ecografia', title: '📄 Preparación Ecografía / Tomografía (Ayuno 8hs)', name: 'Indicaciones_Ecografia_Tomografia_Ayuno.pdf' },
+  { id: 'cirugia', title: '📄 Cuidados Post-Cirugía y Reposo', name: 'Indicaciones_Post_Cirugia_Cuidados.pdf' },
+  { id: 'orl', title: '📄 Instructivo Estudios ORL', name: 'Instructivo_Estudios_ORL.pdf' }
+];
+
 export const DEFAULT_TAGS: Record<string, TagDefinition> = {
   'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
   'falta_foto': { key: 'falta_foto', label: '🟡 Falta Foto', color: '#d97706' },
@@ -67,6 +93,8 @@ export class FirestoreService {
   private static globalBotConfig: BotConfigMessages = {};
   private static globalMenuTree: MenuTreeConfig | null = null;
   private static globalTags: Record<string, TagDefinition> | null = null;
+  private static globalQuickReplies: QuickReplyItem[] | null = null;
+  private static globalPdfConfig: PredefinedPdfItem[] | null = null;
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -113,6 +141,82 @@ export class FirestoreService {
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
+  }
+
+  public async getQuickReplies(): Promise<QuickReplyItem[]> {
+    if (FirestoreService.globalQuickReplies) return FirestoreService.globalQuickReplies;
+    if (!this.projectId) return DEFAULT_QUICK_REPLIES;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/quick_replies${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          FirestoreService.globalQuickReplies = fields.items as QuickReplyItem[];
+          return fields.items as QuickReplyItem[];
+        }
+      }
+    } catch (e) {}
+
+    return DEFAULT_QUICK_REPLIES;
+  }
+
+  public async saveQuickReplies(items: QuickReplyItem[]): Promise<void> {
+    FirestoreService.globalQuickReplies = items;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/quick_replies${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ items, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar quick_replies en Firestore:', e);
+    }
+  }
+
+  public async getPdfConfig(): Promise<PredefinedPdfItem[]> {
+    if (FirestoreService.globalPdfConfig) return FirestoreService.globalPdfConfig;
+    if (!this.projectId) return DEFAULT_PREDEFINED_PDFS;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pdf_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          FirestoreService.globalPdfConfig = fields.items as PredefinedPdfItem[];
+          return fields.items as PredefinedPdfItem[];
+        }
+      }
+    } catch (e) {}
+
+    return DEFAULT_PREDEFINED_PDFS;
+  }
+
+  public async savePdfConfig(items: PredefinedPdfItem[]): Promise<void> {
+    FirestoreService.globalPdfConfig = items;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pdf_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ items, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar pdf_config en Firestore:', e);
+    }
   }
 
   public async getTagConfig(): Promise<Record<string, TagDefinition>> {

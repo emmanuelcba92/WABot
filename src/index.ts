@@ -53,6 +53,48 @@ app.post('/api/schedule-config', async (c) => {
   }
 });
 
+app.get('/api/quick-replies', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const items = await firestore.getQuickReplies();
+  return c.json({ items });
+});
+
+app.post('/api/quick-replies', async (c) => {
+  try {
+    const body = await c.req.json();
+    const items = body.items || body;
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveQuickReplies(items);
+    return c.json({
+      success: true,
+      mensaje: 'Respuestas rápidas actualizadas exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar respuestas rápidas', details: e?.message }, 500);
+  }
+});
+
+app.get('/api/pdf-config', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const items = await firestore.getPdfConfig();
+  return c.json({ items });
+});
+
+app.post('/api/pdf-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const items = body.items || body;
+    const firestore = new FirestoreService(c.env);
+    await firestore.savePdfConfig(items);
+    return c.json({
+      success: true,
+      mensaje: 'Lista de PDFs predeterminados actualizada exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar PDFs predeterminados', details: e?.message }, 500);
+  }
+});
+
 app.get('/api/tag-config', async (c) => {
   const firestore = new FirestoreService(c.env);
   const tags = await firestore.getTagConfig();
