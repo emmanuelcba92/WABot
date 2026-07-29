@@ -1,6 +1,5 @@
 import { WebhookPayload, WebhookResponse, StateType, UserSession, Env } from '../types';
 import { MESSAGES } from '../templates/messages';
-import { MENU_PRINCIPAL, SUBMENU_TURNOS, interactiveToPlainText } from '../templates/buttons';
 import { FirestoreService } from '../services/firestoreService';
 import { ScheduleService } from '../services/scheduleService';
 import { ImageUploadService } from '../services/imageUploadService';
@@ -42,8 +41,7 @@ export class StateEngine {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
-          respuesta: interactiveToPlainText(MENU_PRINCIPAL),
-          interactive: MENU_PRINCIPAL,
+          respuesta: MESSAGES.SALUDO_BIENVENIDA,
           estadoActual: 'esperando_opcion_principal',
           enHorario: true,
           timestamp
@@ -67,8 +65,7 @@ export class StateEngine {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
         remitente,
-        respuesta: interactiveToPlainText(MENU_PRINCIPAL),
-        interactive: MENU_PRINCIPAL,
+        respuesta: MESSAGES.SALUDO_BIENVENIDA,
         estadoActual: 'esperando_opcion_principal',
         enHorario: true,
         timestamp
@@ -85,8 +82,7 @@ export class StateEngine {
           await firestore.saveSesion(remitente, 'esperando_opcion_a_sub');
           return {
             remitente,
-            respuesta: interactiveToPlainText(SUBMENU_TURNOS),
-            interactive: SUBMENU_TURNOS,
+            respuesta: MESSAGES.SUBMENU_OPCION_A,
             estadoActual: 'esperando_opcion_a_sub',
             enHorario: true,
             timestamp
@@ -130,8 +126,7 @@ export class StateEngine {
         } else {
           return {
             remitente,
-            respuesta: interactiveToPlainText(MENU_PRINCIPAL),
-            interactive: MENU_PRINCIPAL,
+            respuesta: MESSAGES.SALUDO_BIENVENIDA,
             estadoActual: 'esperando_opcion_principal',
             enHorario: true,
             timestamp
@@ -153,8 +148,7 @@ export class StateEngine {
         } else {
           return {
             remitente,
-            respuesta: interactiveToPlainText(SUBMENU_TURNOS),
-            interactive: SUBMENU_TURNOS,
+            respuesta: MESSAGES.SUBMENU_OPCION_A,
             estadoActual: 'esperando_opcion_a_sub',
             enHorario: true,
             timestamp
@@ -187,8 +181,7 @@ export class StateEngine {
         await firestore.saveSesion(remitente, 'esperando_opcion_principal');
         return {
           remitente,
-          respuesta: interactiveToPlainText(MENU_PRINCIPAL),
-          interactive: MENU_PRINCIPAL,
+          respuesta: MESSAGES.SALUDO_BIENVENIDA,
           estadoActual: 'esperando_opcion_principal',
           enHorario: true,
           timestamp
