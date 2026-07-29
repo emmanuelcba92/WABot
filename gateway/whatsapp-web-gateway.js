@@ -1,53 +1,54 @@
-/**
- * CONECTOR WHATSAPP PROTOCOLO NATIVO (BAILEYS ENGINE)
- * 
- * Motor ultra-rápido de WhatsApp sin navegador Chrome (100% nativo en Node.js).
- * Desencripta fotos HD de 1080p/4K en 0.05 segundos y optimiza adjuntos para almacenar hasta 10 fotos por consulta.
- */
-
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  downloadMediaMessage,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 const sharp = require('sharp');
 
-const WORKER_BASE_URL = process.env.WORKER_URL ? process.env.WORKER_URL.replace('/webhook', '') : 'https://coatwa.emmanuel-ag92.workers.dev';
-const WORKER_WEBHOOK_URL = `${WORKER_BASE_URL}/webhook`;
+// Configuración del Webhook del Backend en Cloudflare Worker
+const WORKER_WEBHOOK_URL = process.env.WORKER_WEBHOOK_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
+const WORKER_PENDING_URL = process.env.WORKER_PENDING_URL || 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
 
-console.log('🚀 Iniciando Conector Nativo de WhatsApp (Engine Baileys)...');
-console.log(`🔗 Webhook apuntando a: ${WORKER_WEBHOOK_URL}\n`);
+const AUTH_FOLDER = path.join(__dirname, 'baileys_auth');
 
-// Helper con reintentos automáticos para tolerar parpadeos de red
-async function fetchWithRetry(url, options = {}, retries = 3, delayMs = 600) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+// Control de duplicados por ID de mensaje
+const processedMsgIds = new Set();
+
+async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch(url, options);
-      return res;
+      const response = await fetch(url, options);
+      if (response.ok) return response;
     } catch (err) {
-      if (attempt === retries) throw err;
-      await new Promise(r => setTimeout(r, delayMs));
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, delay));
     }
   }
 }
 
-let sock = null;
-const processedMsgIds = new Set();
+async function startWhatsAppGateway() {
+  console.log('🚀 Iniciando Gateway de WhatsApp Web (Baileys v6.7+)...');
 
-async function connectToWhatsApp() {
-  const { state, saveCreds } = await useMultiFileAuthState('./baileys_auth');
-  const { version } = await fetchLatestBaileysVersion();
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+  console.log(`ℹ️ Usando WhatsApp Web v${version.join('.')}, ¿Es la última versión?: ${isLatest}`);
 
-  sock = makeWASocket({
+  const sock = makeWASocket({
     version,
-    auth: state,
-    logger: pino({ level: 'silent' }),
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+    },
     printQRInTerminal: false,
-    generateHighQualityLinkPreview: true
+    logger: pino({ level: 'silent' }),
+    browser: ['Clínica Médica Bot', 'Chrome', '1.0.0']
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -56,25 +57,36 @@ async function connectToWhatsApp() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log('📱 ESCANEA ESTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:\n');
-      qrcode.generate(qr, { small: true });
+      console.log('\n==================================================');
+      console.log('📱 ESCANEA ESTE CÓDIGO QR CON WHATSAPP EN TU CELULAR:');
+      console.log('==================================================\n');
+      QRCode.generate(qr, { small: true });
+      console.log('\n==================================================\n');
     }
 
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('🔌 Conexión cerrada. Reorganizando enlace...', shouldReconnect ? 'Reconectando...' : 'Sesión cerrada');
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log(`⚠️ Conexión cerrada. Razón/Status: ${statusCode}. Reconectando: ${shouldReconnect}`);
+
       if (shouldReconnect) {
-        setTimeout(connectToWhatsApp, 3000);
+        setTimeout(startWhatsAppGateway, 3000);
+      } else {
+        console.log('❌ Sesión cerrada por el usuario. Eliminando auth y reiniciando...');
+        if (fs.existsSync(AUTH_FOLDER)) {
+          fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+        }
+        setTimeout(startWhatsAppGateway, 3000);
       }
     } else if (connection === 'open') {
-      console.log('✅ ¡WhatsApp Nativo Conectado y Listo para recibir y enviar mensajes!');
-      console.log('📸 [Motor HD Optimizado] Soporte para hasta 10 fotos por consulta activado (Sharp HD 1200px)');
-      console.log('📡 Servicio de entrega automática de respuestas y adjuntos PDF ACTIVADO (Polling 3s)\n');
+      console.log('✅ CONEXIÓN ESTABLECIDA EXITOSAMENTE CON WHATSAPP WEB.');
+      console.log('🟢 Bot receptor listo para procesar mensajes e imágenes HD entrantes.');
     }
   });
 
-  // Escuchar mensajes entrantes del paciente
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  // Reorganizar recepción de mensajes entrantes
+  sock.ev.on('messages.upsert', async (m) => {
+    const { messages, type } = m;
     if (type !== 'notify') return;
 
     for (const msg of messages) {
@@ -95,13 +107,18 @@ async function connectToWhatsApp() {
         const mensajeTexto = msg.message.conversation ||
           msg.message.extendedTextMessage?.text ||
           msg.message.imageMessage?.caption ||
+          msg.message.documentMessage?.caption ||
           '';
 
         let imagenBase64 = null;
         let imagenNombre = null;
+        let pdfBase64 = null;
+        let pdfNombre = null;
 
-        // Detectar si el paciente envió una foto o archivo adjunto de imagen
+        // Detectar si el paciente envió una foto
         const isImage = !!msg.message.imageMessage;
+        // Detectar si el paciente envió un documento PDF
+        const isDocument = !!msg.message.documentMessage || !!msg.message.documentWithCaptionMessage;
 
         if (isImage) {
           try {
@@ -119,7 +136,6 @@ async function connectToWhatsApp() {
             if (rawBuffer && rawBuffer.length > 2000) {
               let optimizedBuffer = rawBuffer;
               try {
-                // Optimizar peso a 1200px con nitidez máxima para almacenar múltiples fotos en Firestore
                 optimizedBuffer = await sharp(rawBuffer)
                   .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
                   .jpeg({ quality: 82 })
@@ -131,14 +147,39 @@ async function connectToWhatsApp() {
               const mimetype = 'image/jpeg';
               imagenBase64 = `data:${mimetype};base64,${optimizedBuffer.toString('base64')}`;
               imagenNombre = `foto_${Date.now()}.jpg`;
-              console.log(`📸 [HD ÉXITO CRISTALINO] Foto procesada en nitidez máxima 1200px (${rawBuffer.length}b -> ${optimizedBuffer.length}b / ${imagenBase64.length} base64)`);
+              console.log(`📸 [HD ÉXITO CRISTALINO] Foto procesada en nitidez máxima 1200px (${rawBuffer.length}b -> ${optimizedBuffer.length}b)`);
             }
           } catch (imgErr) {
             console.error('❌ Error al desencriptar foto HD nativa:', imgErr?.message || imgErr);
           }
+        } else if (isDocument) {
+          try {
+            const docMsg = msg.message.documentMessage || msg.message.documentWithCaptionMessage?.message?.documentMessage;
+            const mimetype = docMsg?.mimetype || 'application/pdf';
+            const fileName = docMsg?.fileName || `documento_${Date.now()}.pdf`;
+
+            console.log(`📄 [Descargando Documento] Recibiendo PDF/Documento (${fileName}) de ${remoteJid}...`);
+            const docBuffer = await downloadMediaMessage(
+              msg,
+              'buffer',
+              {},
+              {
+                logger: pino({ level: 'silent' }),
+                reuploadRequest: sock.updateMediaMessage
+              }
+            );
+
+            if (docBuffer && docBuffer.length > 100) {
+              pdfBase64 = `data:${mimetype};base64,${docBuffer.toString('base64')}`;
+              pdfNombre = fileName;
+              console.log(`📄 [PDF RECIBIDO EXITOSAMENTE] ${fileName} (${docBuffer.length} bytes)`);
+            }
+          } catch (docErr) {
+            console.error('❌ Error al procesar documento PDF entrante:', docErr?.message || docErr);
+          }
         }
 
-        console.log(`📩 Mensaje recibido de ${remoteJid}: "${mensajeTexto || (imagenBase64 ? '📷 (Foto adjunta)' : '')}"`);
+        console.log(`📩 Mensaje recibido de ${remoteJid}: "${mensajeTexto || (imagenBase64 ? '📷 (Foto)' : (pdfBase64 ? '📄 (PDF)' : ''))}"`);
 
         // Enviar payload al Webhook de Cloudflare Worker
         const res = await fetchWithRetry(WORKER_WEBHOOK_URL, {
@@ -148,78 +189,56 @@ async function connectToWhatsApp() {
             remitente: remoteJid,
             mensaje: mensajeTexto,
             imagenBase64,
-            imagenNombre
+            imagenNombre,
+            pdfBase64,
+            pdfNombre
           })
-        }, 3, 600);
-
-        if (!res.ok) {
-          console.error(`❌ Error del Worker HTTP ${res.status}`);
-          continue;
-        }
+        });
 
         const data = await res.json();
 
+        // Si el bot generó respuesta automática inmediata, enviarla por WhatsApp
         if (data.respuesta) {
+          console.log(`🤖 Enviando respuesta automática del bot a ${remoteJid}...`);
           await sock.sendMessage(remoteJid, { text: data.respuesta });
-          console.log(`🤖 Respuesta del bot enviada a ${remoteJid}`);
         }
       } catch (err) {
-        console.error('❌ Error al procesar mensaje entrante:', err?.message || err);
+        console.error('❌ Error procesando mensaje de WhatsApp:', err?.message || err);
       }
     }
   });
-}
 
-// Polling continuo de respuestas enviadas por secretarias desde admin.html
-async function pollSecretaryOutgoingMessages() {
-  if (!sock) return;
+  // Polling para enviar respuestas escritas por las secretarias desde el Panel Web (admin.html)
+  setInterval(async () => {
+    try {
+      const res = await fetch(WORKER_PENDING_URL);
+      if (!res.ok) return;
 
-  try {
-    const res = await fetchWithRetry(`${WORKER_BASE_URL}/api/pending-outgoing`, {}, 2, 400);
-    if (!res || !res.ok) return;
+      const data = await res.json();
+      const messages = data.messages || [];
 
-    const data = await res.json();
-    const messages = data.messages || [];
+      for (const item of messages) {
+        if (item.remitente) {
+          console.log(`👩‍⚕️ [SECRETARÍA -> WA] Enviando mensaje manual a ${item.remitente}...`);
 
-    for (const item of messages) {
-      if (item.remitente && (item.text || item.pdfBase64 || item.pdfUrl)) {
-        try {
+          // Si la secretaria adjuntó un archivo PDF personalizado o de plantilla
           if (item.pdfBase64) {
-            const cleanBase64 = item.pdfBase64.includes(',') ? item.pdfBase64.split(',')[1] : item.pdfBase64;
-            const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+            const buffer = Buffer.from(item.pdfBase64.split(',')[1] || item.pdfBase64, 'base64');
             await sock.sendMessage(item.remitente, {
-              document: pdfBuffer,
+              document: buffer,
               mimetype: 'application/pdf',
-              fileName: item.pdfNombre || 'Indicaciones.pdf',
-              caption: item.text || ''
+              fileName: item.pdfNombre || 'Indicaciones_Medicas.pdf',
+              caption: item.text
             });
-            console.log(`📄 [Secretaría] Documento PDF (${item.pdfNombre || 'Indicaciones.pdf'}) + Respuesta enviada a ${item.remitente}`);
-          } else if (item.pdfUrl) {
-            const pdfRes = await fetch(item.pdfUrl);
-            const arrayBuf = await pdfRes.arrayBuffer();
-            await sock.sendMessage(item.remitente, {
-              document: Buffer.from(arrayBuf),
-              mimetype: 'application/pdf',
-              fileName: item.pdfNombre || 'Indicaciones.pdf',
-              caption: item.text || ''
-            });
-            console.log(`📄 [Secretaría] Documento PDF URL + Respuesta enviada a ${item.remitente}`);
-          } else if (item.text) {
+          } else {
             await sock.sendMessage(item.remitente, { text: item.text });
-            console.log(`📤 [Secretaría] Respuesta entregada con éxito a ${item.remitente}: "${item.text.substring(0, 40)}..."`);
           }
-        } catch (sendErr) {
-          console.error(`❌ Error al entregar mensaje de secretaría a ${item.remitente}:`, sendErr?.message || sendErr);
+
+          console.log(`✅ Mensaje de Secretaría enviado exitosamente a ${item.remitente}`);
         }
       }
-    }
-  } catch (err) {
-    // Silencioso en reintentos de red
-  }
+    } catch (e) {}
+  }, 4000);
 }
 
-// Iniciar polling regular cada 3 segundos
-setInterval(pollSecretaryOutgoingMessages, 3000);
-
-// Iniciar cliente de WhatsApp
-connectToWhatsApp();
+startWhatsAppGateway().catch((err) => console.error('❌ Error fatal en Gateway:', err));

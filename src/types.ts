@@ -45,6 +45,8 @@ export interface WebhookPayload {
   simulatedTime?: string;
   imagenBase64?: string;
   imagenNombre?: string;
+  pdfBase64?: string;
+  pdfNombre?: string;
 }
 
 export interface InteractiveButton {
@@ -64,35 +66,29 @@ export interface InteractiveListSection {
   rows: InteractiveListRow[];
 }
 
-export interface InteractiveButtonMessage {
-  type: 'button';
-  bodyText: string;
-  buttons: InteractiveButton[];
+export interface InteractiveMessage {
+  type: 'button' | 'list';
+  header?: string;
+  body: string;
+  footer?: string;
+  buttons?: InteractiveButton[];
+  sections?: InteractiveListSection[];
+  buttonText?: string;
 }
-
-export interface InteractiveListMessage {
-  type: 'list';
-  bodyText: string;
-  buttonLabel: string;
-  sections: InteractiveListSection[];
-}
-
-export type InteractiveMessage = InteractiveButtonMessage | InteractiveListMessage;
 
 export interface WebhookResponse {
-  remitente: string;
   respuesta: string;
   interactive?: InteractiveMessage;
-  estadoActual: StateType | string;
-  enHorario: boolean;
-  timestamp: string;
+  siguienteEstado: StateType | string;
+  guardarEnBD?: boolean;
+  datosRecolectados?: Record<string, any>;
   imagenSubidaUrl?: string;
 }
 
 export interface MenuItemOption {
-  key: string;           // ej: 'a', 'b', '1', '2'
-  label: string;         // ej: 'Solicitud de Turnos'
-  type: 'submenu' | 'form' | 'info';
+  key: string;
+  label: string;
+  type: 'form' | 'submenu' | 'info';
   responseTemplate?: string;
   subItems?: MenuItemOption[];
 }

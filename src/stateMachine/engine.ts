@@ -1,40 +1,37 @@
-import { WebhookPayload, WebhookResponse, StateType, UserSession, Env, MenuTreeConfig, MenuItemOption } from '../types';
+import { WebhookPayload, WebhookResponse, Env } from '../types';
 import { MESSAGES } from '../templates/messages';
-import { FirestoreService } from '../services/firestoreService';
 import { ScheduleService } from '../services/scheduleService';
+import { FirestoreService } from '../services/firestoreService';
 import { ImageUploadService } from '../services/imageUploadService';
 
 export class StateEngine {
-  public static buildWelcomeMenu(tree: MenuTreeConfig): string {
-    let msg = tree.welcomeMessage || '🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:';
-    msg += '\n\n';
-    if (tree.items && Array.isArray(tree.items)) {
-      tree.items.forEach(item => {
-        msg += `*${item.key.toUpperCase()})* ${item.label}\n`;
-      });
-    }
-    return msg.trim();
-  }
-
-  public static async processMessage(payload: WebhookPayload, env?: Env): Promise<WebhookResponse> {
+  public static async processMessage(
+    payload: WebhookPayload,
+    env?: Env
+  ): Promise<WebhookResponse> {
+    const firestore = new FirestoreService(env);
     const remitente = payload.remitente.trim();
     const mensaje = payload.mensaje.trim();
-    const simulatedTime = payload.simulatedTime;
     const imagenBase64 = payload.imagenBase64;
     const imagenNombre = payload.imagenNombre;
-    const timestamp = new Date().toISOString();
+    const pdfBase64 = payload.pdfBase64;
+    const pdfNombre = payload.pdfNombre;
 
-    const firestore = new FirestoreService(env);
+    const timestamp = payload.simulatedTime || new Date().toISOString();
+
+    const scheduleMode = await firestore.getScheduleMode();
+    ScheduleService.setMode(scheduleMode);
+    const scheduleInfo = ScheduleService.isWithinBusinessHours(payload.simulatedTime, scheduleMode);
+
     const botConfig = await firestore.getBotConfig();
-    const menuTree = await firestore.getMenuTree();
-
-    const saludoBienvenidaMsg = this.buildWelcomeMenu(menuTree);
     const fueraDeHorarioMsg = botConfig.fueraDeHorario || MESSAGES.FUERA_DE_HORARIO;
 
-    // 1. Control de Horario (Persistido en Firestore)
-    const scheduleMode = await firestore.getScheduleMode();
-    const scheduleCheck = ScheduleService.isWithinBusinessHours(simulatedTime, scheduleMode);
-    if (!scheduleCheck.isWithinHours) {
+    const menuTree = await firestore.getMenuTree();
+    const saludoBienvenidaMsg = menuTree.welcomeMessage || MESSAGES.SALUDO_BIENVENIDA;
+
+    // 1. FUERA DE HORARIO DE ATENCIÓN
+    if (!scheduleInfo.isOpen) {
+      await firestore.saveSesion(remitente, 'inicio');
       return {
         remitente,
         respuesta: fueraDeHorarioMsg,
@@ -44,39 +41,27 @@ export class StateEngine {
       };
     }
 
-    // 2. Obtener estado de sesión del paciente
     const sesion = await firestore.getSesion(remitente);
-
-    // Normalizar texto para palabras clave de reinicio o saludo
     const msgClean = mensaje.toLowerCase().trim();
-    const esSaludoExplicit = ['hola', 'buen dia', 'buenas tardes', 'buenas noches', 'menu', 'inicio', 'volver', 'recomenzar'].includes(msgClean);
 
-    // 3. Si el paciente ya completó la solicitud y está esperando atención de secretaría
-    if (sesion.estado === 'esperando_atencion_humana') {
-      if (esSaludoExplicit) {
-        await firestore.saveSesion(remitente, 'esperando_opcion_principal');
-        return {
-          remitente,
-          respuesta: saludoBienvenidaMsg,
-          estadoActual: 'esperando_opcion_principal',
-          enHorario: true,
-          timestamp
-        };
+    // Reset comandos globales ("hola", "inicio", "menu")
+    const esSaludoExplicit = msgClean === 'hola' || msgClean === 'inicio' || msgClean === 'menu' || msgClean === 'cancelar' || msgClean === 'reset';
+
+    // 2. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL SI EL PACIENTE HABLA)
+    if (sesion.estado === 'esperando_atencion_humana' && !esSaludoExplicit) {
+      if (mensaje.length > 0 || imagenBase64 || pdfBase64) {
+        await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
       }
-
-      // Si el bot está en silencio, adjuntar la nueva foto o mensaje a la consulta existente
-      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
-
       return {
         remitente,
-        respuesta: '', // Cadena vacía = Bot en silencio sin spam
+        respuesta: '', // Silencio para no saturar al paciente mientras responde la secretaria
         estadoActual: 'esperando_atencion_humana',
         enHorario: true,
         timestamp
       };
     }
 
-    // 4. Mostrar Menú Principal si es un saludo explícito o si la sesión está en inicio
+    // 3. SALUDO INICIAL / RESET DE CONVERSACIÓN
     if (esSaludoExplicit || sesion.estado === 'inicio') {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
@@ -162,10 +147,10 @@ export class StateEngine {
       }
     }
 
-    // 7. RECEPCIÓN DE DATOS / FOTOS FINAL DE LA SOLICITUD
+    // 7. RECEPCIÓN DE DATOS / FOTOS / PDFS FINAL DE LA SOLICITUD
     if (typeof sesion.estado === 'string' && (sesion.estado.startsWith('esperando_datos_') || sesion.estado.startsWith('esperando_datos'))) {
       const opcionElegida = sesion.estado.replace('esperando_datos_', '').toUpperCase();
-      return await this.guardarConsultaFinal(remitente, opcionElegida, mensaje, imagenBase64, imagenNombre, env, timestamp, firestore);
+      return await this.guardarConsultaFinal(remitente, opcionElegida, mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
     }
 
     // Fallback al menú principal
@@ -185,6 +170,8 @@ export class StateEngine {
     mensaje: string,
     imagenBase64: string | undefined,
     imagenNombre: string | undefined,
+    pdfBase64: string | undefined,
+    pdfNombre: string | undefined,
     env: Env | undefined,
     timestamp: string,
     firestore: FirestoreService
@@ -193,7 +180,7 @@ export class StateEngine {
     const consultaActiva = consultasExistentes.find(c => c.remitente === remitente && c.estado === 'pendiente');
 
     if (consultaActiva) {
-      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64);
+      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
       await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
       return {
@@ -220,6 +207,8 @@ export class StateEngine {
       }
     }
 
+    const pdfsAdjuntos = pdfBase64 ? [{ nombre: pdfNombre || 'documento.pdf', base64: pdfBase64, timestamp }] : [];
+
     const datosEstructurados = {
       tipoSolicitud: opcionElegida,
       contenidoMensaje: mensaje,
@@ -227,6 +216,7 @@ export class StateEngine {
       imagenUrl: (proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') ? imagenSubidaUrl : null,
       imagenBase64: imagenBase64 || null,
       imagenesAdjuntas: imagenBase64 ? [imagenBase64] : [],
+      pdfsAdjuntos,
       proveedorAlmacenamiento: proveedorAlmacenamiento || null,
       respuestasPaciente: []
     };
@@ -235,7 +225,9 @@ export class StateEngine {
     await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
     let confirmacionMsg = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
-    if (imagenSubidaUrl && proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') {
+    if (pdfBase64) {
+      confirmacionMsg += `\n\n📄 *Documento PDF adjunto (${pdfNombre || 'archivo.pdf'}) recibido correctamente.*`;
+    } else if (imagenSubidaUrl && proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') {
       const prov = proveedorAlmacenamiento === 'google_drive' ? 'Google Drive'
         : proveedorAlmacenamiento === 'supabase' ? 'Supabase' : 'Almacenamiento';
       confirmacionMsg += `\n\n📷 *Imagen adjuntada correctamente en ${prov}:*\n[Ver Imagen](${imagenSubidaUrl})`;

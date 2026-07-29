@@ -826,6 +826,14 @@
       fetchConsultas();
       setInterval(fetchConsultas, 5000);
       setInterval(fetchScheduleConfig, 10000);
+
+      // TECLA ESCAPE PARA CERRAR FOTO EN ALTA DEFINICIÓN O MODALES
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeLightbox();
+          closeSubOptionModal();
+        }
+      });
     });
 
     async function fetchBotConfig() {
@@ -1493,6 +1501,8 @@
           ? datos.imagenesAdjuntas
           : (displayImg ? [displayImg] : []);
 
+        const listPdfs = datos.pdfsAdjuntos || [];
+
         const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
 
         html += `
@@ -1554,6 +1564,21 @@
                     🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
                   </div>
                 `).join('')}
+              </div>
+            ` : ''}
+
+            <!-- 📄 DOCUMENTOS PDF ENVIADOS POR EL PACIENTE -->
+            ${listPdfs.length > 0 ? `
+              <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(56, 189, 248, 0.06); padding: 10px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">📄 Documentos PDF Adjuntos del Paciente (${listPdfs.length}):</span>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  ${listPdfs.map((pdfItem, pIdx) => `
+                    <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
+                      <span>📄 ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`}</span>
+                      <span style="font-size: 0.75rem; background: #38bdf8; color: #0f172a; padding: 2px 8px; border-radius: 4px;">⬇️ Abrir PDF</span>
+                    </a>
+                  `).join('')}
+                </div>
               </div>
             ` : ''}
 

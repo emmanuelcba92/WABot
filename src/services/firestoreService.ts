@@ -467,7 +467,13 @@ export class FirestoreService {
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales, historial);
   }
 
-  public async appendPacienteMensajeAConsulta(remitente: string, textoMensaje: string, imagenBase64?: string): Promise<void> {
+  public async appendPacienteMensajeAConsulta(
+    remitente: string,
+    textoMensaje: string,
+    imagenBase64?: string,
+    pdfBase64?: string,
+    pdfNombre?: string
+  ): Promise<void> {
     const consultas = await this.getConsultas();
     const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
 
@@ -490,8 +496,19 @@ export class FirestoreService {
 
       datos.imagenesAdjuntas = imagenesAdjuntas;
 
+      let pdfsAdjuntos = Array.isArray(datos.pdfsAdjuntos) ? [...datos.pdfsAdjuntos] : [];
+      if (pdfBase64) {
+        pdfsAdjuntos.push({
+          nombre: pdfNombre || 'documento.pdf',
+          base64: pdfBase64,
+          timestamp: new Date().toISOString()
+        });
+      }
+      datos.pdfsAdjuntos = pdfsAdjuntos;
+
+      const tagDesc = pdfBase64 ? `📄 (PDF: ${pdfNombre || 'documento.pdf'})` : (imagenBase64 ? '📷 (Foto de pedido médico)' : '');
       const nuevaResp = {
-        texto: textoMensaje || (imagenBase64 ? '📷 (Foto de pedido médico adjuntada)' : ''),
+        texto: `${textoMensaje} ${tagDesc}`.trim(),
         timestamp: new Date().toISOString()
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
