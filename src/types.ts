@@ -69,17 +69,26 @@ export interface InteractiveListSection {
 export interface InteractiveMessage {
   type: 'button' | 'list';
   header?: string;
-  body: string;
+  body?: string;
+  bodyText?: string;
   footer?: string;
+  buttonLabel?: string;
+  buttonText?: string;
   buttons?: InteractiveButton[];
   sections?: InteractiveListSection[];
-  buttonText?: string;
 }
 
+export type InteractiveButtonMessage = InteractiveMessage;
+export type InteractiveListMessage = InteractiveMessage;
+
 export interface WebhookResponse {
+  remitente?: string;
   respuesta: string;
   interactive?: InteractiveMessage;
-  siguienteEstado: StateType | string;
+  estadoActual?: StateType | string;
+  siguienteEstado?: StateType | string;
+  enHorario?: boolean;
+  timestamp?: string;
   guardarEnBD?: boolean;
   datosRecolectados?: Record<string, any>;
   imagenSubidaUrl?: string;

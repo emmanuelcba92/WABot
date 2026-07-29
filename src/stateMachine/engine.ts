@@ -30,7 +30,7 @@ export class StateEngine {
     const saludoBienvenidaMsg = menuTree.welcomeMessage || MESSAGES.SALUDO_BIENVENIDA;
 
     // 1. FUERA DE HORARIO DE ATENCIÓN
-    if (!scheduleInfo.isOpen) {
+    if (!scheduleInfo.isWithinHours) {
       await firestore.saveSesion(remitente, 'inicio');
       return {
         remitente,
