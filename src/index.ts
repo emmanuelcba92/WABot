@@ -291,6 +291,65 @@ app.post('/api/clear-consultas', async (c) => {
   return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
 });
 
+app.post('/api/iniciar-chat', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { phone, nombre, mensaje, pdfNombre, pdfBase64 } = body;
+
+    if (!phone || (!mensaje && !pdfBase64)) {
+      return c.json({ error: 'Número de teléfono y mensaje o PDF son requeridos' }, 400);
+    }
+
+    let cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+    if (cleanPhone.startsWith('15')) cleanPhone = cleanPhone.substring(2);
+
+    if (!cleanPhone.startsWith('54')) {
+      cleanPhone = `549${cleanPhone}`;
+    } else if (cleanPhone.startsWith('54') && !cleanPhone.startsWith('549')) {
+      cleanPhone = `549${cleanPhone.substring(2)}`;
+    }
+
+    const remitente = cleanPhone;
+    const firestore = new FirestoreService(c.env);
+
+    // Poner la sesión en esperando atención humana
+    await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+
+    const idConsulta = await firestore.crearConsulta(remitente, 'Contacto Directo Secretaría', {
+      tipoSolicitud: 'Contacto Directo Secretaría',
+      contenidoMensaje: `💬 Chat Iniciado por Secretaría para ${nombre || remitente}`,
+      pushName: nombre || null,
+      lineasParseadas: [],
+      respuestasPaciente: [],
+      respuestasSecretaria: [{
+        texto: mensaje || 'Iniciado por secretaría',
+        timestamp: new Date().toISOString()
+      }]
+    });
+
+    const textoFinal = mensaje ? `👩‍⚕️ *[Secretaría]* ${mensaje}` : `👩‍⚕️ *[Secretaría]* Te enviamos un documento adjunto de la Clínica Médica.`;
+
+    await firestore.agregarMensajeHistorial(remitente, {
+      id: `msg_${Date.now()}_sec_init`,
+      sender: 'secretaria',
+      text: textoFinal,
+      timestamp: new Date().toISOString()
+    });
+
+    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
+
+    return c.json({
+      success: true,
+      idConsulta,
+      remitente,
+      mensaje: `Chat iniciado exitosamente con ${nombre || remitente}`
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Error al iniciar nuevo chat', details: err?.message }, 500);
+  }
+});
+
 app.post('/api/forward-telemedicina', async (c) => {
   try {
     const body = await c.req.json();

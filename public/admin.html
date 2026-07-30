@@ -651,6 +651,11 @@
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <!-- BOTÓN INICIAR NUEVO CHAT -->
+          <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); font-weight: 700; box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);" onclick="openIniciarChatModal()">
+            💬 Iniciar Nuevo Chat / Escribir a Número
+          </button>
+
           <!-- SELECTOR DE MODO DE VISTA (TARJETAS vs CHAT ESTILO WHATSAPP) -->
           <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
             <button class="nav-tab-btn active" id="viewModeGridBtn" onclick="setViewMode('grid')">🎴 Vista Tarjetas</button>
@@ -906,6 +911,49 @@
   <div id="lightboxModal" class="lightbox-modal" style="display: none;" onclick="closeLightbox()">
     <button class="lightbox-close" onclick="closeLightbox()">✕</button>
     <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- MODAL DE INICIAR NUEVO CHAT -->
+  <div id="iniciarChatModal" class="lightbox-modal" style="display: none;" onclick="closeIniciarChatModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #00a884; font-weight: 700;">💬 Iniciar Nuevo Chat por WhatsApp</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeIniciarChatModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>📱 Número de Teléfono del Paciente:</label>
+        <input type="text" id="newChatPhone" placeholder="Ej: 3516123456 o 5493516123456..." style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">
+      </div>
+
+      <div class="settings-group">
+        <label>👤 Nombre del Paciente (Opcional):</label>
+        <input type="text" id="newChatName" placeholder="Ej: Juan Pérez...">
+      </div>
+
+      <div class="settings-group">
+        <label>💬 Mensaje Inicial a Enviar:</label>
+        <textarea id="newChatMessage" style="min-height: 90px; font-size: 0.9rem;" placeholder="Escribe el mensaje inicial o plantilla para el paciente..."></textarea>
+      </div>
+
+      <div class="quick-reply-chips" id="newChatQuickReplies">
+        <!-- Respuestas rápidas dinámicas -->
+      </div>
+
+      <div class="settings-group">
+        <label>📄 Adjuntar Indicación o Instructivo (PDF Opcional):</label>
+        <select id="newChatPdfSelect" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 8px;">
+          <option value="">-- Sin Archivo Adjunto --</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeIniciarChatModal()">Cancelar</button>
+        <button class="btn" style="background: #00a884; color: #ffffff; font-weight: 700; padding: 12px 22px;" onclick="submitIniciarChat()">
+          📤 Iniciar Chat y Enviar por WhatsApp
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL DE DERIVACIÓN DE TELEMEDICINA -->
@@ -1172,9 +1220,89 @@
           closeLightbox();
           closeSubOptionModal();
           closeTelemedicinaModal();
+          closeIniciarChatModal();
         }
       });
     });
+
+    function openIniciarChatModal() {
+      document.getElementById('newChatPhone').value = '';
+      document.getElementById('newChatName').value = '';
+      document.getElementById('newChatMessage').value = '';
+
+      const qrContainer = document.getElementById('newChatQuickReplies');
+      let qrHtml = '';
+      quickRepliesList.forEach(qr => {
+        qrHtml += `<button class="chip-btn" onclick="insertNewChatTemplate(\`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>`;
+      });
+      qrContainer.innerHTML = qrHtml;
+
+      const pdfSelect = document.getElementById('newChatPdfSelect');
+      let pdfHtml = '<option value="">-- Sin Archivo PDF Adjunto --</option>';
+      predefinedPdfsList.forEach(pdf => {
+        pdfHtml += `<option value="${pdf.id}">${pdf.title}</option>`;
+      });
+      pdfSelect.innerHTML = pdfHtml;
+
+      document.getElementById('iniciarChatModal').style.display = 'flex';
+    }
+
+    function closeIniciarChatModal() {
+      document.getElementById('iniciarChatModal').style.display = 'none';
+    }
+
+    function insertNewChatTemplate(text) {
+      document.getElementById('newChatMessage').value = text;
+    }
+
+    async function submitIniciarChat() {
+      const phone = document.getElementById('newChatPhone').value.trim();
+      const nombre = document.getElementById('newChatName').value.trim();
+      const mensaje = document.getElementById('newChatMessage').value.trim();
+      const pdfKey = document.getElementById('newChatPdfSelect').value;
+
+      let pdfNombre = null;
+      if (pdfKey) {
+        const found = predefinedPdfsList.find(p => p.id === pdfKey);
+        if (found) pdfNombre = found.name;
+      }
+
+      if (!phone) {
+        alert('Por favor ingresa el número de teléfono del paciente.');
+        return;
+      }
+
+      if (!mensaje && !pdfKey) {
+        alert('Por favor escribe un mensaje o selecciona un PDF para enviar al paciente.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/iniciar-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone,
+            nombre,
+            mensaje,
+            pdfKey,
+            pdfNombre
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ ¡Mensaje enviado y chat iniciado exitosamente con ${nombre || phone}!`);
+          closeIniciarChatModal();
+          selectedChatId = data.idConsulta;
+          fetchConsultas(true);
+        } else {
+          alert('Error al iniciar chat: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('Error de conexión al iniciar chat.');
+      }
+    }
 
     async function fetchDoctorsConfig() {
       try {
