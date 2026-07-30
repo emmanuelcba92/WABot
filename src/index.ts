@@ -374,10 +374,20 @@ app.post('/api/forward-telemedicina', async (c) => {
     // 1. Enviar Encabezado al Médico (isForwardToDoctor = true para no sobreescribir con el JID del paciente)
     await firestore.addPendingOutgoing(doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
 
-    // 2. Enviar PDFs Adjuntos al Médico
+    // 2. Enviar PDFs Adjuntos al Médico (Deduplicados)
     const respuestasPaciente = datos.respuestasPaciente || [];
-    const pdfsFromResp = respuestasPaciente.filter((r: any) => r.pdfBase64).map((r: any) => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
-    const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+    const rawPdfs = [
+      ...(datos.pdfsAdjuntos || []),
+      ...respuestasPaciente.filter((r: any) => r.pdfBase64).map((r: any) => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }))
+    ];
+
+    const uniquePdfsMap = new Map();
+    for (const item of rawPdfs) {
+      if (item && item.base64 && !uniquePdfsMap.has(item.base64)) {
+        uniquePdfsMap.set(item.base64, item);
+      }
+    }
+    const listPdfs = Array.from(uniquePdfsMap.values());
 
     for (const pdfItem of listPdfs) {
       if (pdfItem.base64) {
@@ -385,22 +395,28 @@ app.post('/api/forward-telemedicina', async (c) => {
       }
     }
 
-    // 3. Enviar Imágenes Adjuntas al Médico
+    // 3. Enviar Imágenes Adjuntas al Médico (Deduplicadas por string base64)
     const displayImg = datos.imagenBase64 || datos.imagenUrl;
     const imgFromResp = respuestasPaciente.filter((r: any) => r.imagenBase64).map((r: any) => r.imagenBase64);
-    const listImagenes = [
+    const rawImagenes = [
       ...(datos.imagenesAdjuntas || []),
       ...imgFromResp
     ];
-    if (listImagenes.length === 0 && displayImg) {
-      listImagenes.push(displayImg);
+    if (rawImagenes.length === 0 && displayImg) {
+      rawImagenes.push(displayImg);
     }
 
-    for (const imgSrc of listImagenes) {
+    const uniqueImagenesSet = new Set<string>();
+    for (const imgSrc of rawImagenes) {
       if (imgSrc && typeof imgSrc === 'string' && imgSrc.length > 20) {
-        const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
-        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
+        uniqueImagenesSet.add(imgSrc);
       }
+    }
+    const listImagenes = Array.from(uniqueImagenesSet);
+
+    for (const imgSrc of listImagenes) {
+      const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
+      await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
     }
 
     // 4. Registrar en la consulta que fue derivada a Telemedicina
