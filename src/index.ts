@@ -2,24 +2,22 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Env, WebhookPayload } from './types';
 import { StateEngine } from './stateMachine/engine';
-import { ScheduleService, ScheduleMode } from './services/scheduleService';
-import { FirestoreService } from './services/firestoreService';
-import { SeedService } from './services/seedService';
 import { MESSAGES } from './templates/messages';
+import { FirestoreService, DEFAULT_MENU_TREE } from './services/firestoreService';
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use('*', cors());
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.get('/api/status', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const mode = await firestore.getScheduleMode();
-  const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
+app.get('/health', (c) => {
   return c.json({
     status: 'ok',
-    service: 'WA Bot Backend - Clínica Médica',
-    platform: 'Cloudflare Worker',
-    scheduleInfo: schedule
+    timestamp: new Date().toISOString(),
+    service: 'WA Bot Clínica Worker'
   });
 });
 
@@ -32,45 +30,12 @@ app.get('/api/vip-contacts', async (c) => {
 app.post('/api/vip-contacts', async (c) => {
   try {
     const body = await c.req.json();
-    const items = body.items || body;
+    const items = body.items || [];
     const firestore = new FirestoreService(c.env);
     await firestore.saveVipContacts(items);
-    return c.json({
-      success: true,
-      mensaje: 'Lista de contactos VIP / prioritarios actualizada exitosamente.'
-    });
+    return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar contactos VIP', details: e?.message }, 500);
-  }
-});
-
-app.get('/api/schedule-config', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const mode = await firestore.getScheduleMode();
-  ScheduleService.setMode(mode);
-  const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
-  return c.json({
-    mode,
-    scheduleInfo: schedule
-  });
-});
-
-app.post('/api/schedule-config', async (c) => {
-  try {
-    const body = await c.req.json();
-    const mode = (body.mode as ScheduleMode) || 'auto';
-    ScheduleService.setMode(mode);
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveScheduleMode(mode);
-    const schedule = ScheduleService.isWithinBusinessHours(undefined, mode);
-    return c.json({
-      success: true,
-      mode,
-      scheduleInfo: schedule,
-      mensaje: `Modo de horario actualizado a: ${mode}`
-    });
-  } catch (e: any) {
-    return c.json({ error: 'Error al cambiar modo de horario', details: e?.message }, 500);
   }
 });
 
@@ -83,13 +48,10 @@ app.get('/api/quick-replies', async (c) => {
 app.post('/api/quick-replies', async (c) => {
   try {
     const body = await c.req.json();
-    const items = body.items || body;
+    const items = body.items || [];
     const firestore = new FirestoreService(c.env);
     await firestore.saveQuickReplies(items);
-    return c.json({
-      success: true,
-      mensaje: 'Respuestas rápidas actualizadas exitosamente.'
-    });
+    return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar respuestas rápidas', details: e?.message }, 500);
   }
@@ -104,15 +66,12 @@ app.get('/api/pdf-config', async (c) => {
 app.post('/api/pdf-config', async (c) => {
   try {
     const body = await c.req.json();
-    const items = body.items || body;
+    const items = body.items || [];
     const firestore = new FirestoreService(c.env);
     await firestore.savePdfConfig(items);
-    return c.json({
-      success: true,
-      mensaje: 'Lista de PDFs predeterminados actualizada exitosamente.'
-    });
+    return c.json({ success: true, count: items.length });
   } catch (e: any) {
-    return c.json({ error: 'Error al guardar PDFs predeterminados', details: e?.message }, 500);
+    return c.json({ error: 'Error al guardar configuración de PDFs', details: e?.message }, 500);
   }
 });
 
@@ -125,15 +84,30 @@ app.get('/api/tag-config', async (c) => {
 app.post('/api/tag-config', async (c) => {
   try {
     const body = await c.req.json();
-    const tags = body.tags || body;
+    const tags = body.tags || {};
     const firestore = new FirestoreService(c.env);
     await firestore.saveTagConfig(tags);
-    return c.json({
-      success: true,
-      mensaje: 'Configuración de etiquetas y colores actualizada exitosamente.'
-    });
+    return c.json({ success: true });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar etiquetas', details: e?.message }, 500);
+  }
+});
+
+app.get('/api/schedule-config', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const mode = await firestore.getScheduleMode();
+  return c.json({ mode });
+});
+
+app.post('/api/schedule-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const mode = body.mode || 'auto';
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveScheduleMode(mode);
+    return c.json({ success: true, mode });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar schedule mode', details: e?.message }, 500);
   }
 });
 
@@ -178,25 +152,16 @@ app.post('/api/bot-config', async (c) => {
     const body = await c.req.json();
     const firestore = new FirestoreService(c.env);
     await firestore.saveBotConfig(body);
-    return c.json({
-      success: true,
-      mensaje: 'Configuración de mensajes del bot actualizada exitosamente.'
-    });
+    return c.json({ success: true, config: body });
   } catch (e: any) {
-    return c.json({ error: 'Error al actualizar configuración del bot', details: e?.message }, 500);
+    return c.json({ error: 'Error al guardar mensajes de bot-config', details: e?.message }, 500);
   }
 });
 
 app.post('/webhook', async (c) => {
   try {
-    let body: Partial<WebhookPayload>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: 'JSON payload inválido. Se espera { remitente, mensaje }' }, 400);
-    }
-
-    const remitente = body.remitente?.trim();
+    const body = await c.req.json();
+    const remitente = body.remitente;
     const mensaje = body.mensaje ?? '';
 
     if (!remitente) {
@@ -205,10 +170,14 @@ app.post('/webhook', async (c) => {
 
     const payload: WebhookPayload = {
       remitente,
+      altRemitente: body.altRemitente,
+      pushName: body.pushName,
       mensaje,
       simulatedTime: body.simulatedTime,
       imagenBase64: body.imagenBase64,
-      imagenNombre: body.imagenNombre
+      imagenNombre: body.imagenNombre,
+      pdfBase64: body.pdfBase64,
+      pdfNombre: body.pdfNombre
     };
 
     const firestore = new FirestoreService(c.env);
@@ -216,7 +185,7 @@ app.post('/webhook', async (c) => {
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
       sender: 'paciente',
-      text: mensaje || '(Imagen adjunta)',
+      text: mensaje || '(Imagen/Documento adjunto)',
       timestamp: new Date().toISOString(),
       imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
     });
@@ -298,6 +267,12 @@ app.patch('/api/consultas/:id', async (c) => {
   }
 });
 
+app.post('/api/clear-consultas', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  await firestore.clearAllConsultas();
+  return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
+});
+
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
@@ -310,7 +285,8 @@ app.post('/api/send-message', async (c) => {
     const firestore = new FirestoreService(c.env);
 
     if (idConsulta) {
-      await firestore.actualizarEstadoConsulta(idConsulta, 'atendido');
+      // CORRECCIÓN CRÍTICA: Responder por secretaría NUNCA debe marcar el estado como 'atendido' automáticamente.
+      // El chat debe permanecer en estado 'pendiente' y abierto en pantalla hasta que la secretaria haga clic en 'Marcar Atendido'.
       const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
       await firestore.registrarRespuestaSecretaria(idConsulta, textoReg);
     }
@@ -344,31 +320,6 @@ app.get('/api/pending-outgoing', async (c) => {
     total: messages.length,
     messages
   });
-});
-
-app.post('/api/seed-consultas', async (c) => {
-  try {
-    const totalGeneradas = await SeedService.generate70TestConsultas(c.env);
-    return c.json({
-      success: true,
-      totalGeneradas,
-      mensaje: 'Se han generado 70 consultas de prueba en Firestore exitosamente.'
-    });
-  } catch (err: any) {
-    return c.json({ error: 'Error al generar datos de prueba', details: err?.message }, 500);
-  }
-});
-
-app.post('/api/clear-consultas', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  await firestore.clearAllConsultas();
-  return c.json({ success: true, mensaje: 'Todas las consultas y chats de prueba han sido limpiados.' });
-});
-
-app.delete('/api/consultas', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  await firestore.clearAllConsultas();
-  return c.json({ success: true, mensaje: 'Todas las consultas y chats de prueba han sido limpiados.' });
 });
 
 export default app;
