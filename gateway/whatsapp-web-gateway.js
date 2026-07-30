@@ -264,6 +264,7 @@ async function startWhatsAppGateway() {
                 });
                 console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
                 sendSuccess = true;
+                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
               } else if (msg.imagenBase64) {
                 const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
                 const buffer = Buffer.from(base64Data, 'base64');
@@ -273,13 +274,15 @@ async function startWhatsAppGateway() {
                 });
                 console.log(`📤 Imagen enviada a ${targetJid}.`);
                 sendSuccess = true;
+                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
               } else if (msg.text) {
                 await sock.sendMessage(targetJid, { text: msg.text });
                 console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
                 sendSuccess = true;
+                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
               }
             } catch (errJid) {
-              console.warn(`⚠️ Error al enviar a ${targetJid}:`, errJid?.message || errJid);
+              console.warn(`⚠️ Error al enviar a ${targetJid}, intentando siguiente dirección...:`, errJid?.message || errJid);
             }
           }
 
