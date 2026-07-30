@@ -161,6 +161,22 @@ export class FirestoreService {
     return result;
   }
 
+  private async getPendingQueueFromFirestore(): Promise<PendingOutgoingMsg[]> {
+    if (!this.projectId) return [];
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pending_queue${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          return fields.items as PendingOutgoingMsg[];
+        }
+      }
+    } catch (e) {}
+    return [];
+  }
+
   public async getDoctors(): Promise<DoctorItem[]> {
     if (FirestoreService.globalDoctors) return FirestoreService.globalDoctors;
     if (!this.projectId) return DEFAULT_DOCTORS;
@@ -592,7 +608,7 @@ export class FirestoreService {
       }
 
       if (cAltDigits.length >= 7) {
-        if (rDigits.length >= 7 && rDigits.slice(-8) === cAltDigits.slice(-8)) return true;
+        if (rDigits.length >= 7 && rDigits.slice(-8) === cDigits.slice(-8)) return true;
         if (altDigits.length >= 7 && altDigits.slice(-8) === cAltDigits.slice(-8)) return true;
       }
 
@@ -778,13 +794,33 @@ export class FirestoreService {
       timestamp: new Date().toISOString()
     };
 
+    // 1. Guardar en memoria RAM local
     FirestoreService.pendingOutgoingMemory.push(item);
+
+    // 2. Persistir en Firestore /sesiones/pending_queue para compartir con TODOS los Cloudflare Worker Isolates
+    if (this.projectId) {
+      try {
+        const existing = await this.getPendingQueueFromFirestore();
+        existing.push(item);
+        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pending_queue${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+        await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: this.toFirestoreFields({ items: existing, updatedAt: new Date().toISOString() })
+          })
+        });
+      } catch (e) {
+        console.error('Error al persitir pending_queue en Firestore:', e);
+      }
+    }
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
     const result: PendingOutgoingMsg[] = [];
     const seenIds = new Set<string>();
 
+    // 1. Recolectar RAM local
     for (const item of FirestoreService.pendingOutgoingMemory) {
       const key = item.id || `${item.remitente}_${item.timestamp}_${item.text}`;
       if (!seenIds.has(key)) {
@@ -793,6 +829,34 @@ export class FirestoreService {
       }
     }
     FirestoreService.pendingOutgoingMemory = [];
+
+    // 2. Recolectar Firestore persitente (soporte multi-isolate Cloudflare Workers)
+    if (this.projectId) {
+      try {
+        const fsItems = await this.getPendingQueueFromFirestore();
+        for (const item of fsItems) {
+          const key = item.id || `${item.remitente}_${item.timestamp}_${item.text}`;
+          if (!seenIds.has(key)) {
+            seenIds.add(key);
+            result.push(item);
+          }
+        }
+
+        // Vaciar la cola en Firestore una vez recolectada
+        if (fsItems.length > 0) {
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pending_queue${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+          await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: this.toFirestoreFields({ items: [], updatedAt: new Date().toISOString() })
+            })
+          });
+        }
+      } catch (e) {
+        console.error('Error al limpiar pending_queue en Firestore:', e);
+      }
+    }
 
     return result;
   }
