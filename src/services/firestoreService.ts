@@ -623,7 +623,7 @@ export class FirestoreService {
     pdfNombre?: string,
     altRemitente?: string,
     pushName?: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const consultas = await this.getConsultas();
 
     const rDigits = remitente.replace(/[^0-9]/g, '');
@@ -729,7 +729,9 @@ export class FirestoreService {
           console.error('Error al actualizar consulta en Firestore:', e);
         }
       }
+      return true; // Éxito: consulta pendiente encontrada y mensaje adjuntado
     }
+    return false; // No hay ninguna consulta pendiente activa para este paciente
   }
 
   public async actualizarEtiquetasConsulta(id: string, etiquetas: string[]): Promise<boolean> {
@@ -830,7 +832,6 @@ export class FirestoreService {
       timestamp: new Date().toISOString()
     };
 
-    // PERSISTIR 100% EN FIRESTORE (SIN MANTENER RAM LOCAL EN ISOLATES)
     if (this.projectId) {
       try {
         const existing = await this.getPendingQueueFromFirestore();
@@ -860,7 +861,6 @@ export class FirestoreService {
         if (fsItems.length > 0) {
           result.push(...fsItems);
 
-          // Vaciar la cola en Firestore una vez recolectada atómicamente
           const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pending_queue${this.apiKey ? `?key=${this.apiKey}` : ''}`;
           await fetch(url, {
             method: 'PATCH',
@@ -975,18 +975,42 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const json: any = await res.json();
-        if (json.documents) {
-          for (const doc of json.documents) {
+      // 1. Borrar todas las consultas de /consultas
+      const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const resC = await fetch(urlC);
+      if (resC.ok) {
+        const jsonC: any = await resC.json();
+        if (jsonC.documents) {
+          for (const doc of jsonC.documents) {
             await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
           }
         }
       }
+
+      // 2. Borrar todas las sesiones activas de usuarios en /sesiones (conservando las configuraciones)
+      const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const resS = await fetch(urlS);
+      if (resS.ok) {
+        const jsonS: any = await resS.json();
+        if (jsonS.documents) {
+          for (const doc of jsonS.documents) {
+            if (
+              !doc.name.includes('/sesiones/bot_') &&
+              !doc.name.includes('/sesiones/global_') &&
+              !doc.name.includes('/sesiones/tag_') &&
+              !doc.name.includes('/sesiones/quick_') &&
+              !doc.name.includes('/sesiones/pdf_') &&
+              !doc.name.includes('/sesiones/vip_') &&
+              !doc.name.includes('/sesiones/doctor_') &&
+              !doc.name.includes('/sesiones/pending_')
+            ) {
+              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+            }
+          }
+        }
+      }
     } catch (e) {
-      console.error('Error al vaciar consultas en Firestore:', e);
+      console.error('Error al vaciar consultas y sesiones en Firestore:', e);
     }
   }
 

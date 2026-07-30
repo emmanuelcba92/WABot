@@ -91,16 +91,26 @@ export class StateEngine {
 
     // 3. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL DEL BOT PARA CONVERSACIÓN FLUIDA)
     if (sesion.estado === 'esperando_atencion_humana' && !esSaludoExplicit) {
+      let consultaEncontrada = false;
       if (mensaje.length > 0 || imagenBase64 || pdfBase64) {
-        await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente);
+        consultaEncontrada = await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente, pushName);
       }
-      return {
-        remitente,
-        respuesta: '', // SILENCIO ABSOLUTO DEL BOT: LA SECRETARÍA ESTÁ CONVERSANDO DIRECTAMENTE
-        estadoActual: 'esperando_atencion_humana',
-        enHorario: true,
-        timestamp
-      };
+
+      // Si no hay ninguna consulta pendiente activa (ej: se hizo "Limpiar Todo"),
+      // resetear la sesión y dejar que el bot procese el mensaje normalmente.
+      if (!consultaEncontrada) {
+        console.log(`⚠️ [ENGINE] Estado esperando_atencion_humana pero sin consulta activa para ${remitente}. Reseteando a 'inicio'.`);
+        await firestore.saveSesion(remitente, 'inicio');
+        // Fall-through: el mensaje se procesará como si fuera estado 'inicio'
+      } else {
+        return {
+          remitente,
+          respuesta: '', // SILENCIO ABSOLUTO DEL BOT: LA SECRETARÍA ESTÁ CONVERSANDO DIRECTAMENTE
+          estadoActual: 'esperando_atencion_humana',
+          enHorario: true,
+          timestamp
+        };
+      }
     }
 
     // Si el usuario envía reset / cancelar, volver al menú inicial
