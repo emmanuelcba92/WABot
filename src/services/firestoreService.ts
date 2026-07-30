@@ -519,15 +519,28 @@ export class FirestoreService {
     textoMensaje: string,
     imagenBase64?: string,
     pdfBase64?: string,
-    pdfNombre?: string
+    pdfNombre?: string,
+    altRemitente?: string
   ): Promise<void> {
     const consultas = await this.getConsultas();
-    // SOLUCIÓN: Buscar la consulta activa por remitente O por altRemitente que esté PENDIENTE.
-    const consultaPaciente = consultas.find(c =>
-      (c.remitente === remitente ||
-       (c.datos && c.datos.altRemitente && c.datos.altRemitente === remitente)) &&
-      c.estado === 'pendiente'
-    );
+
+    // BÚSQUEDA EXHAUSTIVA DE CONSULTA PENDIENTE (UNIFICA TODOS LOS MENSAJES DEL MISMO PACIENTE)
+    const consultaPaciente = consultas.find(c => {
+      if (c.estado !== 'pendiente') return false;
+
+      if (c.remitente === remitente) return true;
+      if (altRemitente && (c.remitente === altRemitente || c.datos?.altRemitente === altRemitente)) return true;
+      if (c.datos?.altRemitente === remitente) return true;
+
+      // Coincidencia por teléfono normalizado
+      const rDigits = remitente.replace(/[^0-9]/g, '');
+      const cDigits = (c.remitente || '').replace(/[^0-9]/g, '');
+      if (rDigits.length >= 7 && cDigits.length >= 7) {
+        if (rDigits.slice(-8) === cDigits.slice(-8)) return true;
+      }
+
+      return false;
+    });
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};

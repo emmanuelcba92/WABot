@@ -92,7 +92,7 @@ export class StateEngine {
     // 3. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL SI EL PACIENTE HABLA)
     if (sesion.estado === 'esperando_atencion_humana' && !esSaludoExplicit) {
       if (mensaje.length > 0 || imagenBase64 || pdfBase64) {
-        await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
+        await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente);
       }
       return {
         remitente,
@@ -222,10 +222,30 @@ export class StateEngine {
     esPrioritario: boolean = false
   ): Promise<WebhookResponse> {
     const consultasExistentes = await firestore.getConsultas();
-    const consultaActiva = consultasExistentes.find(c => (c.remitente === remitente || (altRemitente && c.remitente === altRemitente)) && c.estado === 'pendiente');
+
+    // BÚSQUEDA EXHAUSTIVA DE CONSULTA ACTIVA (EVITA DUPLICAR TARJETAS PARA EL MISMO PACIENTE)
+    const consultaActiva = consultasExistentes.find(c => {
+      if (c.estado !== 'pendiente') return false;
+
+      if (c.remitente === remitente) return true;
+      if (altRemitente && (c.remitente === altRemitente || c.datos?.altRemitente === altRemitente)) return true;
+      if (c.datos?.altRemitente === remitente) return true;
+
+      // Coincidencia por teléfono normalizado
+      const rDigits = remitente.replace(/[^0-9]/g, '');
+      const cDigits = (c.remitente || '').replace(/[^0-9]/g, '');
+      if (rDigits.length >= 7 && cDigits.length >= 7) {
+        if (rDigits.slice(-8) === cDigits.slice(-8)) return true;
+      }
+
+      // Coincidencia por pushName si existe
+      if (pushName && c.datos?.pushName && c.datos.pushName.toLowerCase() === pushName.toLowerCase()) return true;
+
+      return false;
+    });
 
     if (consultaActiva) {
-      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
+      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente);
       await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
       return {

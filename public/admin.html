@@ -341,6 +341,84 @@
       backdrop-filter: blur(4px);
     }
 
+    /* ESTILOS DE VISTA CHAT ESTILO WHATSAPP (ULTRA LIVIANO) */
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      height: 740px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .chat-sidebar {
+      background: #0f172a;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .chat-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+
+    .chat-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .chat-item.active {
+      background: rgba(0, 168, 132, 0.22);
+      border-left: 4px solid var(--accent);
+    }
+
+    .chat-main {
+      display: flex;
+      flex-direction: column;
+      background: #0b141a;
+    }
+
+    .chat-stream {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.7) 0%, rgba(11, 20, 26, 0.95) 100%);
+    }
+
+    .chat-bubble-patient {
+      align-self: flex-start;
+      background: #202c33;
+      color: #e9edef;
+      padding: 12px 16px;
+      border-radius: 12px 12px 12px 0;
+      max-width: 78%;
+      font-size: 0.92rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .chat-bubble-sec {
+      align-self: flex-end;
+      background: #005c4b;
+      color: #e9edef;
+      padding: 12px 16px;
+      border-radius: 12px 12px 0 12px;
+      max-width: 78%;
+      font-size: 0.92rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
     .lightbox-modal {
       position: fixed;
       inset: 0;
@@ -572,7 +650,13 @@
           <input type="text" id="searchInput" placeholder="Buscar por Nombre, DNI, Teléfono o Mensaje..." oninput="handleSearch()">
         </div>
 
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <!-- SELECTOR DE MODO DE VISTA (TARJETAS vs CHAT ESTILO WHATSAPP) -->
+          <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+            <button class="nav-tab-btn active" id="viewModeGridBtn" onclick="setViewMode('grid')">🎴 Vista Tarjetas</button>
+            <button class="nav-tab-btn" id="viewModeChatBtn" onclick="setViewMode('chat')">💬 Vista Chat (WhatsApp)</button>
+          </div>
+
           <button class="btn btn-excel" onclick="exportToCsv()">
             📊 Exportar a Excel (CSV)
           </button>
@@ -595,8 +679,22 @@
         </div>
       </div>
 
+      <!-- VISTA 1: GRID DE TARJETAS (ORIGINAL) -->
       <div class="consultas-grid" id="consultasGrid" style="margin-top: 16px;">
         <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando solicitudes...</div>
+      </div>
+
+      <!-- VISTA 2: LAYOUT DE CHAT ESTILO WHATSAPP (ULTRA LIVIANO) -->
+      <div class="chat-layout" id="consultasChatLayout" style="display: none;">
+        <!-- BARRA LATERAL IZQUIERDA: LISTA DE CHATS -->
+        <div class="chat-sidebar" id="chatSidebarList">
+          <!-- Items generados en JS -->
+        </div>
+
+        <!-- PANEL DERECHO PRINCIPAL: CONVERSACIÓN & RESPUESTA -->
+        <div class="chat-main" id="chatMainView">
+          <div style="color: var(--muted); margin: auto; text-align: center;">Seleccioná una conversación del panel izquierdo para comenzar a chatear.</div>
+        </div>
       </div>
 
     </div>
@@ -822,6 +920,9 @@
     let allConsultas = [];
     let currentFilter = 'pendiente';
     let currentTagFilter = 'all';
+    let currentViewMode = localStorage.getItem('adminViewMode') || 'grid';
+    let selectedChatId = null;
+
     let searchQuery = '';
     let draftResponses = {};
     let selectedPdfs = {};
@@ -861,6 +962,28 @@
       welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
       items: []
     };
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      localStorage.setItem('adminViewMode', mode);
+      const gridBtn = document.getElementById('viewModeGridBtn');
+      const chatBtn = document.getElementById('viewModeChatBtn');
+      const gridEl = document.getElementById('consultasGrid');
+      const chatEl = document.getElementById('consultasChatLayout');
+
+      if (mode === 'chat') {
+        gridBtn.classList.remove('active');
+        chatBtn.classList.add('active');
+        gridEl.style.display = 'none';
+        chatEl.style.display = 'grid';
+      } else {
+        gridBtn.classList.add('active');
+        chatBtn.classList.remove('active');
+        gridEl.style.display = 'grid';
+        chatEl.style.display = 'none';
+      }
+      renderConsultas(true);
+    }
 
     function requestNotificationPermission() {
       if (!('Notification' in window)) {
@@ -972,6 +1095,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       updateNotificationBtn();
+      setViewMode(currentViewMode);
       fetchScheduleConfig();
       fetchBotConfig();
       fetchTagConfig();
@@ -1729,15 +1853,22 @@
       }
     }
 
+    function selectChat(id) {
+      selectedChatId = id;
+      renderConsultas(true);
+    }
+
     function renderConsultas(forceRedraw = false) {
-      const container = document.getElementById('consultasGrid');
+      const containerGrid = document.getElementById('consultasGrid');
+      const containerChatSidebar = document.getElementById('chatSidebarList');
+      const containerChatMain = document.getElementById('chatMainView');
 
       // PROTECCIÓN CONTRA PÉRDIDA DE FOCO AL ESCRIBIR
       if (!forceRedraw && document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) {
         return;
       }
 
-      document.querySelectorAll('.reply-box textarea').forEach(ta => {
+      document.querySelectorAll('textarea[id^="replyText_"]').forEach(ta => {
         const cardId = ta.id.replace('replyText_', '');
         if (ta.value.trim().length > 0) {
           draftResponses[cardId] = ta.value;
@@ -1790,194 +1921,368 @@
         return timeA - timeB;
       });
 
-      if (filtered.length === 0) {
-        container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">No hay solicitudes en esta sección. (¡Bandeja al día!)</div>`;
-        return;
-      }
+      // RENDER VISTA 1: GRID DE TARJETAS
+      if (currentViewMode === 'grid') {
+        if (filtered.length === 0) {
+          containerGrid.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">No hay solicitudes en esta sección. (¡Bandeja al día!)</div>`;
+        } else {
+          let html = '';
+          filtered.forEach(c => {
+            const datos = c.datos || {};
+            const respuestasSecretaria = datos.respuestasSecretaria || [];
+            const respuestasPaciente = datos.respuestasPaciente || [];
+            const etiquetas = datos.etiquetas || [];
+            const fecha = new Date(c.timestamp || c.createdAt).toLocaleString();
+            const displayImg = datos.imagenBase64 || datos.imagenUrl;
+            const imgUrl = datos.imagenUrl;
 
-      let html = '';
+            const draftValue = draftResponses[c.id] || '';
+            const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+              ? datos.imagenesAdjuntas
+              : (displayImg ? [displayImg] : []);
 
-      filtered.forEach(c => {
-        const datos = c.datos || {};
-        const respuestasSecretaria = datos.respuestasSecretaria || [];
-        const respuestasPaciente = datos.respuestasPaciente || [];
-        const etiquetas = datos.etiquetas || [];
-        const fecha = new Date(c.timestamp || c.createdAt).toLocaleString();
-        const displayImg = datos.imagenBase64 || datos.imagenUrl;
-        const imgUrl = datos.imagenUrl;
+            const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+            const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
 
-        const draftValue = draftResponses[c.id] || '';
-        const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
-          ? datos.imagenesAdjuntas
-          : (displayImg ? [displayImg] : []);
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
-        const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
-        const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+            const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
 
-        const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+            let cardClass = 'card';
+            if (vipMatch) {
+              cardClass += vipMatch.priority === 'urgente' ? ' urgent-card' : ' vip-card';
+            }
 
-        const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
-
-        let cardClass = 'card';
-        if (vipMatch) {
-          cardClass += vipMatch.priority === 'urgente' ? ' urgent-card' : ' vip-card';
-        }
-
-        html += `
-          <div class="${cardClass}" id="card_${c.id}">
-            <div class="card-header">
-              <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
-                ${c.opcion || 'Consulta'}
-              </span>
-              <span class="tab-btn" style="background: ${c.estado === 'atendido' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(251, 191, 36, 0.2)'}; color: ${c.estado === 'atendido' ? '#34d399' : '#fbbf24'}; border: none; font-size: 0.75rem;">
-                ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
-              </span>
-            </div>
-
-            ${vipMatch ? `
-              <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO PRIORITARIO'}</span>
-                <span><strong>${vipMatch.name || 'Prioritario'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
-              </div>
-            ` : ''}
-
-            <div class="patient-info">
-              <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}</span></div>
-              <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
-
-              <!-- ETIQUETAS Y ETIQUETADOR -->
-              <div style="margin-top: 4px;">
-                ${etiquetas.map(t => {
-                  const def = tagDefinitions[t];
-                  if (!def) return '';
-                  return `<span class="tag-badge" style="background: ${def.color}33; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
-                }).join('')}
-              </div>
-
-              <div class="tag-selector">
-                <span style="font-size: 0.7rem; color: var(--muted); font-weight: 600; align-self: center;">Etiquetar:</span>
-                ${Object.entries(tagDefinitions).map(([key, def]) => {
-                  const isSel = etiquetas.includes(key);
-                  return `<button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color};` : ''}" onclick="toggleTag('${c.id}', '${key}')">${def.label}</button>`;
-                }).join('')}
-              </div>
-            </div>
-
-            <!-- 📥 Solicitud Inicial del Paciente -->
-            <div style="background: #0f172a; padding: 10px; border-radius: 8px; font-size: 0.85rem; color: #cbd5e1; white-space: pre-wrap; border: 1px solid var(--border);">
-              ${contenidoMsg}
-            </div>
-
-            <!-- 👩‍⚕️ Historial de Respuestas de Secretaría -->
-            ${respuestasSecretaria.length > 0 ? `
-              <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
-                <strong style="color: #60a5fa;">👩‍⚕️ Enviado por Secretaría:</strong>
-                ${respuestasSecretaria.map(r => `
-                  <div style="margin-top: 4px; color: #e2e8f0;">
-                    💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-
-            <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE -->
-            ${respuestasPaciente.length > 0 ? `
-              <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem;">
-                <strong style="color: #00e699; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">💬 Respuesta del Paciente en Vivo:</strong>
-                ${respuestasPaciente.map(r => `
-                  <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
-                    🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
-                    ${r.pdfBase64 ? `
-                      <div style="margin-top: 6px;">
-                        <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                          📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
-                        </a>
-                      </div>
-                    ` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-
-            <!-- 📄 DOCUMENTOS PDF ENVIADOS POR EL PACIENTE -->
-            ${listPdfs.length > 0 ? `
-              <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(56, 189, 248, 0.06); padding: 10px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.2);">
-                <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">📄 Documentos PDF Adjuntos del Paciente (${listPdfs.length}):</span>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  ${listPdfs.map((pdfItem, pIdx) => `
-                    <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
-                      <span>📄 ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`}</span>
-                      <span style="font-size: 0.75rem; background: #38bdf8; color: #0f172a; padding: 2px 8px; border-radius: 4px;">⬇️ Abrir PDF</span>
-                    </a>
-                  `).join('')}
+            html += `
+              <div class="${cardClass}" id="card_${c.id}">
+                <div class="card-header">
+                  <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
+                    ${c.opcion || 'Consulta'}
+                  </span>
+                  <span class="tab-btn" style="background: ${c.estado === 'atendido' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(251, 191, 36, 0.2)'}; color: ${c.estado === 'atendido' ? '#34d399' : '#fbbf24'}; border: none; font-size: 0.75rem;">
+                    ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
+                  </span>
                 </div>
-              </div>
-            ` : ''}
 
-            <!-- 📷 GALERÍA MULTI-FOTO CON LAZY LOADING -->
-            ${(() => {
-              if (listImagenes.length === 0 && !imgUrl) return '';
-              return `
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length}):</span>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
-                    ${listImagenes.map((imgSrc, idx) => `
-                      <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
-                        <img src="${imgSrc}" class="card-img-preview" loading="lazy" alt="Foto ${idx + 1}">
-                        <div class="card-img-overlay">
-                          <span>🔍 Foto ${idx + 1}</span>
-                        </div>
+                ${vipMatch ? `
+                  <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                    <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO PRIORITARIO'}</span>
+                    <span><strong>${vipMatch.name || 'Prioritario'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
+                  </div>
+                ` : ''}
+
+                <div class="patient-info">
+                  <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}</span></div>
+                  <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
+
+                  <!-- ETIQUETAS Y ETIQUETADOR -->
+                  <div style="margin-top: 4px;">
+                    ${etiquetas.map(t => {
+                      const def = tagDefinitions[t];
+                      if (!def) return '';
+                      return `<span class="tag-badge" style="background: ${def.color}33; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
+                    }).join('')}
+                  </div>
+
+                  <div class="tag-selector">
+                    <span style="font-size: 0.7rem; color: var(--muted); font-weight: 600; align-self: center;">Etiquetar:</span>
+                    ${Object.entries(tagDefinitions).map(([key, def]) => {
+                      const isSel = etiquetas.includes(key);
+                      return `<button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color};` : ''}" onclick="toggleTag('${c.id}', '${key}')">${def.label}</button>`;
+                    }).join('')}
+                  </div>
+                </div>
+
+                <!-- 📥 Solicitud Inicial del Paciente -->
+                <div style="background: #0f172a; padding: 10px; border-radius: 8px; font-size: 0.85rem; color: #cbd5e1; white-space: pre-wrap; border: 1px solid var(--border);">
+                  ${contenidoMsg}
+                </div>
+
+                <!-- 👩‍⚕️ Historial de Respuestas de Secretaría -->
+                ${respuestasSecretaria.length > 0 ? `
+                  <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
+                    <strong style="color: #60a5fa;">👩‍⚕️ Enviado por Secretaría:</strong>
+                    ${respuestasSecretaria.map(r => `
+                      <div style="margin-top: 4px; color: #e2e8f0;">
+                        💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
                       </div>
                     `).join('')}
                   </div>
+                ` : ''}
+
+                <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE -->
+                ${respuestasPaciente.length > 0 ? `
+                  <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem;">
+                    <strong style="color: #00e699; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">💬 Respuesta del Paciente en Vivo:</strong>
+                    ${respuestasPaciente.map(r => `
+                      <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
+                        🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                        ${r.pdfBase64 ? `
+                          <div style="margin-top: 6px;">
+                            <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                              📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                            </a>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                <!-- 📄 DOCUMENTOS PDF ENVIADOS POR EL PACIENTE -->
+                ${listPdfs.length > 0 ? `
+                  <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(56, 189, 248, 0.06); padding: 10px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">📄 Documentos PDF Adjuntos del Paciente (${listPdfs.length}):</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                      ${listPdfs.map((pdfItem, pIdx) => `
+                        <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
+                          <span>📄 ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`}</span>
+                          <span style="font-size: 0.75rem; background: #38bdf8; color: #0f172a; padding: 2px 8px; border-radius: 4px;">⬇️ Abrir PDF</span>
+                        </a>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- 📷 GALERÍA MULTI-FOTO CON LAZY LOADING -->
+                ${(() => {
+                  if (listImagenes.length === 0 && !imgUrl) return '';
+                  return `
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                      <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length}):</span>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                        ${listImagenes.map((imgSrc, idx) => `
+                          <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
+                            <img src="${imgSrc}" class="card-img-preview" loading="lazy" alt="Foto ${idx + 1}">
+                            <div class="card-img-overlay">
+                              <span>🔍 Foto ${idx + 1}</span>
+                            </div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                })()}
+
+                <div class="reply-box">
+                  <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
+
+                  <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS -->
+                  <div class="quick-reply-chips">
+                    ${quickRepliesList.map(qr => `
+                      <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
+                    `).join('')}
+                  </div>
+
+                  <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${draftValue}</textarea>
+
+                  <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                    <label style="font-size: 0.78rem; color: #38bdf8; font-weight: 600;">📄 Adjuntar Indicaciones de Estudio (PDF):</label>
+                    <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.8rem;">
+                      <option value="">-- Sin Archivo Adjunto --</option>
+                      ${predefinedPdfsList.map(pdf => `
+                        <option value="${pdf.id}">${pdf.title}</option>
+                      `).join('')}
+                    </select>
+
+                    <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                      O subir PDF personalizado:
+                      <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                    </div>
+                  </div>
+
+                  <button class="btn" style="margin-top: 8px; width: 100%; font-size: 0.95rem;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
+                    📤 Enviar Respuesta por WhatsApp
+                  </button>
                 </div>
-              `;
-            })()}
 
-            <div class="reply-box">
-              <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
+                <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                  <button class="btn btn-secondary" style="font-size: 0.78rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
+                    ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+          containerGrid.innerHTML = html;
+        }
+      }
 
-              <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS -->
+      // RENDER VISTA 2: LAYOUT DE CHAT ESTILO WHATSAPP (ULTRA LIVIANO)
+      if (currentViewMode === 'chat') {
+        // 1. Sidebar items
+        if (filtered.length === 0) {
+          containerChatSidebar.innerHTML = `<div style="color: var(--muted); padding: 20px; text-align: center; font-size: 0.84rem;">Sin chats en esta sección.</div>`;
+        } else {
+          let sideHtml = '';
+          filtered.forEach(c => {
+            const datos = c.datos || {};
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+            const isSel = selectedChatId === c.id;
+            const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName || c.remitente);
+            const lastMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje)';
+            const fechaStr = new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+            sideHtml += `
+              <div class="chat-item ${isSel ? 'active' : ''}" onclick="selectChat('${c.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="font-size: 0.9rem; color: ${vipMatch ? '#facc15' : 'var(--text)'}; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;">
+                    ${patientName}
+                  </strong>
+                  <span style="font-size: 0.72rem; color: var(--muted);">${fechaStr}</span>
+                </div>
+                <div style="font-size: 0.78rem; color: var(--muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                  ${lastMsg}
+                </div>
+                <div style="display: flex; gap: 4px; margin-top: 2px;">
+                  <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">
+                    ${c.opcion || 'Consulta'}
+                  </span>
+                  ${c.estado === 'atendido' ? `<span style="font-size: 0.68rem; background: rgba(52, 211, 153, 0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">Atendido</span>` : ''}
+                </div>
+              </div>
+            `;
+          });
+          containerChatSidebar.innerHTML = sideHtml;
+        }
+
+        // Si no hay chat seleccionado o el seleccionado fue filtrado, seleccionar el primero automáticamente
+        if (filtered.length > 0 && (!selectedChatId || !filtered.some(c => c.id === selectedChatId))) {
+          selectedChatId = filtered[0].id;
+        }
+
+        const currentSelected = filtered.find(c => c.id === selectedChatId);
+
+        if (!currentSelected) {
+          containerChatMain.innerHTML = `<div style="color: var(--muted); margin: auto; text-align: center;">No hay chat seleccionado.</div>`;
+        } else {
+          const c = currentSelected;
+          const datos = c.datos || {};
+          const respuestasSecretaria = datos.respuestasSecretaria || [];
+          const respuestasPaciente = datos.respuestasPaciente || [];
+          const etiquetas = datos.etiquetas || [];
+          const displayImg = datos.imagenBase64 || datos.imagenUrl;
+          const imgUrl = datos.imagenUrl;
+
+          const draftValue = draftResponses[c.id] || '';
+          const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+            ? datos.imagenesAdjuntas
+            : (displayImg ? [displayImg] : []);
+
+          const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+          const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
+          const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+
+          let mainHtml = `
+            <!-- ENCABEZADO CHAT -->
+            <div style="background: #111b21; padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; background: ${vipMatch ? '#facc15' : '#00a884'}; color: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
+                  ${vipMatch ? '⭐' : '📱'}
+                </div>
+                <div>
+                  <h3 style="font-size: 1rem; font-weight: 700; color: #e9edef;">
+                    ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}
+                  </h3>
+                  <div style="font-size: 0.75rem; color: #00a884; font-weight: 600;">
+                    ${vipMatch ? `${vipMatch.name} (${vipMatch.role || 'Prioritario'})` : `Opción: ${c.opcion || 'Consulta'}`}
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
+                  ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
+                </button>
+              </div>
+            </div>
+
+            <!-- CHAT STREAM SCROLLABLE -->
+            <div class="chat-stream">
+              <!-- Mensaje Inicial -->
+              <div class="chat-bubble-patient">
+                <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">📥 Mensaje Inicial del Paciente (${new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
+                <div>${datos.contenidoMensaje || datos.mensajeRaw || '(Sin texto)'}</div>
+              </div>
+
+              <!-- Fotos Adjuntas -->
+              ${listImagenes.map((imgSrc, idx) => `
+                <div class="chat-bubble-patient" style="padding: 6px;">
+                  <div class="card-img-container" onclick="openLightbox('${imgSrc}')">
+                    <img src="${imgSrc}" style="max-height: 250px; border-radius: 8px;" loading="lazy" alt="Foto ${idx + 1}">
+                  </div>
+                </div>
+              `).join('')}
+
+              <!-- Documentos PDF Adjuntos -->
+              ${listPdfs.map((pdfItem, pIdx) => `
+                <div class="chat-bubble-patient">
+                  <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+                    📄 Abrir PDF: ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`} ⬇️
+                  </a>
+                </div>
+              `).join('')}
+
+              <!-- Historial de Conversación Alternada (Respuestas Secretaría + Paciente) -->
+              ${respuestasSecretaria.map(r => `
+                <div class="chat-bubble-sec">
+                  <div style="font-size: 0.72rem; color: #a7f3d0; font-weight: 700; margin-bottom: 4px;">👩‍⚕️ Secretaría (${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
+                  <div>${r.texto}</div>
+                </div>
+              `).join('')}
+
+              ${respuestasPaciente.map(r => `
+                <div class="chat-bubble-patient">
+                  <div style="font-size: 0.72rem; color: #00e699; font-weight: 700; margin-bottom: 4px;">🟢 Paciente (${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
+                  <div>${r.texto}</div>
+                  ${r.pdfBase64 ? `
+                    <div style="margin-top: 6px;">
+                      <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                        📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                      </a>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- PANEL INFERIOR DE RESPUESTA ESPACIOSO -->
+            <div style="background: #111b21; padding: 14px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
               <div class="quick-reply-chips">
                 ${quickRepliesList.map(qr => `
                   <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
                 `).join('')}
               </div>
 
-              <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar...">${draftValue}</textarea>
+              <div style="display: flex; gap: 12px; align-items: flex-end;">
+                <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta a ${datos.pushName || c.remitente} y presiona Enter..." style="flex: 1; background: #2a3942; border: 1px solid rgba(255,255,255,0.1); color: #e9edef; padding: 12px; border-radius: 10px; min-height: 70px; font-size: 0.92rem; outline: none;">${draftValue}</textarea>
+                <button class="btn" style="padding: 14px 24px; font-size: 1rem; height: 70px;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
+                  📤 Enviar WhatsApp
+                </button>
+              </div>
 
-              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-                <label style="font-size: 0.78rem; color: #38bdf8; font-weight: 600;">📄 Adjuntar Indicaciones de Estudio (PDF):</label>
-                <!-- DESPLEGABLE DINÁMICO DE PDFS PREDETERMINADOS -->
-                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.8rem;">
-                  <option value="">-- Sin Archivo Adjunto --</option>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #2a3942; border: 1px solid var(--border); color: #e9edef; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; flex: 1;">
+                  <option value="">-- Sin Archivo PDF Adjunto --</option>
                   ${predefinedPdfsList.map(pdf => `
                     <option value="${pdf.id}">${pdf.title}</option>
                   `).join('')}
                 </select>
 
-                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
-                  O subir PDF personalizado:
-                  <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                <div style="font-size: 0.75rem; color: var(--muted);">
+                  O subir PDF:
+                  <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted);">
                 </div>
               </div>
-
-              <button class="btn" style="margin-top: 8px; width: 100%; font-size: 0.95rem;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
-                📤 Enviar Respuesta por WhatsApp
-              </button>
             </div>
+          `;
 
-            <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
-              <button class="btn btn-secondary" style="font-size: 0.78rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
-                ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
-              </button>
-            </div>
-          </div>
-        `;
-      });
+          containerChatMain.innerHTML = mainHtml;
+        }
+      }
 
-      container.innerHTML = html;
-
+      // VINCULAR EVENTO ENTER A CADA TEXTAREA
       filtered.forEach(c => {
         const ta = document.getElementById(`replyText_${c.id}`);
         if (ta) {
@@ -2032,6 +2337,9 @@
           delete customPdfBase64[idConsulta];
           delete customPdfNames[idConsulta];
           if (textarea) textarea.value = '';
+
+          // MANTENER EL CHAT SELECCIONADO ABIERTO
+          selectedChatId = idConsulta;
           fetchConsultas(true);
         } else {
           alert('Error al enviar mensaje: ' + (data.error || 'Desconocido'));
