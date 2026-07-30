@@ -200,6 +200,7 @@ app.post('/webhook', async (c) => {
 
     const firestore = new FirestoreService(c.env);
 
+    // Guardar el mensaje del paciente en el historial
     await firestore.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
       sender: 'paciente',
@@ -208,6 +209,40 @@ app.post('/webhook', async (c) => {
       imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
     });
 
+    // PRE-CHECK CRÍTICO: Antes de invocar el bot, verificar si existe una consulta
+    // pendiente activa para este paciente. Esto cubre el caso donde la secretaría
+    // inicia el chat (sesión guardada con número limpio) y el paciente responde
+    // con JID @lid que no matchea la sesión guardada.
+    const msgCleanLower = mensaje.toLowerCase().trim();
+    const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu';
+
+    if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64)) {
+      const adjuntado = await firestore.appendPacienteMensajeAConsulta(
+        remitente,
+        mensaje,
+        body.imagenBase64,
+        body.pdfBase64,
+        body.pdfNombre,
+        body.altRemitente,
+        body.pushName
+      );
+
+      if (adjuntado) {
+        // Hay consulta activa: silencio absoluto del bot, el mensaje ya fue adjuntado
+        const silentResult = {
+          remitente,
+          respuesta: '',
+          estadoActual: 'esperando_atencion_humana',
+          enHorario: true,
+          timestamp: new Date().toISOString()
+        };
+        // Asegurarse de que la sesión refleje el estado correcto
+        await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+        return c.json(silentResult, 200);
+      }
+    }
+
+    // No hay consulta activa: procesar normalmente con el StateEngine
     const result = await StateEngine.processMessage(payload, c.env);
 
     await firestore.agregarMensajeHistorial(remitente, {
