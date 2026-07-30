@@ -21,6 +21,24 @@ app.get('/health', (c) => {
   });
 });
 
+app.get('/api/doctors', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const items = await firestore.getDoctors();
+  return c.json({ items });
+});
+
+app.post('/api/doctors', async (c) => {
+  try {
+    const body = await c.req.json();
+    const items = body.items || [];
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveDoctors(items);
+    return c.json({ success: true, count: items.length });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar lista de médicos', details: e?.message }, 500);
+  }
+});
+
 app.get('/api/vip-contacts', async (c) => {
   const firestore = new FirestoreService(c.env);
   const items = await firestore.getVipContacts();
@@ -273,6 +291,68 @@ app.post('/api/clear-consultas', async (c) => {
   return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
 });
 
+app.post('/api/forward-telemedicina', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { idConsulta, doctorPhone, doctorName, notaSecretaria } = body;
+
+    if (!idConsulta || !doctorPhone) {
+      return c.json({ error: 'idConsulta y doctorPhone son requeridos' }, 400);
+    }
+
+    const firestore = new FirestoreService(c.env);
+    const consultas = await firestore.getConsultas();
+    const target = consultas.find(item => item.id === idConsulta);
+
+    if (!target) {
+      return c.json({ error: 'Consulta no encontrada' }, 404);
+    }
+
+    const datos = target.datos || {};
+    const patientName = datos.pushName ? `${datos.pushName} (${target.remitente})` : target.remitente;
+
+    const headerMsg = `🏥 *DERIVACIÓN DE TELEMEDICINA - CLÍNICA MÉDICA*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
+
+    // 1. Enviar Encabezado al Médico
+    await firestore.addPendingOutgoing(doctorPhone, headerMsg, idConsulta);
+
+    // 2. Enviar PDFs Adjuntos al Médico
+    const respuestasPaciente = datos.respuestasPaciente || [];
+    const pdfsFromResp = respuestasPaciente.filter((r: any) => r.pdfBase64).map((r: any) => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+    const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
+    for (const pdfItem of listPdfs) {
+      if (pdfItem.base64) {
+        await firestore.addPendingOutgoing(doctorPhone, `📄 Documento PDF (${pdfItem.nombre || 'estudio.pdf'})`, idConsulta, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64);
+      }
+    }
+
+    // 3. Enviar Imágenes Adjuntas al Médico
+    const displayImg = datos.imagenBase64 || datos.imagenUrl;
+    const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+      ? datos.imagenesAdjuntas
+      : (displayImg ? [displayImg] : []);
+
+    for (const imgSrc of listImagenes) {
+      if (imgSrc && imgSrc.startsWith('data:image')) {
+        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, idConsulta, undefined, undefined, undefined, imgSrc);
+      }
+    }
+
+    // 4. Registrar en la consulta que fue derivada a Telemedicina
+    const regMsg = `🩺 Telemedicina derivada a ${doctorName || 'Médico'} (${doctorPhone}) ${notaSecretaria ? `- "${notaSecretaria}"` : ''}`;
+    await firestore.registrarRespuestaSecretaria(idConsulta, regMsg);
+
+    return c.json({
+      success: true,
+      mensaje: `Telemedicina derivada exitosamente a ${doctorName || doctorPhone}`,
+      totalArchivos: listPdfs.length + listImagenes.length
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Error al derivar telemedicina', details: err?.message }, 500);
+  }
+});
+
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
@@ -285,8 +365,6 @@ app.post('/api/send-message', async (c) => {
     const firestore = new FirestoreService(c.env);
 
     if (idConsulta) {
-      // CORRECCIÓN CRÍTICA: Responder por secretaría NUNCA debe marcar el estado como 'atendido' automáticamente.
-      // El chat debe permanecer en estado 'pendiente' y abierto en pantalla hasta que la secretaria haga clic en 'Marcar Atendido'.
       const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
       await firestore.registrarRespuestaSecretaria(idConsulta, textoReg);
     }

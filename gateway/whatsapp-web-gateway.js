@@ -3,49 +3,43 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore,
   downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const QRCode = require('qrcode-terminal');
+const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-// Configuración del Webhook del Backend en Cloudflare Worker
-const WORKER_WEBHOOK_URL = process.env.WORKER_WEBHOOK_URL || 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
-const WORKER_PENDING_URL = process.env.WORKER_PENDING_URL || 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
+const WORKER_WEBHOOK_URL = 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
+const WORKER_PENDING_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
 
-const AUTH_FOLDER = path.join(__dirname, 'baileys_auth');
-
-// Control de duplicados por ID de mensaje
 const processedMsgIds = new Set();
 
-async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
-  for (let i = 0; i < retries; i++) {
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await fetch(url, options);
       if (response.ok) return response;
+      console.warn(`[WARN] Intento ${i + 1} falló HTTP ${response.status}. Reintentando...`);
     } catch (err) {
-      if (i === retries - 1) throw err;
-      await new Promise(r => setTimeout(r, delay));
+      console.warn(`[WARN] Intento ${i + 1} fallo de red: ${err.message}. Reintentando...`);
     }
+    await new Promise(res => setTimeout(res, 1500));
   }
+  throw new Error(`Fallaron los ${maxRetries} intentos hacia ${url}`);
 }
 
 async function startWhatsAppGateway() {
-  console.log('🚀 Iniciando Gateway de WhatsApp Web (Baileys v6.7+)...');
+  console.log('🚀 Iniciando Conector Oficial de WhatsApp Baileys para la Clínica...');
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(`ℹ️ Usando WhatsApp Web v${version.join('.')}, ¿Es la última versión?: ${isLatest}`);
+  const authFolder = path.join(__dirname, 'auth_info_baileys');
+  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+  const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
-    },
+    auth: state,
     printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
     browser: ['Clínica Médica Bot', 'Chrome', '1.0.0']
@@ -57,56 +51,39 @@ async function startWhatsAppGateway() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log('\n==================================================');
-      console.log('📱 ESCANEA ESTE CÓDIGO QR CON WHATSAPP EN TU CELULAR:');
-      console.log('==================================================\n');
-      QRCode.generate(qr, { small: true });
-      console.log('\n==================================================\n');
+      console.log('\n📲 ESCANEE ESTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA PARA VINCULAR:');
+      qrcode.generate(qr, { small: true });
     }
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`⚠️ Conexión cerrada. Razón/Status: ${statusCode}. Reconectando: ${shouldReconnect}`);
+      console.log(`⚠️ Conexión cerrada. Razón: ${statusCode}. ¿Reconectar?: ${shouldReconnect}`);
 
       if (shouldReconnect) {
-        setTimeout(startWhatsAppGateway, 3000);
+        setTimeout(() => startWhatsAppGateway(), 3000);
       } else {
-        console.log('❌ Sesión cerrada por el usuario. Eliminando auth y reiniciando...');
-        if (fs.existsSync(AUTH_FOLDER)) {
-          fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-        }
-        setTimeout(startWhatsAppGateway, 3000);
+        console.error('❌ Sesión cerrada por el usuario. Por favor elimine la carpeta auth_info_baileys y escanee el QR nuevamente.');
       }
     } else if (connection === 'open') {
-      console.log('✅ CONEXIÓN ESTABLECIDA EXITOSAMENTE CON WHATSAPP WEB.');
-      console.log('🟢 Bot receptor listo para procesar mensajes e imágenes HD entrantes.');
+      console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
+      console.log('👂 Escuchando mensajes entrantes en tiempo real...');
     }
   });
 
-  // Reorganizar recepción de mensajes entrantes
   sock.ev.on('messages.upsert', async (m) => {
-    const { messages, type } = m;
-    if (type !== 'notify') return;
+    if (m.type !== 'notify') return;
 
-    for (const msg of messages) {
+    for (const msg of m.messages) {
       try {
         if (!msg.message || msg.key.fromMe) continue;
 
-        const rawRemoteJid = msg.key.remoteJid;
-        if (!rawRemoteJid || rawRemoteJid.includes('@g.us') || rawRemoteJid === 'status@broadcast') continue;
+        const remitente = msg.key.remoteJid;
+        if (!remitente || remitente.includes('@g.us')) continue; // Ignorar grupos
 
-        // Extraer JID del número o LID
-        let remitente = rawRemoteJid;
         let altRemitente = null;
-
-        if (rawRemoteJid.endsWith('@lid')) {
-          altRemitente = rawRemoteJid;
-          if (msg.key.participant && msg.key.participant.includes('@s.whatsapp.net')) {
-            remitente = msg.key.participant;
-          } else if (msg.key.remoteJidAlt && msg.key.remoteJidAlt.includes('@s.whatsapp.net')) {
-            remitente = msg.key.remoteJidAlt;
-          }
+        if (msg.key.remoteJidAlt) {
+          altRemitente = msg.key.remoteJidAlt;
         } else if (msg.key.participant) {
           altRemitente = msg.key.participant;
         }
@@ -158,45 +135,46 @@ async function startWhatsAppGateway() {
                   .jpeg({ quality: 82 })
                   .toBuffer();
               } catch (sErr) {
-                optimizedBuffer = rawBuffer;
+                console.warn('⚠️ No se pudo procesar con Sharp, usando buffer original:', sErr.message);
               }
 
-              const mimetype = 'image/jpeg';
-              imagenBase64 = `data:${mimetype};base64,${optimizedBuffer.toString('base64')}`;
-              imagenNombre = `foto_${Date.now()}.jpg`;
-              console.log(`📸 [HD ÉXITO CRISTALINO] Foto procesada en nitidez máxima 1200px (${rawBuffer.length}b -> ${optimizedBuffer.length}b)`);
+              imagenBase64 = `data:image/jpeg;base64,${optimizedBuffer.toString('base64')}`;
+              imagenNombre = `pedido_${Date.now()}.jpg`;
             }
           } catch (imgErr) {
-            console.error('❌ Error al desencriptar foto HD nativa:', imgErr?.message || imgErr);
-          }
-        } else if (isDocument) {
-          try {
-            const docMsg = msg.message.documentMessage || msg.message.documentWithCaptionMessage?.message?.documentMessage;
-            const mimetype = docMsg?.mimetype || 'application/pdf';
-            const fileName = docMsg?.fileName || `documento_${Date.now()}.pdf`;
-
-            console.log(`📄 [Descargando Documento] Recibiendo PDF (${fileName}) de ${remitente}...`);
-            const docBuffer = await downloadMediaMessage(
-              msg,
-              'buffer',
-              {},
-              {
-                logger: pino({ level: 'silent' }),
-                reuploadRequest: sock.updateMediaMessage
-              }
-            );
-
-            if (docBuffer && docBuffer.length > 100) {
-              pdfBase64 = `data:${mimetype};base64,${docBuffer.toString('base64')}`;
-              pdfNombre = fileName;
-              console.log(`📄 [DOCUMENTO PDF CAPTURADO] ${fileName} (${docBuffer.length} bytes) listo para enviar a secretaría.`);
-            }
-          } catch (docErr) {
-            console.error('❌ Error al procesar documento PDF:', docErr?.message || docErr);
+            console.error('⚠️ Error al desencriptar foto:', imgErr);
           }
         }
 
-        console.log(`📩 Mensaje recibido de ${pushName ? `${pushName} (${remitente})` : remitente}: "${mensajeTexto}" ${imagenBase64 ? '[FOTO NATIVA HD]' : ''} ${pdfBase64 ? '[PDF ADJUNTO]' : ''}`);
+        if (isDocument) {
+          try {
+            const docMsg = msg.message.documentMessage || msg.message.documentWithCaptionMessage?.message?.documentMessage;
+            const mime = docMsg?.mimetype || '';
+            const fileName = docMsg?.fileName || 'documento.pdf';
+
+            if (mime.includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) {
+              console.log(`📄 [Desencriptando PDF] Capturando archivo PDF "${fileName}" de ${remitente}...`);
+              const pdfBuffer = await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+                {
+                  logger: pino({ level: 'silent' }),
+                  reuploadRequest: sock.updateMediaMessage
+                }
+              );
+
+              if (pdfBuffer && pdfBuffer.length > 100) {
+                pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
+                pdfNombre = fileName;
+              }
+            }
+          } catch (pdfErr) {
+            console.error('⚠️ Error al desencriptar PDF:', pdfErr);
+          }
+        }
+
+        console.log(`📩 Mensaje recibido de ${pushName || remitente} (${remitente}): "${mensajeTexto || (imagenBase64 ? '📷 [Foto]' : (pdfBase64 ? '📄 [PDF]' : ''))}"`);
 
         const webhookPayload = {
           remitente,
@@ -250,10 +228,18 @@ async function startWhatsAppGateway() {
               fileName: msg.pdfNombre,
               caption: msg.text || undefined
             });
-            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado exitosamente a ${targetJid} por secretaría.`);
+            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado exitosamente a ${targetJid}.`);
+          } else if (msg.imagenBase64) {
+            const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            await sock.sendMessage(targetJid, {
+              image: buffer,
+              caption: msg.text || undefined
+            });
+            console.log(`📤 Imagen / Pedido médico enviado exitosamente a ${targetJid}.`);
           } else if (msg.text) {
             await sock.sendMessage(targetJid, { text: msg.text });
-            console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
+            console.log(`📤 Mensaje enviado a ${targetJid}: "${msg.text}"`);
           }
         } catch (sendErr) {
           console.error(`❌ Error al enviar mensaje saliente a ${msg.remitente}:`, sendErr?.message || sendErr);

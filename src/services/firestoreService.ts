@@ -1,4 +1,4 @@
-import { Env, StateType, UserSession, ChatMessage, MenuTreeConfig, MenuItemOption } from '../types';
+import { Env, StateType, UserSession, ChatMessage, MenuTreeConfig, MenuItemOption, DoctorItem } from '../types';
 import { CONFIG } from '../config';
 import { ScheduleMode } from './scheduleService';
 import { MESSAGES } from '../templates/messages';
@@ -11,6 +11,7 @@ export interface PendingOutgoingMsg {
   pdfUrl?: string;
   pdfNombre?: string;
   pdfBase64?: string;
+  imagenBase64?: string;
 }
 
 export interface BotConfigMessages {
@@ -48,6 +49,11 @@ export interface VipContactItem {
   role: string;
   priority: 'vip' | 'urgente';
 }
+
+export const DEFAULT_DOCTORS: DoctorItem[] = [
+  { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
+  { id: 'doc_2', name: 'Dr. López', specialty: 'Cirugía General / Telemedicina', phone: '3510000001' }
+];
 
 export const DEFAULT_QUICK_REPLIES: QuickReplyItem[] = [
   { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
@@ -104,6 +110,7 @@ export class FirestoreService {
   private static globalQuickReplies: QuickReplyItem[] | null = null;
   private static globalPdfConfig: PredefinedPdfItem[] | null = null;
   private static globalVipContacts: VipContactItem[] | null = null;
+  private static globalDoctors: DoctorItem[] | null = null;
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -150,6 +157,44 @@ export class FirestoreService {
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
+  }
+
+  public async getDoctors(): Promise<DoctorItem[]> {
+    if (FirestoreService.globalDoctors) return FirestoreService.globalDoctors;
+    if (!this.projectId) return DEFAULT_DOCTORS;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/doctor_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          FirestoreService.globalDoctors = fields.items as DoctorItem[];
+          return fields.items as DoctorItem[];
+        }
+      }
+    } catch (e) {}
+
+    return DEFAULT_DOCTORS;
+  }
+
+  public async saveDoctors(items: DoctorItem[]): Promise<void> {
+    FirestoreService.globalDoctors = items;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/doctor_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ items, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar doctor_config en Firestore:', e);
+    }
   }
 
   public async getVipContacts(): Promise<VipContactItem[]> {
@@ -680,7 +725,8 @@ export class FirestoreService {
     idConsulta?: string,
     pdfUrl?: string,
     pdfNombre?: string,
-    pdfBase64?: string
+    pdfBase64?: string,
+    imagenBase64?: string
   ): Promise<void> {
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -689,6 +735,7 @@ export class FirestoreService {
       pdfUrl,
       pdfNombre,
       pdfBase64,
+      imagenBase64,
       timestamp: new Date().toISOString()
     };
 

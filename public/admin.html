@@ -712,6 +712,7 @@
         <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
         <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
         <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
+        <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -878,6 +879,25 @@
         </button>
       </div>
 
+      <!-- SUB-SECCIÓN 7: DIRECTORIO DE MÉDICOS / TELEMEDICINA -->
+      <div id="subSettingsDoctor" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">🩺 Directorio de Médicos & Telemedicina</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura el staff de profesionales médicos a los cuales las secretarias derivarán las solicitudes y estudios de telemedicina por WhatsApp.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewDoctor()">➕ Agregar Médico</button>
+        </div>
+
+        <div id="doctorEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de médicos dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveDoctorsConfig()">
+          💾 Guardar Directorio de Médicos
+        </button>
+      </div>
+
     </div>
 
   </div>
@@ -886,6 +906,39 @@
   <div id="lightboxModal" class="lightbox-modal" style="display: none;" onclick="closeLightbox()">
     <button class="lightbox-close" onclick="closeLightbox()">✕</button>
     <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- MODAL DE DERIVACIÓN DE TELEMEDICINA -->
+  <div id="telemedicinaModal" class="lightbox-modal" style="display: none;" onclick="closeTelemedicinaModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;">🩺 Derivar Telemedicina a Médico Profesional</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeTelemedicinaModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>Seleccionar Médico Destinatario:</label>
+        <select id="telemedDoctorSelect">
+          <!-- Opciones dinámicas -->
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Nota de Secretaría para el Médico (Opcional):</label>
+        <textarea id="telemedNotaSecretaria" style="min-height: 70px; font-size: 0.88rem;" placeholder="Ej: Se adjunta informe de audiometría y tomografía enviados por el paciente..."></textarea>
+      </div>
+
+      <div id="telemedFilesPreview" style="background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+        <!-- Resumen de archivos a reenviar -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeTelemedicinaModal()">Cancelar</button>
+        <button class="btn" style="background: #38bdf8; color: #0f172a; font-weight: 700;" onclick="submitTelemedicinaDerivacion()">
+          📤 Reenviar Estudios a Médico por WhatsApp
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL PARA EDITAR PLANTILLA DE SUB-OPCIÓN (ELEGANTE POPUP DENTRO DE LA PÁGINA) -->
@@ -922,6 +975,7 @@
     let currentTagFilter = 'all';
     let currentViewMode = localStorage.getItem('adminViewMode') || 'grid';
     let selectedChatId = null;
+    let activeTelemedicinaConsultaId = null;
 
     let searchQuery = '';
     let draftResponses = {};
@@ -932,6 +986,11 @@
 
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
     let previousConsultaIds = new Set();
+
+    let doctorList = [
+      { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
+      { id: 'doc_2', name: 'Dr. López', specialty: 'Cirugía General / Telemedicina', phone: '3510000001' }
+    ];
 
     let tagDefinitions = {
       'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
@@ -1100,6 +1159,7 @@
       fetchBotConfig();
       fetchTagConfig();
       fetchVipContactsConfig();
+      fetchDoctorsConfig();
       fetchQuickRepliesConfig();
       fetchPdfItemsConfig();
       fetchMenuTree();
@@ -1111,9 +1171,151 @@
         if (e.key === 'Escape') {
           closeLightbox();
           closeSubOptionModal();
+          closeTelemedicinaModal();
         }
       });
     });
+
+    async function fetchDoctorsConfig() {
+      try {
+        const res = await fetch('/api/doctors');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items && Array.isArray(data.items)) {
+          doctorList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderDoctorEditor() {
+      const container = document.getElementById('doctorEditorList');
+      let html = '';
+      doctorList.forEach((doc, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <input type="text" value="${doc.name}" onchange="updateDocName(${idx}, this.value)" placeholder="Nombre del Médico (ej: Dra. Venier)..." style="font-weight: 700; flex: 1; min-width: 200px;">
+              <input type="text" value="${doc.specialty}" onchange="updateDocSpecialty(${idx}, this.value)" placeholder="Especialidad (ej: ORL / Telemedicina)..." style="flex: 1; min-width: 200px;">
+              <input type="text" value="${doc.phone}" onchange="updateDocPhone(${idx}, this.value)" placeholder="WhatsApp (ej: 5493516123456)..." style="width: 220px; color: #38bdf8; font-weight: 700;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeDoctor(${idx})">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateDocName(idx, val) { doctorList[idx].name = val.trim(); }
+    function updateDocSpecialty(idx, val) { doctorList[idx].specialty = val.trim(); }
+    function updateDocPhone(idx, val) { doctorList[idx].phone = val.trim(); }
+
+    function addNewDoctor() {
+      doctorList.push({
+        id: `doc_${Date.now()}`,
+        name: 'Nuevo Médico',
+        specialty: 'Especialidad',
+        phone: '549351'
+      });
+      renderDoctorEditor();
+    }
+
+    function removeDoctor(idx) {
+      doctorList.splice(idx, 1);
+      renderDoctorEditor();
+    }
+
+    async function saveDoctorsConfig() {
+      try {
+        const res = await fetch('/api/doctors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: doctorList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Directorio de médicos guardado exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar médicos.');
+      }
+    }
+
+    function openTelemedicinaModal(idConsulta) {
+      const consulta = allConsultas.find(c => c.id === idConsulta);
+      if (!consulta) return;
+      activeTelemedicinaConsultaId = idConsulta;
+
+      const select = document.getElementById('telemedDoctorSelect');
+      let html = '<option value="">-- Seleccionar Médico de la Clínica --</option>';
+      doctorList.forEach(d => {
+        html += `<option value="${d.phone}" data-name="${d.name}">${d.name} (${d.specialty}) - 📱 ${d.phone}</option>`;
+      });
+      html += '<option value="custom">✏️ Ingresar Otro Número de Teléfono...</option>';
+      select.innerHTML = html;
+
+      const datos = consulta.datos || {};
+      const respuestasPaciente = datos.respuestasPaciente || [];
+      const displayImg = datos.imagenBase64 || datos.imagenUrl;
+      const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0 ? datos.imagenesAdjuntas : (displayImg ? [displayImg] : []);
+      const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+      const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
+      const prevContainer = document.getElementById('telemedFilesPreview');
+      prevContainer.innerHTML = `
+        <div style="font-size: 0.82rem; color: #38bdf8; font-weight: 700;">
+          📄 Documentos PDF a Reenviar (${listPdfs.length}) | 📷 Fotos a Reenviar (${listImagenes.length})
+        </div>
+      `;
+
+      document.getElementById('telemedNotaSecretaria').value = '';
+      document.getElementById('telemedicinaModal').style.display = 'flex';
+    }
+
+    function closeTelemedicinaModal() {
+      document.getElementById('telemedicinaModal').style.display = 'none';
+    }
+
+    async function submitTelemedicinaDerivacion() {
+      const idConsulta = activeTelemedicinaConsultaId;
+      const select = document.getElementById('telemedDoctorSelect');
+      let doctorPhone = select.value;
+      let doctorName = select.options[select.selectedIndex]?.getAttribute('data-name') || 'Médico';
+
+      if (doctorPhone === 'custom') {
+        doctorPhone = prompt('Ingresa el número de WhatsApp del médico con código de país (ej: 5493516123456):');
+        doctorName = 'Médico Externo';
+      }
+
+      if (!doctorPhone) {
+        alert('Por favor selecciona un médico o ingresa su número de WhatsApp.');
+        return;
+      }
+
+      const notaSecretaria = document.getElementById('telemedNotaSecretaria').value.trim();
+
+      try {
+        const res = await fetch('/api/forward-telemedicina', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idConsulta,
+            doctorPhone,
+            doctorName,
+            notaSecretaria
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ ¡Estudios y ficha derivados exitosamente al WhatsApp del ${doctorName}! (${data.totalArchivos} archivos reenviados).`);
+          closeTelemedicinaModal();
+          fetchConsultas(true);
+        } else {
+          alert('Error al derivar: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('Error de conexión al derivar telemedicina.');
+      }
+    }
 
     async function fetchVipContactsConfig() {
       try {
@@ -1363,6 +1565,7 @@
       const secQuick = document.getElementById('subSettingsQuick');
       const secPdf = document.getElementById('subSettingsPdf');
       const secVip = document.getElementById('subSettingsVip');
+      const secDoc = document.getElementById('subSettingsDoctor');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
@@ -1370,9 +1573,10 @@
       const btnQuick = document.getElementById('subTabQuickBtn');
       const btnPdf = document.getElementById('subTabPdfBtn');
       const btnVip = document.getElementById('subTabVipBtn');
+      const btnDoc = document.getElementById('subTabDocBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip].forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip].forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc].forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc].forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -1393,6 +1597,10 @@
         secVip.style.display = 'flex';
         btnVip.classList.add('active');
         renderVipEditor();
+      } else if (subTab === 'doctor') {
+        secDoc.style.display = 'flex';
+        btnDoc.classList.add('active');
+        renderDoctorEditor();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
@@ -1962,6 +2170,9 @@
                   <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
                     ${c.opcion || 'Consulta'}
                   </span>
+                  <button class="btn btn-secondary" style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8;" onclick="openTelemedicinaModal('${c.id}')">
+                    🩺 Derivar Telemedicina
+                  </button>
                   <span class="tab-btn" style="background: ${c.estado === 'atendido' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(251, 191, 36, 0.2)'}; color: ${c.estado === 'atendido' ? '#34d399' : '#fbbf24'}; border: none; font-size: 0.75rem;">
                     ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
                   </span>
@@ -2184,7 +2395,7 @@
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
           let mainHtml = `
-            <!-- ENCABEZADO CHAT CON ETIQUETADOR INTEGRADO -->
+            <!-- ENCABEZADO CHAT CON ETIQUETADOR Y DERIVACIÓN A TELEMEDICINA -->
             <div style="background: #111b21; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 44px; height: 44px; background: ${vipMatch ? '#facc15' : '#00a884'}; color: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
@@ -2213,7 +2424,10 @@
                 }).join('')}
               </div>
 
-              <div style="display: flex; gap: 10px;">
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-secondary" style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;" onclick="openTelemedicinaModal('${c.id}')">
+                  🩺 Derivar Telemedicina
+                </button>
                 <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
                   ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
                 </button>

@@ -51,6 +51,13 @@ export interface WebhookPayload {
   pdfNombre?: string;
 }
 
+export interface DoctorItem {
+  id: string;
+  name: string;
+  specialty: string;
+  phone: string;
+}
+
 export interface InteractiveButton {
   id: string;
   title: string;
