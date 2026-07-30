@@ -313,7 +313,6 @@ app.post('/api/iniciar-chat', async (c) => {
     const remitente = cleanPhone;
     const firestore = new FirestoreService(c.env);
 
-    // Poner la sesión en esperando atención humana
     await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
     const idConsulta = await firestore.crearConsulta(remitente, 'Contacto Directo Secretaría', {
@@ -388,13 +387,19 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     // 3. Enviar Imágenes Adjuntas al Médico
     const displayImg = datos.imagenBase64 || datos.imagenUrl;
-    const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
-      ? datos.imagenesAdjuntas
-      : (displayImg ? [displayImg] : []);
+    const imgFromResp = respuestasPaciente.filter((r: any) => r.imagenBase64).map((r: any) => r.imagenBase64);
+    const listImagenes = [
+      ...(datos.imagenesAdjuntas || []),
+      ...imgFromResp
+    ];
+    if (listImagenes.length === 0 && displayImg) {
+      listImagenes.push(displayImg);
+    }
 
     for (const imgSrc of listImagenes) {
-      if (imgSrc && imgSrc.startsWith('data:image')) {
-        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, idConsulta, undefined, undefined, undefined, imgSrc);
+      if (imgSrc && typeof imgSrc === 'string' && imgSrc.length > 20) {
+        const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
+        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, idConsulta, undefined, undefined, undefined, formattedImg);
       }
     }
 

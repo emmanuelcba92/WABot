@@ -590,7 +590,7 @@ export class FirestoreService {
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
       const respAnteriores = datos.respuestasPaciente || [];
-      
+
       let imagenesAdjuntas = Array.isArray(datos.imagenesAdjuntas) ? [...datos.imagenesAdjuntas] : [];
       if (datos.imagenBase64 && imagenesAdjuntas.length === 0) {
         imagenesAdjuntas.push(datos.imagenBase64);
@@ -740,59 +740,22 @@ export class FirestoreService {
     };
 
     FirestoreService.pendingOutgoingMemory.push(item);
-
-    if (this.projectId && idConsulta) {
-      try {
-        const consultas = await this.getConsultas();
-        const target = consultas.find(c => c.id === idConsulta);
-        if (target) {
-          const datos = target.datos || {};
-          const pendientes = datos.pendientesSalida || [];
-          datos.pendientesSalida = [...pendientes, item];
-          target.datos = datos;
-
-          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-          await fetch(url, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
-          });
-        }
-      } catch (e) {
-        console.error('Error al guardar pendienteSalida en consulta:', e);
-      }
-    }
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
-    const result: PendingOutgoingMsg[] = [...FirestoreService.pendingOutgoingMemory];
+    const result: PendingOutgoingMsg[] = [];
+    const seenIds = new Set<string>();
+
+    for (const item of FirestoreService.pendingOutgoingMemory) {
+      const key = item.id || `${item.remitente}_${item.timestamp}_${item.text}`;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        result.push(item);
+      }
+    }
     FirestoreService.pendingOutgoingMemory = [];
 
-    if (this.projectId) {
-      try {
-        const consultas = await this.getConsultas();
-        for (const c of consultas) {
-          const datos = c.datos || {};
-          const pendientes: PendingOutgoingMsg[] = datos.pendientesSalida || [];
-          if (pendientes.length > 0) {
-            result.push(...pendientes);
-            datos.pendientesSalida = [];
-            c.datos = datos;
-
-            const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${c.id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-            await fetch(url, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
-            });
-          }
-        }
-      } catch (e) {}
-    }
-
-    const uniqueMap = new Map();
-    result.forEach(item => uniqueMap.set(item.id || (item.remitente + item.timestamp), item));
-    return Array.from(uniqueMap.values());
+    return result;
   }
 
   public async crearConsulta(
@@ -842,7 +805,7 @@ export class FirestoreService {
           const json: any = await res.json();
           if (json.documents) {
             items = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
-            FirestoreService.inMemoryConsultas = items; // SINCRONIZAR MEMORIA CON FIRESTORE
+            FirestoreService.inMemoryConsultas = items;
           }
         }
       } catch (e) {
