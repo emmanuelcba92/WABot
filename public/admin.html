@@ -385,10 +385,14 @@
       display: flex;
       flex-direction: column;
       background: #0b141a;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .chat-stream {
       flex: 1;
+      min-height: 0;
       padding: 20px;
       overflow-y: auto;
       display: flex;
@@ -913,6 +917,20 @@
     <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
   </div>
 
+  <!-- VISOR DE PDF EN MODAL SIN NECESIDAD DE DESCARGAR -->
+  <div id="pdfViewerModal" class="lightbox-modal" style="display: none;" onclick="closePdfViewer()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 95vw; max-width: 1200px; height: 90vh; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.9);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;" id="pdfViewerTitle">📄 Visor de Documento PDF</h3>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <a id="pdfViewerDownloadBtn" href="" download="" class="btn btn-secondary" style="font-size: 0.8rem; text-decoration: none;">⬇️ Descargar PDF</a>
+          <button style="background: transparent; border: none; color: white; font-size: 24px; cursor: pointer;" onclick="closePdfViewer()">✕</button>
+        </div>
+      </div>
+      <iframe id="pdfViewerFrame" style="width: 100%; flex: 1; border: none; border-radius: 8px; background: #ffffff;" src="about:blank"></iframe>
+    </div>
+  </div>
+
   <!-- MODAL DE INICIAR NUEVO CHAT -->
   <div id="iniciarChatModal" class="lightbox-modal" style="display: none;" onclick="closeIniciarChatModal()">
     <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
@@ -1218,12 +1236,50 @@
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           closeLightbox();
+          closePdfViewer();
           closeSubOptionModal();
           closeTelemedicinaModal();
           closeIniciarChatModal();
         }
       });
     });
+
+    function openPdfViewer(base64Data, pdfName) {
+      const modal = document.getElementById('pdfViewerModal');
+      const frame = document.getElementById('pdfViewerFrame');
+      const title = document.getElementById('pdfViewerTitle');
+      const downloadLink = document.getElementById('pdfViewerDownloadBtn');
+
+      if (!modal || !frame) return;
+
+      title.innerText = `📄 Visor: ${pdfName || 'Documento.pdf'}`;
+      downloadLink.href = base64Data;
+      downloadLink.download = pdfName || 'documento.pdf';
+
+      try {
+        let base64Clean = base64Data.replace(/^data:application\/pdf;base64,/, '');
+        const byteCharacters = atob(base64Clean);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        frame.src = blobUrl;
+      } catch (e) {
+        frame.src = base64Data;
+      }
+
+      modal.style.display = 'flex';
+    }
+
+    function closePdfViewer() {
+      const modal = document.getElementById('pdfViewerModal');
+      const frame = document.getElementById('pdfViewerFrame');
+      if (frame) frame.src = 'about:blank';
+      if (modal) modal.style.display = 'none';
+    }
 
     function openIniciarChatModal() {
       document.getElementById('newChatPhone').value = '';
@@ -1238,7 +1294,7 @@
       qrContainer.innerHTML = qrHtml;
 
       const pdfSelect = document.getElementById('newChatPdfSelect');
-      let pdfHtml = '<option value="">-- Sin Archivo PDF Adjunto --</option>';
+      let pdfHtml = '<option value="">-- Sin Archivo Adjunto --</option>';
       predefinedPdfsList.forEach(pdf => {
         pdfHtml += `<option value="${pdf.id}">${pdf.title}</option>`;
       });
@@ -2361,8 +2417,11 @@
                         🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
                         ${r.pdfBase64 ? `
                           <div style="margin-top: 6px;">
-                            <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                              📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                            <button onclick="openPdfViewer('${r.pdfBase64}', '${r.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                              👁️ Ver PDF: ${r.pdfNombre || 'pedido_medico.pdf'}
+                            </button>
+                            <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline; margin-left: 8px;">
+                              ⬇️ Descargar
                             </a>
                           </div>
                         ` : ''}
@@ -2377,10 +2436,13 @@
                     <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">📄 Documentos PDF Adjuntos del Paciente (${listPdfs.length}):</span>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                       ${listPdfs.map((pdfItem, pIdx) => `
-                        <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
                           <span>📄 ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`}</span>
-                          <span style="font-size: 0.75rem; background: #38bdf8; color: #0f172a; padding: 2px 8px; border-radius: 4px;">⬇️ Abrir PDF</span>
-                        </a>
+                          <div style="display: flex; gap: 8px; align-items: center;">
+                            <button onclick="openPdfViewer('${pdfItem.base64}', '${pdfItem.nombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">👁️ Ver PDF</button>
+                            <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="font-size: 0.75rem; color: var(--muted); text-decoration: underline;">⬇️ Descargar</a>
+                          </div>
+                        </div>
                       `).join('')}
                     </div>
                   </div>
@@ -2509,20 +2571,11 @@
           const respuestasSecretaria = datos.respuestasSecretaria || [];
           const respuestasPaciente = datos.respuestasPaciente || [];
           const etiquetas = datos.etiquetas || [];
-          const displayImg = datos.imagenBase64 || datos.imagenUrl;
-          const imgUrl = datos.imagenUrl;
 
           const draftValue = draftResponses[c.id] || '';
-          const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
-            ? datos.imagenesAdjuntas
-            : (displayImg ? [displayImg] : []);
-
-          const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
-          const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
-
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
-          // CONSTRUIR STREAM UNIFICADO 100% CRONOLÓGICO POR TIMESTAMP
+          // CONSTRUIR STREAM UNIFICADO 100% CRONOLÓGICO POR TIMESTAMP E INTEGRADO (FOTOS + PDFS + TEXTO)
           const allStreamMsgs = [];
           const baseTime = new Date(c.timestamp || c.createdAt).getTime();
 
@@ -2562,6 +2615,42 @@
               cssClass: 'chat-bubble-patient',
               headerColor: '#00e699'
             });
+          });
+
+          // Incluir imágenes adjuntas iniciales si no están ya en respuestasPaciente
+          const displayImg = datos.imagenBase64 || datos.imagenUrl;
+          const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0 ? datos.imagenesAdjuntas : (displayImg ? [displayImg] : []);
+
+          listImagenes.forEach((imgSrc, idx) => {
+            const alreadyInResp = respuestasPaciente.some(r => r.imagenBase64 === imgSrc);
+            if (!alreadyInResp && imgSrc) {
+              allStreamMsgs.push({
+                type: 'pac_img',
+                senderName: '🟢 Paciente',
+                text: '',
+                timestamp: baseTime + 10 + idx,
+                imagenBase64: imgSrc,
+                cssClass: 'chat-bubble-patient',
+                headerColor: '#00e699'
+              });
+            }
+          });
+
+          const listPdfs = datos.pdfsAdjuntos || [];
+          listPdfs.forEach((pdfItem, idx) => {
+            const alreadyInResp = respuestasPaciente.some(r => r.pdfBase64 === pdfItem.base64);
+            if (!alreadyInResp && pdfItem.base64) {
+              allStreamMsgs.push({
+                type: 'pac_pdf',
+                senderName: '🟢 Paciente',
+                text: '',
+                timestamp: baseTime + 20 + idx,
+                pdfBase64: pdfItem.base64,
+                pdfNombre: pdfItem.nombre,
+                cssClass: 'chat-bubble-patient',
+                headerColor: '#38bdf8'
+              });
+            }
           });
 
           allStreamMsgs.sort((a, b) => a.timestamp - b.timestamp);
@@ -2607,38 +2696,36 @@
             </div>
 
             <!-- CHAT STREAM SCROLLABLE CRONOLÓGICO -->
-            <div class="chat-stream">
+            <div class="chat-stream" id="chatStreamBox_${c.id}">
               ${allStreamMsgs.map(m => `
                 <div class="${m.cssClass}">
                   <div style="font-size: 0.72rem; color: ${m.headerColor}; font-weight: 700; margin-bottom: 4px;">
                     ${m.senderName} (${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):
                   </div>
-                  <div>${m.text}</div>
+
+                  ${m.text ? `<div>${m.text}</div>` : ''}
+
+                  ${m.imagenBase64 ? `
+                    <div style="margin-top: 6px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                      <div class="card-img-container" onclick="openLightbox('${m.imagenBase64}')" title="Haz clic para ver foto en HD">
+                        <img src="${m.imagenBase64}" style="max-height: 250px; border-radius: 6px; object-fit: cover;" loading="lazy" alt="Foto adjunta">
+                        <div class="card-img-overlay">
+                          <span>🔍 Clic para ampliar HD</span>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
+
                   ${m.pdfBase64 ? `
-                    <div style="margin-top: 6px;">
-                      <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                        📄 Abrir PDF: ${m.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                    <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                      <button onclick="openPdfViewer('${m.pdfBase64}', '${m.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        👁️ Ver PDF: ${m.pdfNombre || 'pedido_medico.pdf'}
+                      </button>
+                      <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline;">
+                        ⬇️ Descargar
                       </a>
                     </div>
                   ` : ''}
-                </div>
-              `).join('')}
-
-              <!-- Fotos Adjuntas Iniciales -->
-              ${listImagenes.map((imgSrc, idx) => `
-                <div class="chat-bubble-patient" style="padding: 6px;">
-                  <div class="card-img-container" onclick="openLightbox('${imgSrc}')">
-                    <img src="${imgSrc}" style="max-height: 250px; border-radius: 8px;" loading="lazy" alt="Foto ${idx + 1}">
-                  </div>
-                </div>
-              `).join('')}
-
-              <!-- Documentos PDF Adjuntos Iniciales -->
-              ${listPdfs.map((pdfItem, pIdx) => `
-                <div class="chat-bubble-patient">
-                  <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-                    📄 Abrir PDF: ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`} ⬇️
-                  </a>
                 </div>
               `).join('')}
             </div>
@@ -2675,6 +2762,11 @@
           `;
 
           containerChatMain.innerHTML = mainHtml;
+
+          const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
+          if (streamBox) {
+            streamBox.scrollTop = streamBox.scrollHeight;
+          }
         }
       }
 
