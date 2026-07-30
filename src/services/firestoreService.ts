@@ -603,7 +603,7 @@ export class FirestoreService {
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
-      
+
       // Guardar el LID para poder responder al usuario por su ID de WhatsApp
       if (remitente.includes('@lid')) {
         datos.altRemitente = remitente;
@@ -753,12 +753,14 @@ export class FirestoreService {
     altRemitente?: string
   ): Promise<void> {
     let targetJid = remitente;
+    let computedAlt = altRemitente;
+
     if (idConsulta) {
       const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
       if (itemMem && itemMem.datos?.altRemitente) {
-        altRemitente = itemMem.datos.altRemitente;
-        if (altRemitente.includes('@lid')) {
-          targetJid = altRemitente;
+        computedAlt = itemMem.datos.altRemitente;
+        if (computedAlt && computedAlt.includes('@lid')) {
+          targetJid = computedAlt;
         }
       }
     }
@@ -766,7 +768,7 @@ export class FirestoreService {
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       remitente,
-      altRemitente,
+      altRemitente: computedAlt,
       targetJid,
       text,
       pdfUrl,
