@@ -1907,6 +1907,9 @@
         if (vipA && vipB) {
           if (vipA.priority === 'urgente' && vipB.priority !== 'urgente') return -1;
           if (vipA.priority !== 'urgente' && vipB.priority === 'urgente') return 1;
+          const timeA = new Date(a.timestamp || a.createdAt).getTime();
+          const timeB = new Date(b.timestamp || b.createdAt).getTime();
+          return timeB - timeA;
         }
 
         // 2. Conversación activa (el paciente respondió tras un mensaje de la secretaria) sube arriba
@@ -2117,6 +2120,7 @@
           let sideHtml = '';
           filtered.forEach(c => {
             const datos = c.datos || {};
+            const etiquetas = datos.etiquetas || [];
             const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
             const isSel = selectedChatId === c.id;
             const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName || c.remitente);
@@ -2134,10 +2138,15 @@
                 <div style="font-size: 0.78rem; color: var(--muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
                   ${lastMsg}
                 </div>
-                <div style="display: flex; gap: 4px; margin-top: 2px;">
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; align-items: center;">
                   <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">
                     ${c.opcion || 'Consulta'}
                   </span>
+                  ${etiquetas.map(t => {
+                    const def = tagDefinitions[t];
+                    if (!def) return '';
+                    return `<span style="font-size: 0.68rem; background:${def.color}33; color:${def.color}; padding: 2px 6px; border-radius: 4px; border: 1px solid ${def.color};">${def.label}</span>`;
+                  }).join('')}
                   ${c.estado === 'atendido' ? `<span style="font-size: 0.68rem; background: rgba(52, 211, 153, 0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">Atendido</span>` : ''}
                 </div>
               </div>
@@ -2175,8 +2184,8 @@
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
           let mainHtml = `
-            <!-- ENCABEZADO CHAT -->
-            <div style="background: #111b21; padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <!-- ENCABEZADO CHAT CON ETIQUETADOR INTEGRADO -->
+            <div style="background: #111b21; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 44px; height: 44px; background: ${vipMatch ? '#facc15' : '#00a884'}; color: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
                   ${vipMatch ? '⭐' : '📱'}
@@ -2189,6 +2198,19 @@
                     ${vipMatch ? `${vipMatch.name} (${vipMatch.role || 'Prioritario'})` : `Opción: ${c.opcion || 'Consulta'}`}
                   </div>
                 </div>
+              </div>
+
+              <!-- SELECTOR DE ETIQUETAS INTEGRADO EN EL ENCABEZADO -->
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="font-size: 0.75rem; color: var(--muted); font-weight: 700;">Etiquetas:</span>
+                ${Object.entries(tagDefinitions).map(([key, def]) => {
+                  const isSel = etiquetas.includes(key);
+                  return `
+                    <button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color}; color:#fff; font-weight:700; border-color:transparent;` : ''}" onclick="toggleTag('${c.id}', '${key}')">
+                      ${def.label}
+                    </button>
+                  `;
+                }).join('')}
               </div>
 
               <div style="display: flex; gap: 10px;">
