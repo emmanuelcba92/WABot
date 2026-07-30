@@ -522,7 +522,8 @@ export class FirestoreService {
     pdfNombre?: string
   ): Promise<void> {
     const consultas = await this.getConsultas();
-    const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado !== 'atendido') || consultas.find(c => c.remitente === remitente);
+    // SOLUCIÓN: ÚNICAMENTE anexar a consultas en estado PENDIENTE. Si una consulta está FINALIZADA (atendida), NUNCA reabrirla.
+    const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado === 'pendiente');
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};

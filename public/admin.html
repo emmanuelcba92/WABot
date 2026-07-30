@@ -858,14 +858,27 @@
 
     function normalizePhone(str) {
       if (!str) return '';
-      return str.replace(/[^0-9]/g, '');
+      let digits = str.replace(/[^0-9]/g, '');
+      if (digits.startsWith('0')) digits = digits.substring(1);
+      if (digits.startsWith('549')) digits = digits.substring(3);
+      else if (digits.startsWith('54')) digits = digits.substring(2);
+      if (digits.startsWith('15')) digits = digits.substring(2);
+      return digits;
     }
 
     function isVipMatch(remitente, vipPhone) {
       const rClean = normalizePhone(remitente);
       const vClean = normalizePhone(vipPhone);
       if (!rClean || !vClean) return false;
-      return rClean.includes(vClean) || vClean.includes(rClean);
+
+      if (rClean === vClean) return true;
+      if (rClean.includes(vClean) || vClean.includes(rClean)) return true;
+
+      const rTail = rClean.slice(-8);
+      const vTail = vClean.slice(-8);
+      if (rTail.length >= 7 && rTail === vTail) return true;
+
+      return false;
     }
 
     function playVipChimeSound() {
