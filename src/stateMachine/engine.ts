@@ -1,8 +1,20 @@
-import { WebhookPayload, WebhookResponse, Env } from '../types';
+import { WebhookPayload, WebhookResponse, Env, MenuTreeConfig } from '../types';
 import { MESSAGES } from '../templates/messages';
 import { ScheduleService } from '../services/scheduleService';
 import { FirestoreService } from '../services/firestoreService';
 import { ImageUploadService } from '../services/imageUploadService';
+
+function buildFullMenuMessage(menuTree: MenuTreeConfig): string {
+  const welcome = menuTree.welcomeMessage || MESSAGES.SALUDO_BIENVENIDA;
+  const items = menuTree.items || [];
+  if (items.length === 0) return welcome;
+
+  let text = welcome.trim() + '\n\n';
+  items.forEach(item => {
+    text += `*${item.key.toUpperCase()})* ${item.label}\n`;
+  });
+  return text.trim();
+}
 
 export class StateEngine {
   public static async processMessage(
@@ -27,7 +39,7 @@ export class StateEngine {
     const fueraDeHorarioMsg = botConfig.fueraDeHorario || MESSAGES.FUERA_DE_HORARIO;
 
     const menuTree = await firestore.getMenuTree();
-    const saludoBienvenidaMsg = menuTree.welcomeMessage || MESSAGES.SALUDO_BIENVENIDA;
+    const saludoBienvenidaMsg = buildFullMenuMessage(menuTree);
 
     // 1. FUERA DE HORARIO DE ATENCIÓN
     if (!scheduleInfo.isWithinHours) {
