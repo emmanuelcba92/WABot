@@ -2272,27 +2272,12 @@
 
     function formatTextForWhatsApp(text, datos) {
       if (!text) text = '';
+      const cleanText = text.trim();
+      if (!cleanText) return '';
 
-      if (datos && (datos.dni || datos.obraSocial || datos.tipoSolicitud || datos.estudioDeseado || datos.cirugiaPropuesta)) {
-        const parts = [];
-        if (datos.tipoSolicitud) parts.push(`📋 *Solicitud:* ${datos.tipoSolicitud}`);
-        if (datos.pushName || datos.nombre) parts.push(`👤 *Nombre:* ${datos.pushName || datos.nombre}`);
-        if (datos.dni) parts.push(`🪪 *DNI:* ${datos.dni}`);
-        if (datos.fechaNacimiento) parts.push(`📅 *Fecha Nac.:* ${datos.fechaNacimiento}`);
-        if (datos.obraSocial) parts.push(`🏥 *Obra Social:* ${datos.obraSocial}`);
-        if (datos.especialidad) parts.push(`🩺 *Especialidad:* ${datos.especialidad}`);
-        if (datos.estudioDeseado) parts.push(`🔬 *Estudio:* ${datos.estudioDeseado}`);
-        if (datos.cirugiaPropuesta) parts.push(`🏥 *Cirugía:* ${datos.cirugiaPropuesta}`);
-        if (datos.medicoPreferido || datos.medicoTratante) parts.push(`👨‍⚕️ *Médico:* ${datos.medicoPreferido || datos.medicoTratante}`);
-        if (datos.motivo) parts.push(`📝 *Motivo:* ${datos.motivo}`);
-        if (datos.numeroAfiliadoPami) parts.push(`👵 *Afiliado PAMI:* ${datos.numeroAfiliadoPami}`);
+      const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-        if (parts.length > 0) return parts.join('\n');
-      }
-
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-      const LABELS = [
+      const LABELS_PLANTILLA = [
         '🪪 *DNI*',
         '👤 *Nombre completo*',
         '📅 *Fecha de nacimiento*',
@@ -2304,11 +2289,25 @@
         '⏰ *Preferencia horaria*'
       ];
 
-      if (lines.length >= 3 && lines.length <= 9 && !text.includes(':')) {
-        return lines.map((line, i) => `${LABELS[i] || `📌 *Dato ${i+1}*`}: ${line}`).join('\n');
+      // Si el mensaje consiste en respuestas en varias líneas sin los dos puntos ':', aparear CADA línea con su etiqueta
+      if (lines.length >= 2 && lines.length <= 12 && !cleanText.includes(':')) {
+        const formattedLines = lines.map((line, i) => {
+          const label = LABELS_PLANTILLA[i] || `📌 *Dato ${i+1}*`;
+          return `${label}: ${line}`;
+        });
+
+        if (datos && (datos.tipoSolicitud || datos.opcion)) {
+          formattedLines.unshift(`📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}`);
+        }
+        return formattedLines.join('\n');
       }
 
-      return text;
+      // Si ya tiene etiquetas o es texto libre, conservar el 100% del texto intacto
+      if (datos && (datos.tipoSolicitud || datos.opcion) && !cleanText.toLowerCase().includes('solicitud')) {
+        return `📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}\n${cleanText}`;
+      }
+
+      return cleanText;
     }
 
     function renderWhatsAppFormattedText(text) {
