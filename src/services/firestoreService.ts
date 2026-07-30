@@ -483,16 +483,13 @@ export class FirestoreService {
   public async getSesion(remitente: string, altRemitente?: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
-    // 1. Probar por remitente directo en RAM
     let sesionMem = FirestoreService.inMemorySessions.get(docId);
 
-    // 2. Probar por altRemitente directo en RAM
     if (!sesionMem && altRemitente) {
       const altId = encodeURIComponent(altRemitente.trim());
       sesionMem = FirestoreService.inMemorySessions.get(altId);
     }
 
-    // 3. Probar por coincidencia de dígitos de teléfono en RAM
     if (!sesionMem) {
       const rDigits = remitente.replace(/[^0-9]/g, '');
       const altDigits = (altRemitente || '').replace(/[^0-9]/g, '');
@@ -632,7 +629,6 @@ export class FirestoreService {
     const rDigits = remitente.replace(/[^0-9]/g, '');
     const altDigits = (altRemitente || '').replace(/[^0-9]/g, '');
 
-    // BÚSQUEDA EXHAUSTIVA DE CONSULTA PENDIENTE CON SOPORTE LID Y TELÉFONO
     const consultaPaciente = consultas.find(c => {
       if (c.estado !== 'pendiente') return false;
 
@@ -661,7 +657,6 @@ export class FirestoreService {
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
 
-      // Guardar el LID para poder responder al usuario por su ID de WhatsApp
       if (remitente.includes('@lid')) {
         datos.altRemitente = remitente;
       } else if (altRemitente && altRemitente.includes('@lid')) {
@@ -675,7 +670,7 @@ export class FirestoreService {
         imagenesAdjuntas.push(datos.imagenBase64);
       }
 
-      if (imagenBase64) {
+      if (imagenBase64 && !imagenesAdjuntas.includes(imagenBase64)) {
         imagenesAdjuntas.push(imagenBase64);
       }
 
@@ -686,7 +681,7 @@ export class FirestoreService {
       datos.imagenesAdjuntas = imagenesAdjuntas;
 
       let pdfsAdjuntos = Array.isArray(datos.pdfsAdjuntos) ? [...datos.pdfsAdjuntos] : [];
-      if (pdfBase64) {
+      if (pdfBase64 && !pdfsAdjuntos.some((p: any) => p.base64 === pdfBase64)) {
         pdfsAdjuntos.push({
           nombre: pdfNombre || 'documento.pdf',
           base64: pdfBase64,
@@ -709,7 +704,6 @@ export class FirestoreService {
       consultaPaciente.estado = 'pendiente';
       consultaPaciente.timestamp = new Date().toISOString();
 
-      // ACTUALIZAR MEMORIA ESTÁTICA LOCAL INSTANTÁNEAMENTE
       const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === consultaPaciente.id);
       if (targetMem) {
         targetMem.datos = datos;
@@ -836,10 +830,7 @@ export class FirestoreService {
       timestamp: new Date().toISOString()
     };
 
-    // 1. Guardar en memoria RAM local
-    FirestoreService.pendingOutgoingMemory.push(item);
-
-    // 2. Persistir en Firestore /sesiones/pending_queue para compartir con TODOS los Cloudflare Worker Isolates
+    // PERSISTIR 100% EN FIRESTORE (SIN MANTENER RAM LOCAL EN ISOLATES)
     if (this.projectId) {
       try {
         const existing = await this.getPendingQueueFromFirestore();
@@ -855,37 +846,21 @@ export class FirestoreService {
       } catch (e) {
         console.error('Error al persitir pending_queue en Firestore:', e);
       }
+    } else {
+      FirestoreService.pendingOutgoingMemory.push(item);
     }
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
     const result: PendingOutgoingMsg[] = [];
-    const seenIds = new Set<string>();
 
-    // 1. Recolectar RAM local
-    for (const item of FirestoreService.pendingOutgoingMemory) {
-      const key = item.id || `${item.remitente}_${item.timestamp}_${item.text}`;
-      if (!seenIds.has(key)) {
-        seenIds.add(key);
-        result.push(item);
-      }
-    }
-    FirestoreService.pendingOutgoingMemory = [];
-
-    // 2. Recolectar Firestore persitente (soporte multi-isolate Cloudflare Workers)
     if (this.projectId) {
       try {
         const fsItems = await this.getPendingQueueFromFirestore();
-        for (const item of fsItems) {
-          const key = item.id || `${item.remitente}_${item.timestamp}_${item.text}`;
-          if (!seenIds.has(key)) {
-            seenIds.add(key);
-            result.push(item);
-          }
-        }
-
-        // Vaciar la cola en Firestore una vez recolectada
         if (fsItems.length > 0) {
+          result.push(...fsItems);
+
+          // Vaciar la cola en Firestore una vez recolectada atómicamente
           const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/pending_queue${this.apiKey ? `?key=${this.apiKey}` : ''}`;
           await fetch(url, {
             method: 'PATCH',
@@ -898,6 +873,9 @@ export class FirestoreService {
       } catch (e) {
         console.error('Error al limpiar pending_queue en Firestore:', e);
       }
+    } else {
+      result.push(...FirestoreService.pendingOutgoingMemory);
+      FirestoreService.pendingOutgoingMemory = [];
     }
 
     return result;

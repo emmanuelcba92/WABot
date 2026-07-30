@@ -15,6 +15,7 @@ const WORKER_WEBHOOK_URL = 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
 const WORKER_PENDING_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
 
 const processedMsgIds = new Set();
+const sentMsgHistory = new Map(); // id -> timestamp
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
@@ -217,6 +218,18 @@ async function startWhatsAppGateway() {
 
       for (const msg of messages) {
         try {
+          // DEDUPLICADOR ATÓMICO EN GATEWAY
+          const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
+          if (sentMsgHistory.has(msgDedupeKey)) {
+            const prevTime = sentMsgHistory.get(msgDedupeKey);
+            if (Date.now() - prevTime < 30000) {
+              console.warn(`⚠️ [DEDUPLICADOR GATEWAY] Omitiendo mensaje duplicado en cola: ${msgDedupeKey}`);
+              continue;
+            }
+          }
+          sentMsgHistory.set(msgDedupeKey, Date.now());
+          if (sentMsgHistory.size > 1000) sentMsgHistory.clear();
+
           let primaryJid = msg.targetJid || msg.remitente;
           let altJid = msg.altRemitente;
 
@@ -264,7 +277,7 @@ async function startWhatsAppGateway() {
                 });
                 console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
                 sendSuccess = true;
-                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
+                break;
               } else if (msg.imagenBase64) {
                 const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
                 const buffer = Buffer.from(base64Data, 'base64');
@@ -274,12 +287,12 @@ async function startWhatsAppGateway() {
                 });
                 console.log(`📤 Imagen enviada a ${targetJid}.`);
                 sendSuccess = true;
-                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
+                break;
               } else if (msg.text) {
                 await sock.sendMessage(targetJid, { text: msg.text });
                 console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
                 sendSuccess = true;
-                break; // IMPORTANTE: Una vez entregado con éxito a la dirección principal, salir del bucle para evitar duplicar el envío
+                break;
               }
             } catch (errJid) {
               console.warn(`⚠️ Error al enviar a ${targetJid}, intentando siguiente dirección...:`, errJid?.message || errJid);
