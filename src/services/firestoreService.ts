@@ -584,6 +584,14 @@ export class FirestoreService {
       consultaPaciente.estado = 'pendiente';
       consultaPaciente.timestamp = new Date().toISOString();
 
+      // ACTUALIZAR MEMORIA ESTÁTICA LOCAL INSTANTÁNEAMENTE
+      const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === consultaPaciente.id);
+      if (targetMem) {
+        targetMem.datos = datos;
+        targetMem.timestamp = consultaPaciente.timestamp;
+        targetMem.estado = 'pendiente';
+      }
+
       if (this.projectId) {
         try {
           const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${consultaPaciente.id}?updateMask.fieldPaths=datos&updateMask.fieldPaths=estado&updateMask.fieldPaths=timestamp${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -612,6 +620,11 @@ export class FirestoreService {
       const datos = target.datos || {};
       datos.etiquetas = etiquetas;
       target.datos = datos;
+
+      const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === id);
+      if (targetMem) {
+        targetMem.datos = datos;
+      }
 
       if (this.projectId) {
         try {
@@ -642,6 +655,11 @@ export class FirestoreService {
         timestamp: new Date().toISOString()
       }];
       target.datos = datos;
+
+      const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
+      if (targetMem) {
+        targetMem.datos = datos;
+      }
 
       if (this.projectId) {
         try {
@@ -777,6 +795,7 @@ export class FirestoreService {
           const json: any = await res.json();
           if (json.documents) {
             items = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
+            FirestoreService.inMemoryConsultas = items; // SINCRONIZAR MEMORIA CON FIRESTORE
           }
         }
       } catch (e) {
