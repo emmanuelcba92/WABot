@@ -522,8 +522,12 @@ export class FirestoreService {
     pdfNombre?: string
   ): Promise<void> {
     const consultas = await this.getConsultas();
-    // SOLUCIÓN: ÚNICAMENTE anexar a consultas en estado PENDIENTE. Si una consulta está FINALIZADA (atendida), NUNCA reabrirla.
-    const consultaPaciente = consultas.find(c => c.remitente === remitente && c.estado === 'pendiente');
+    // SOLUCIÓN: Buscar la consulta activa por remitente O por altRemitente que esté PENDIENTE.
+    const consultaPaciente = consultas.find(c =>
+      (c.remitente === remitente ||
+       (c.datos && c.datos.altRemitente && c.datos.altRemitente === remitente)) &&
+      c.estado === 'pendiente'
+    );
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
@@ -557,6 +561,8 @@ export class FirestoreService {
       const tagDesc = pdfBase64 ? `📄 (PDF: ${pdfNombre || 'documento.pdf'})` : (imagenBase64 ? '📷 (Foto de pedido médico)' : '');
       const nuevaResp = {
         texto: `${textoMensaje} ${tagDesc}`.trim(),
+        pdfBase64: pdfBase64 || null,
+        pdfNombre: pdfNombre || null,
         timestamp: new Date().toISOString()
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
@@ -580,7 +586,7 @@ export class FirestoreService {
             })
           });
         } catch (e) {
-          console.error('Error al reabrir consulta en Firestore:', e);
+          console.error('Error al actualizar consulta en Firestore:', e);
         }
       }
     }

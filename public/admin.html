@@ -761,6 +761,7 @@
           <div>
             <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos VIP / Socios / Urgencias</h3>
             <p style="font-size: 0.85rem; color: var(--muted);">Configura números telefónicos o IDs prioritarios. Cuando escriban, subirán automáticamente a la cima (#1) con alerta sonora.</p>
+            <p style="font-size: 0.78rem; color: #38bdf8; margin-top: 4px;">💡 <em>Nota: Podés ingresar el número de teléfono (ej: 3516123456) O el ID de WhatsApp (ej: 205948144619633@lid).</em></p>
           </div>
           <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto VIP</button>
         </div>
@@ -882,16 +883,20 @@
         remitente = String(consultaOrRemitente);
       }
 
-      const vPhone = vipContact.phone || '';
-      const vClean = normalizePhone(vPhone);
+      const vPhone = (vipContact.phone || '').trim().toLowerCase();
+      if (!vPhone) return false;
+
+      const rLower = remitente.toLowerCase();
+      const altLower = altRemitente.toLowerCase();
 
       // 1. Coincidencia por JID directo o LID (ej: "205948144619633@lid" o "205948...")
-      if (vPhone.length > 10) {
-        const rawV = vPhone.toLowerCase().trim();
-        if (remitente.toLowerCase().includes(rawV) || altRemitente.toLowerCase().includes(rawV)) return true;
+      const vDigitsOnly = vPhone.replace(/[^0-9]/g, '');
+      if (vPhone.includes('@lid') || (vDigitsOnly.length > 10 && !vPhone.startsWith('54'))) {
+        if (rLower.includes(vDigitsOnly) || altLower.includes(vDigitsOnly)) return true;
       }
 
       // 2. Coincidencia por Teléfono (normalizado)
+      const vClean = normalizePhone(vPhone);
       const rClean = normalizePhone(remitente);
       const altClean = normalizePhone(altRemitente);
 
@@ -970,7 +975,7 @@
           <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <input type="text" value="${vip.name}" onchange="updateVipName(${idx}, this.value)" placeholder="Nombre del Contacto (ej: Dr. López)..." style="font-weight: 700; flex: 1; min-width: 200px;">
-              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono o ID (ej: 3516123456 o 205948...)..." style="width: 220px; color: #facc15; font-weight: 700;">
+              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono o ID @lid..." style="width: 230px; color: #facc15; font-weight: 700;">
               <select onchange="updateVipPriority(${idx}, this.value)" style="width: 150px;">
                 <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ VIP / Socio</option>
                 <option value="urgente" ${vip.priority === 'urgente' ? 'selected' : ''}>🚨 Urgencia Médica</option>
@@ -1748,7 +1753,9 @@
           ? datos.imagenesAdjuntas
           : (displayImg ? [displayImg] : []);
 
-        const listPdfs = datos.pdfsAdjuntos || [];
+        const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+        const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
         const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
         const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
@@ -1822,6 +1829,13 @@
                 ${respuestasPaciente.map(r => `
                   <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
                     🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                    ${r.pdfBase64 ? `
+                      <div style="margin-top: 6px;">
+                        <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                          📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                        </a>
+                      </div>
+                    ` : ''}
                   </div>
                 `).join('')}
               </div>
