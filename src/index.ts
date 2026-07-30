@@ -389,9 +389,11 @@ app.post('/api/forward-telemedicina', async (c) => {
     }
     const listPdfs = Array.from(uniquePdfsMap.values());
 
-    for (const pdfItem of listPdfs) {
+    for (let i = 0; i < listPdfs.length; i++) {
+      const pdfItem = listPdfs[i];
       if (pdfItem.base64) {
-        await firestore.addPendingOutgoing(doctorPhone, `📄 Documento PDF (${pdfItem.nombre || 'estudio.pdf'})`, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
+        const label = listPdfs.length > 1 ? `📄 Documento PDF (${i + 1}/${listPdfs.length}): ${pdfItem.nombre || 'estudio.pdf'}` : `📄 Documento PDF: ${pdfItem.nombre || 'estudio.pdf'}`;
+        await firestore.addPendingOutgoing(doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
       }
     }
 
@@ -414,9 +416,11 @@ app.post('/api/forward-telemedicina', async (c) => {
     }
     const listImagenes = Array.from(uniqueImagenesSet);
 
-    for (const imgSrc of listImagenes) {
+    for (let i = 0; i < listImagenes.length; i++) {
+      const imgSrc = listImagenes[i];
       const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
-      await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
+      const label = listImagenes.length > 1 ? `📷 Foto Adjunta de Pedido Médico (${i + 1} de ${listImagenes.length})` : `📷 Pedido Médico / Foto Adjunta del Paciente`;
+      await firestore.addPendingOutgoing(doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
     }
 
     // 4. Registrar en la consulta que fue derivada a Telemedicina
