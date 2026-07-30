@@ -282,7 +282,7 @@ export class StateEngine {
       await fs.saveSesion(altRemitente, 'esperando_atencion_humana');
     }
 
-    const respText = MESSAGES.CONFIRMACION_SOLICITUD_RECIBIDA;
+    const respText = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
 
     return {
       remitente,
