@@ -83,235 +83,225 @@ export class StateEngine {
       };
     }
 
-    const sesion = await firestore.getSesion(remitente);
+    const sesion = await firestore.getSesion(remitente, altRemitente);
     const msgClean = mensaje.toLowerCase().trim();
 
-    // Reset comandos globales ("hola", "inicio", "menu")
-    const esSaludoExplicit = msgClean === 'hola' || msgClean === 'inicio' || msgClean === 'menu' || msgClean === 'cancelar' || msgClean === 'reset';
+    // Reset comandos globales explícitos únicamente ("reset", "cancelar", "menu")
+    const esSaludoExplicit = msgClean === 'reset' || msgClean === 'cancelar' || msgClean === 'menu';
 
-    // 3. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL SI EL PACIENTE HABLA)
+    // 3. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL DEL BOT PARA CONVERSACIÓN FLUIDA)
     if (sesion.estado === 'esperando_atencion_humana' && !esSaludoExplicit) {
       if (mensaje.length > 0 || imagenBase64 || pdfBase64) {
         await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente);
       }
       return {
         remitente,
-        respuesta: '', // Silencio para no saturar al paciente mientras responde la secretaria
+        respuesta: '', // SILENCIO ABSOLUTO DEL BOT: LA SECRETARÍA ESTÁ CONVERSANDO DIRECTAMENTE
         estadoActual: 'esperando_atencion_humana',
         enHorario: true,
         timestamp
       };
     }
 
-    // 4. SALUDO INICIAL / RESET DE CONVERSACIÓN
-    if (esSaludoExplicit || sesion.estado === 'inicio') {
-      await firestore.saveSesion(remitente, 'esperando_opcion_principal');
+    // Si el usuario envía reset / cancelar, volver al menú inicial
+    if (esSaludoExplicit) {
+      await firestore.saveSesion(remitente, 'inicio');
       return {
         remitente,
         respuesta: saludoBienvenidaMsg,
-        estadoActual: 'esperando_opcion_principal',
+        estadoActual: 'inicio',
         enHorario: true,
         timestamp
       };
     }
 
-    // 5. EVALUACIÓN DINÁMICA DE OPCIONES CONFIGURADAS POR EL ADMIN
-    if (sesion.estado === 'esperando_opcion_principal') {
-      const input = msgClean.replace(/[^a-z0-9]/g, '');
+    // 4. MÁQUINA DE ESTADOS - PROCESAMIENTO SEGÚN EL MENÚ DINÁMICO
+    switch (sesion.estado) {
+      case 'inicio': {
+        const itemElegido = (menuTree.items || []).find(i => i.key.toLowerCase() === msgClean);
 
-      // Buscar si coincide con alguna opción principal (A, B, C, D, E, F...)
-      const itemMatch = (menuTree.items || []).find(item => item.key.toLowerCase() === input);
-
-      if (itemMatch) {
-        if (itemMatch.type === 'info') {
-          await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+        if (!itemElegido) {
           return {
             remitente,
-            respuesta: itemMatch.responseTemplate || 'Gracias por comunicarte con nosotros.',
-            estadoActual: 'esperando_atencion_humana',
+            respuesta: saludoBienvenidaMsg,
+            estadoActual: 'inicio',
             enHorario: true,
             timestamp
           };
-        } else if (itemMatch.type === 'submenu' && itemMatch.subItems && itemMatch.subItems.length > 0) {
-          await firestore.saveSesion(remitente, `esperando_sub_${itemMatch.key}`);
-          let subMsg = `📋 *${itemMatch.label}*\nPor favor responde con el número de la opción elegida:\n\n`;
-          itemMatch.subItems.forEach(sub => {
-            subMsg += `*${sub.key})* ${sub.label}\n`;
+        }
+
+        if (itemElegido.type === 'submenu') {
+          await firestore.saveSesion(remitente, 'esperando_sub_a', { parentKey: itemElegido.key });
+
+          let subText = `*${itemElegido.label}*\nPor favor responde con el número de la opción elegida:\n\n`;
+          (itemElegido.subItems || []).forEach(sub => {
+            subText += `*${sub.key})* ${sub.label}\n`;
+          });
+
+          return {
+            remitente,
+            respuesta: subText.trim(),
+            estadoActual: 'esperando_sub_a',
+            enHorario: true,
+            timestamp
+          };
+        } else if (itemElegido.type === 'form') {
+          await firestore.saveSesion(remitente, 'esperando_datos_a_1', { optionKey: itemElegido.key, label: itemElegido.label });
+          return {
+            remitente,
+            respuesta: itemElegido.responseTemplate || MESSAGES.PLANTILLA_A1_ORL,
+            estadoActual: 'esperando_datos_a_1',
+            enHorario: true,
+            timestamp
+          };
+        } else if (itemElegido.type === 'info') {
+          await firestore.saveSesion(remitente, 'inicio');
+          return {
+            remitente,
+            respuesta: itemElegido.responseTemplate || 'Gracias por consultar.',
+            estadoActual: 'inicio',
+            enHorario: true,
+            timestamp
+          };
+        }
+
+        return {
+          remitente,
+          respuesta: saludoBienvenidaMsg,
+          estadoActual: 'inicio',
+          enHorario: true,
+          timestamp
+        };
+      }
+
+      case 'esperando_sub_a': {
+        const parentKey = sesion.datosTemporales.parentKey || 'a';
+        const parentItem = (menuTree.items || []).find(i => i.key.toLowerCase() === parentKey.toLowerCase());
+        const subItems = parentItem?.subItems || [];
+
+        const subElegido = subItems.find(s => s.key.toLowerCase() === msgClean);
+
+        if (!subElegido) {
+          let subText = `⚠️ Opción no válida. Por favor responde con el número de la opción elegida:\n\n`;
+          subItems.forEach(sub => {
+            subText += `*${sub.key})* ${sub.label}\n`;
           });
           return {
             remitente,
-            respuesta: subMsg.trim(),
-            estadoActual: `esperando_sub_${itemMatch.key}`,
-            enHorario: true,
-            timestamp
-          };
-        } else {
-          await firestore.saveSesion(remitente, `esperando_datos_${itemMatch.key}`);
-          return {
-            remitente,
-            respuesta: itemMatch.responseTemplate || MESSAGES.PLANTILLA_OPCION_B,
-            estadoActual: `esperando_datos_${itemMatch.key}`,
+            respuesta: subText.trim(),
+            estadoActual: 'esperando_sub_a',
             enHorario: true,
             timestamp
           };
         }
-      }
 
-      // Si no coincide con ninguna opción, repetir menú principal
-      return {
-        remitente,
-        respuesta: saludoBienvenidaMsg,
-        estadoActual: 'esperando_opcion_principal',
-        enHorario: true,
-        timestamp
-      };
-    }
-
-    // 6. EVALUACIÓN DINÁMICA DE SUB-MENÚS (ej: 'esperando_sub_a')
-    if (typeof sesion.estado === 'string' && sesion.estado.startsWith('esperando_sub_')) {
-      const parentKey = sesion.estado.replace('esperando_sub_', '');
-      const parentMatch = (menuTree.items || []).find(item => item.key.toLowerCase() === parentKey.toLowerCase());
-
-      if (parentMatch && parentMatch.subItems) {
-        const subInput = msgClean.replace(/[^a-z0-9]/g, '');
-        const subMatch = parentMatch.subItems.find(sub => sub.key.toLowerCase() === subInput);
-
-        if (subMatch) {
-          await firestore.saveSesion(remitente, `esperando_datos_${parentMatch.key}_${subMatch.key}`);
+        if (subElegido.type === 'info') {
+          await firestore.saveSesion(remitente, 'inicio');
           return {
             remitente,
-            respuesta: subMatch.responseTemplate || MESSAGES.PLANTILLA_A1_ORL,
-            estadoActual: `esperando_datos_${parentMatch.key}_${subMatch.key}`,
+            respuesta: subElegido.responseTemplate || 'Gracias por consultar.',
+            estadoActual: 'inicio',
             enHorario: true,
             timestamp
           };
         }
+
+        await firestore.saveSesion(remitente, 'esperando_datos_a_1', { optionKey: `${parentKey}_${subElegido.key}`, label: subElegido.label });
+        return {
+          remitente,
+          respuesta: subElegido.responseTemplate || MESSAGES.PLANTILLA_A1_ORL,
+          estadoActual: 'esperando_datos_a_1',
+          enHorario: true,
+          timestamp
+        };
+      }
+
+      case 'esperando_datos_a_1': {
+        return await this.guardarConsultaFinal(remitente, altRemitente, pushName, sesion.datosTemporales.label || 'Solicitud', mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
+      }
+
+      default: {
+        await firestore.saveSesion(remitente, 'inicio');
+        return {
+          remitente,
+          respuesta: saludoBienvenidaMsg,
+          estadoActual: 'inicio',
+          enHorario: true,
+          timestamp
+        };
       }
     }
-
-    // 7. RECEPCIÓN DE DATOS / FOTOS / PDFS FINAL DE LA SOLICITUD
-    if (typeof sesion.estado === 'string' && (sesion.estado.startsWith('esperando_datos_') || sesion.estado.startsWith('esperando_datos'))) {
-      const opcionElegida = sesion.estado.replace('esperando_datos_', '').toUpperCase();
-      return await this.guardarConsultaFinal(remitente, altRemitente, pushName, opcionElegida, mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
-    }
-
-    // Fallback al menú principal
-    await firestore.saveSesion(remitente, 'esperando_opcion_principal');
-    return {
-      remitente,
-      respuesta: saludoBienvenidaMsg,
-      estadoActual: 'esperando_opcion_principal',
-      enHorario: true,
-      timestamp
-    };
   }
 
   private static async guardarConsultaFinal(
     remitente: string,
-    altRemitente: string | undefined,
-    pushName: string | undefined,
-    opcionElegida: string,
-    mensaje: string,
-    imagenBase64: string | undefined,
-    imagenNombre: string | undefined,
-    pdfBase64: string | undefined,
-    pdfNombre: string | undefined,
-    env: Env | undefined,
-    timestamp: string,
-    firestore: FirestoreService,
-    esPrioritario: boolean = false
+    altRemitente?: string,
+    pushName?: string,
+    opcionLabel: string = 'Solicitud',
+    mensaje: string = '',
+    imagenBase64?: string,
+    imagenNombre?: string,
+    pdfBase64?: string,
+    pdfNombre?: string,
+    env?: Env,
+    timestamp?: string,
+    firestore?: FirestoreService,
+    isVipBypass: boolean = false
   ): Promise<WebhookResponse> {
-    const consultasExistentes = await firestore.getConsultas();
+    const fs = firestore || new FirestoreService(env);
+    const ts = timestamp || new Date().toISOString();
 
-    // BÚSQUEDA EXHAUSTIVA DE CONSULTA ACTIVA (EVITA DUPLICAR TARJETAS PARA EL MISMO PACIENTE)
-    const consultaActiva = consultasExistentes.find(c => {
-      if (c.estado !== 'pendiente') return false;
-
-      if (c.remitente === remitente) return true;
-      if (altRemitente && (c.remitente === altRemitente || c.datos?.altRemitente === altRemitente)) return true;
-      if (c.datos?.altRemitente === remitente) return true;
-
-      // Coincidencia por teléfono normalizado
-      const rDigits = remitente.replace(/[^0-9]/g, '');
-      const cDigits = (c.remitente || '').replace(/[^0-9]/g, '');
-      if (rDigits.length >= 7 && cDigits.length >= 7) {
-        if (rDigits.slice(-8) === cDigits.slice(-8)) return true;
-      }
-
-      // Coincidencia por pushName si existe
-      if (pushName && c.datos?.pushName && c.datos.pushName.toLowerCase() === pushName.toLowerCase()) return true;
-
-      return false;
-    });
-
-    if (consultaActiva) {
-      await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente);
-      await firestore.saveSesion(remitente, 'esperando_atencion_humana');
-
-      return {
-        remitente,
-        respuesta: '', // Silencio para no enviar confirmaciones duplicadas
-        estadoActual: 'esperando_atencion_humana',
-        enHorario: true,
-        timestamp
-      };
-    }
-
-    let imagenSubidaUrl: string | undefined;
-    let proveedorAlmacenamiento: string | undefined;
-
+    let uploadedImgUrl: string | undefined = undefined;
     if (imagenBase64) {
-      try {
-        const uploadRes = await ImageUploadService.uploadImage(
-          imagenBase64, imagenNombre || `${remitente}_${Date.now()}.jpg`, env
-        );
-        imagenSubidaUrl = uploadRes.url;
-        proveedorAlmacenamiento = uploadRes.provider;
-      } catch (err) {
-        console.error('Error al subir imagen:', err);
+      const uploadResult = await ImageUploadService.uploadImage(imagenBase64, imagenNombre, env);
+      if (uploadResult.success && uploadResult.url) {
+        uploadedImgUrl = uploadResult.url;
+      } else {
+        uploadedImgUrl = imagenBase64;
       }
     }
 
-    const pdfsAdjuntos = pdfBase64 ? [{ nombre: pdfNombre || 'documento.pdf', base64: pdfBase64, timestamp }] : [];
-
-    const datosEstructurados = {
-      tipoSolicitud: opcionElegida,
+    const datosRec: Record<string, any> = {
+      tipoSolicitud: opcionLabel,
       contenidoMensaje: mensaje,
-      pushName: pushName || null,
       altRemitente: altRemitente || null,
-      lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
-      imagenUrl: (proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') ? imagenSubidaUrl : null,
-      imagenBase64: imagenBase64 || null,
-      imagenesAdjuntas: imagenBase64 ? [imagenBase64] : [],
-      pdfsAdjuntos,
-      proveedorAlmacenamiento: proveedorAlmacenamiento || null,
-      respuestasPaciente: []
+      pushName: pushName || null,
+      lineasParseadas: parsearLineasFormulario(mensaje),
+      respuestasPaciente: [],
+      respuestasSecretaria: [],
+      imagenBase64: uploadedImgUrl || imagenBase64 || null,
+      imagenUrl: uploadedImgUrl || imagenBase64 || null,
+      imagenesAdjuntas: (uploadedImgUrl || imagenBase64) ? [uploadedImgUrl || imagenBase64] : [],
+      pdfsAdjuntos: pdfBase64 ? [{ nombre: pdfNombre || 'documento.pdf', base64: pdfBase64, timestamp: ts }] : []
     };
 
-    await firestore.crearConsulta(remitente, opcionElegida, datosEstructurados);
-    await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+    const idConsulta = await fs.crearConsulta(remitente, opcionLabel, datosRec);
+    await fs.saveSesion(remitente, 'esperando_atencion_humana');
 
-    let confirmacionMsg = esPrioritario
-      ? `⭐ *¡Hola! Recibimos tu mensaje prioritario.*\nUn operador de secretaría procesará tu solicitud a la brevedad.`
-      : MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
-
-    if (pdfBase64) {
-      confirmacionMsg += `\n\n📄 *Documento PDF adjunto (${pdfNombre || 'archivo.pdf'}) recibido correctamente.*`;
-    } else if (imagenSubidaUrl && proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') {
-      const prov = proveedorAlmacenamiento === 'google_drive' ? 'Google Drive'
-        : proveedorAlmacenamiento === 'supabase' ? 'Supabase' : 'Almacenamiento';
-      confirmacionMsg += `\n\n📷 *Imagen adjuntada correctamente en ${prov}:*\n[Ver Imagen](${imagenSubidaUrl})`;
-    } else if (imagenBase64) {
-      confirmacionMsg += `\n\n📷 *Foto / Pedido médico adjunto recibido correctamente.*`;
+    if (altRemitente) {
+      await fs.saveSesion(altRemitente, 'esperando_atencion_humana');
     }
+
+    const respText = isVipBypass
+      ? MESSAGES.CONFIRMACION_DATOS_RECIBIDOS
+      : MESSAGES.CONFIRMACION_DATOS_RECIBIDOS;
 
     return {
       remitente,
-      respuesta: confirmacionMsg,
+      respuesta: respText,
       estadoActual: 'esperando_atencion_humana',
       enHorario: true,
-      timestamp,
-      imagenSubidaUrl
+      timestamp: ts,
+      idConsulta,
+      imagenSubidaUrl: uploadedImgUrl
     };
   }
+}
+
+function parsearLineasFormulario(mensaje: string): string[] {
+  if (!mensaje) return [];
+  return mensaje
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
 }

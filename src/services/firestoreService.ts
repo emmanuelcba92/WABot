@@ -480,10 +480,32 @@ export class FirestoreService {
     }
   }
 
-  public async getSesion(remitente: string): Promise<UserSession> {
+  public async getSesion(remitente: string, altRemitente?: string): Promise<UserSession> {
     const docId = encodeURIComponent(remitente.trim());
 
-    const sesionMem = FirestoreService.inMemorySessions.get(docId);
+    // 1. Probar por remitente directo en RAM
+    let sesionMem = FirestoreService.inMemorySessions.get(docId);
+
+    // 2. Probar por altRemitente directo en RAM
+    if (!sesionMem && altRemitente) {
+      const altId = encodeURIComponent(altRemitente.trim());
+      sesionMem = FirestoreService.inMemorySessions.get(altId);
+    }
+
+    // 3. Probar por coincidencia de dígitos de teléfono en RAM
+    if (!sesionMem) {
+      const rDigits = remitente.replace(/[^0-9]/g, '');
+      const altDigits = (altRemitente || '').replace(/[^0-9]/g, '');
+
+      for (const [key, sess] of FirestoreService.inMemorySessions.entries()) {
+        const kDigits = key.replace(/[^0-9]/g, '');
+        if (kDigits.length >= 7) {
+          if (rDigits.length >= 7 && rDigits.slice(-8) === kDigits.slice(-8)) return sess;
+          if (altDigits.length >= 7 && altDigits.slice(-8) === kDigits.slice(-8)) return sess;
+        }
+      }
+    }
+
     if (sesionMem) {
       return sesionMem;
     }
@@ -501,6 +523,25 @@ export class FirestoreService {
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${docId}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
       const res = await fetch(url);
+
+      if (!res.ok && altRemitente) {
+        const altId = encodeURIComponent(altRemitente.trim());
+        const altUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/${altId}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+        const altRes = await fetch(altUrl);
+        if (altRes.ok) {
+          const dataAlt: any = await altRes.json();
+          const fieldsAlt = this.fromFirestoreFields(dataAlt.fields || {});
+          const sesionAlt: UserSession = {
+            remitente: altRemitente,
+            estado: (fieldsAlt.estado as StateType) || 'inicio',
+            datosTemporales: fieldsAlt.datosTemporales || {},
+            historialMensajes: fieldsAlt.historialMensajes || [],
+            updatedAt: fieldsAlt.updatedAt || new Date().toISOString()
+          };
+          FirestoreService.inMemorySessions.set(docId, sesionAlt);
+          return sesionAlt;
+        }
+      }
 
       if (!res.ok) {
         return {
@@ -608,7 +649,7 @@ export class FirestoreService {
       }
 
       if (cAltDigits.length >= 7) {
-        if (rDigits.length >= 7 && rDigits.slice(-8) === cDigits.slice(-8)) return true;
+        if (rDigits.length >= 7 && rDigits.slice(-8) === cAltDigits.slice(-8)) return true;
         if (altDigits.length >= 7 && altDigits.slice(-8) === cAltDigits.slice(-8)) return true;
       }
 
