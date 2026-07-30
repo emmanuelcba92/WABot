@@ -2522,6 +2522,50 @@
 
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
+          // CONSTRUIR STREAM UNIFICADO 100% CRONOLÓGICO POR TIMESTAMP
+          const allStreamMsgs = [];
+          const baseTime = new Date(c.timestamp || c.createdAt).getTime();
+
+          if (datos.contenidoMensaje || datos.mensajeRaw) {
+            allStreamMsgs.push({
+              type: 'init',
+              senderName: '📥 Mensaje Inicial del Paciente',
+              text: datos.contenidoMensaje || datos.mensajeRaw,
+              timestamp: baseTime,
+              cssClass: 'chat-bubble-patient',
+              headerColor: '#38bdf8'
+            });
+          }
+
+          respuestasSecretaria.forEach((r, idx) => {
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 1) * 1000);
+            allStreamMsgs.push({
+              type: 'sec',
+              senderName: '👩‍⚕️ Secretaría',
+              text: r.texto,
+              timestamp: ts,
+              cssClass: 'chat-bubble-sec',
+              headerColor: '#a7f3d0'
+            });
+          });
+
+          respuestasPaciente.forEach((r, idx) => {
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 2) * 1000);
+            allStreamMsgs.push({
+              type: 'pac',
+              senderName: '🟢 Paciente',
+              text: r.texto,
+              timestamp: ts,
+              pdfBase64: r.pdfBase64,
+              pdfNombre: r.pdfNombre,
+              imagenBase64: r.imagenBase64,
+              cssClass: 'chat-bubble-patient',
+              headerColor: '#00e699'
+            });
+          });
+
+          allStreamMsgs.sort((a, b) => a.timestamp - b.timestamp);
+
           let mainHtml = `
             <!-- ENCABEZADO CHAT CON ETIQUETADOR Y DERIVACIÓN A TELEMEDICINA -->
             <div style="background: #111b21; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -2562,15 +2606,25 @@
               </div>
             </div>
 
-            <!-- CHAT STREAM SCROLLABLE -->
+            <!-- CHAT STREAM SCROLLABLE CRONOLÓGICO -->
             <div class="chat-stream">
-              <!-- Mensaje Inicial -->
-              <div class="chat-bubble-patient">
-                <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">📥 Mensaje Inicial del Paciente (${new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
-                <div>${datos.contenidoMensaje || datos.mensajeRaw || '(Sin texto)'}</div>
-              </div>
+              ${allStreamMsgs.map(m => `
+                <div class="${m.cssClass}">
+                  <div style="font-size: 0.72rem; color: ${m.headerColor}; font-weight: 700; margin-bottom: 4px;">
+                    ${m.senderName} (${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):
+                  </div>
+                  <div>${m.text}</div>
+                  ${m.pdfBase64 ? `
+                    <div style="margin-top: 6px;">
+                      <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                        📄 Abrir PDF: ${m.pdfNombre || 'pedido_medico.pdf'} ⬇️
+                      </a>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
 
-              <!-- Fotos Adjuntas -->
+              <!-- Fotos Adjuntas Iniciales -->
               ${listImagenes.map((imgSrc, idx) => `
                 <div class="chat-bubble-patient" style="padding: 6px;">
                   <div class="card-img-container" onclick="openLightbox('${imgSrc}')">
@@ -2579,34 +2633,12 @@
                 </div>
               `).join('')}
 
-              <!-- Documentos PDF Adjuntos -->
+              <!-- Documentos PDF Adjuntos Iniciales -->
               ${listPdfs.map((pdfItem, pIdx) => `
                 <div class="chat-bubble-patient">
                   <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
                     📄 Abrir PDF: ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`} ⬇️
                   </a>
-                </div>
-              `).join('')}
-
-              <!-- Historial de Conversación Alternada (Respuestas Secretaría + Paciente) -->
-              ${respuestasSecretaria.map(r => `
-                <div class="chat-bubble-sec">
-                  <div style="font-size: 0.72rem; color: #a7f3d0; font-weight: 700; margin-bottom: 4px;">👩‍⚕️ Secretaría (${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
-                  <div>${r.texto}</div>
-                </div>
-              `).join('')}
-
-              ${respuestasPaciente.map(r => `
-                <div class="chat-bubble-patient">
-                  <div style="font-size: 0.72rem; color: #00e699; font-weight: 700; margin-bottom: 4px;">🟢 Paciente (${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):</div>
-                  <div>${r.texto}</div>
-                  ${r.pdfBase64 ? `
-                    <div style="margin-top: 6px;">
-                      <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="background: #38bdf8; color: #0f172a; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                        📄 Abrir PDF: ${r.pdfNombre || 'pedido_medico.pdf'} ⬇️
-                      </a>
-                    </div>
-                  ` : ''}
                 </div>
               `).join('')}
             </div>

@@ -217,40 +217,77 @@ async function startWhatsAppGateway() {
 
       for (const msg of messages) {
         try {
-          let rawTarget = msg.targetJid || msg.remitente;
-          let targetJid = rawTarget.includes('@') ? rawTarget : `${rawTarget}@s.whatsapp.net`;
+          let primaryJid = msg.targetJid || msg.remitente;
+          let altJid = msg.altRemitente;
 
-          if (msg.pdfBase64 && msg.pdfNombre) {
-            const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
-            const buffer = Buffer.from(base64Data, 'base64');
-            await sock.sendMessage(targetJid, {
-              document: buffer,
-              mimetype: 'application/pdf',
-              fileName: msg.pdfNombre,
-              caption: msg.text || undefined
-            });
-            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
-          } else if (msg.imagenBase64) {
-            const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-            const buffer = Buffer.from(base64Data, 'base64');
-            await sock.sendMessage(targetJid, {
-              image: buffer,
-              caption: msg.text || undefined
-            });
-            console.log(`📤 Imagen enviada a ${targetJid}.`);
-          } else if (msg.text) {
-            await sock.sendMessage(targetJid, { text: msg.text });
-            console.log(`📤 Mensaje enviado a ${targetJid}: "${msg.text}"`);
+          let phoneJid = null;
+          let lidJid = null;
+
+          if (primaryJid.includes('@lid')) {
+            lidJid = primaryJid;
+          } else {
+            let clean = primaryJid.replace(/[^0-9]/g, '');
+            if (clean.startsWith('0')) clean = clean.substring(1);
+            if (clean.startsWith('15')) clean = clean.substring(2);
+            if (!clean.startsWith('54')) clean = `549${clean}`;
+            else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
+            phoneJid = `${clean}@s.whatsapp.net`;
           }
 
-          // Si el remitente original era un número pero hay un altRemitente @lid que no se envió, enviar también al altRemitente
-          if (msg.altRemitente && msg.altRemitente.includes('@lid') && targetJid !== msg.altRemitente) {
+          if (altJid) {
+            if (altJid.includes('@lid')) lidJid = altJid;
+            else if (!phoneJid) {
+              let clean = altJid.replace(/[^0-9]/g, '');
+              if (clean.startsWith('0')) clean = clean.substring(1);
+              if (clean.startsWith('15')) clean = clean.substring(2);
+              if (!clean.startsWith('54')) clean = `549${clean}`;
+              else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
+              phoneJid = `${clean}@s.whatsapp.net`;
+            }
+          }
+
+          const targets = [];
+          if (phoneJid) targets.push(phoneJid);
+          if (lidJid && lidJid !== phoneJid) targets.push(lidJid);
+
+          let sendSuccess = false;
+          for (const targetJid of targets) {
             try {
-              if (msg.text) await sock.sendMessage(msg.altRemitente, { text: msg.text });
-            } catch (e) {}
+              if (msg.pdfBase64 && msg.pdfNombre) {
+                const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+                const buffer = Buffer.from(base64Data, 'base64');
+                await sock.sendMessage(targetJid, {
+                  document: buffer,
+                  mimetype: 'application/pdf',
+                  fileName: msg.pdfNombre,
+                  caption: msg.text || undefined
+                });
+                console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
+                sendSuccess = true;
+              } else if (msg.imagenBase64) {
+                const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+                const buffer = Buffer.from(base64Data, 'base64');
+                await sock.sendMessage(targetJid, {
+                  image: buffer,
+                  caption: msg.text || undefined
+                });
+                console.log(`📤 Imagen enviada a ${targetJid}.`);
+                sendSuccess = true;
+              } else if (msg.text) {
+                await sock.sendMessage(targetJid, { text: msg.text });
+                console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
+                sendSuccess = true;
+              }
+            } catch (errJid) {
+              console.warn(`⚠️ Error al enviar a ${targetJid}:`, errJid?.message || errJid);
+            }
+          }
+
+          if (!sendSuccess) {
+            console.error(`❌ No se pudo entregar mensaje a ninguna dirección de ${msg.remitente}`);
           }
         } catch (sendErr) {
-          console.error(`❌ Error al enviar mensaje saliente a ${msg.remitente}:`, sendErr?.message || sendErr);
+          console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);
         }
       }
     } catch (pollErr) {
