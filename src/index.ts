@@ -371,8 +371,8 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     const headerMsg = `🏥 *DERIVACIÓN PARA TELEMEDICINA - CLÍNICA COAT*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
 
-    // 1. Enviar Encabezado al Médico
-    await firestore.addPendingOutgoing(doctorPhone, headerMsg, idConsulta);
+    // 1. Enviar Encabezado al Médico (isForwardToDoctor = true para no sobreescribir con el JID del paciente)
+    await firestore.addPendingOutgoing(doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
 
     // 2. Enviar PDFs Adjuntos al Médico
     const respuestasPaciente = datos.respuestasPaciente || [];
@@ -381,7 +381,7 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     for (const pdfItem of listPdfs) {
       if (pdfItem.base64) {
-        await firestore.addPendingOutgoing(doctorPhone, `📄 Documento PDF (${pdfItem.nombre || 'estudio.pdf'})`, idConsulta, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64);
+        await firestore.addPendingOutgoing(doctorPhone, `📄 Documento PDF (${pdfItem.nombre || 'estudio.pdf'})`, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
       }
     }
 
@@ -399,7 +399,7 @@ app.post('/api/forward-telemedicina', async (c) => {
     for (const imgSrc of listImagenes) {
       if (imgSrc && typeof imgSrc === 'string' && imgSrc.length > 20) {
         const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
-        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, idConsulta, undefined, undefined, undefined, formattedImg);
+        await firestore.addPendingOutgoing(doctorPhone, `📷 Pedido Médico / Foto Adjunta del Paciente`, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
       }
     }
 

@@ -807,12 +807,13 @@ export class FirestoreService {
     pdfNombre?: string,
     pdfBase64?: string,
     imagenBase64?: string,
-    altRemitente?: string
+    altRemitente?: string,
+    isForwardToDoctor: boolean = false
   ): Promise<void> {
     let targetJid = remitente;
     let computedAlt = altRemitente;
 
-    if (idConsulta) {
+    if (idConsulta && !isForwardToDoctor) {
       const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
       if (itemMem && itemMem.datos?.altRemitente) {
         computedAlt = itemMem.datos.altRemitente;
