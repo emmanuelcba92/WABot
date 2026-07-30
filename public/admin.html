@@ -535,6 +535,10 @@
     </div>
 
     <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="btn btn-secondary" id="btnNotifyPermission" onclick="requestNotificationPermission()" style="font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.2);">
+        🔔 Activar Notificaciones de Escritorio
+      </button>
+
       <div id="connectorStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 5px 12px; border-radius: 20px;">
         🟢 Conector WhatsApp En Línea
       </div>
@@ -581,6 +585,7 @@
       <div class="filters-bar" style="margin-top: 12px;">
         <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700;">Estado:</span>
         <button class="tab-btn active" id="filterPendiente" onclick="setFilter('pendiente', this)">⏳ Pendientes</button>
+        <button class="tab-btn" id="filterPrioritarios" onclick="setFilter('prioritarios', this)" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; font-weight: 700;">⭐ Prioritarios (<span id="numPrioritariosBadge">0</span>)</button>
         <button class="tab-btn" id="filterAtendido" onclick="setFilter('atendido', this)">📁 Atendidas</button>
         <button class="tab-btn" id="filterTodos" onclick="setFilter('todos', this)">📋 Ver Todas</button>
 
@@ -608,7 +613,7 @@
         <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
         <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
         <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
-        <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos VIP & Prioritarios</button>
+        <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -755,15 +760,15 @@
         </button>
       </div>
 
-      <!-- SUB-SECCIÓN 6: CONTACTOS VIP & PRIORITARIOS -->
+      <!-- SUB-SECCIÓN 6: CONTACTOS PRIORITARIOS -->
       <div id="subSettingsVip" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos VIP / Socios / Urgencias</h3>
-            <p style="font-size: 0.85rem; color: var(--muted);">Configura números telefónicos o IDs prioritarios. Cuando escriban, subirán automáticamente a la cima (#1) con alerta sonora.</p>
+            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos Prioritarios</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura números o IDs de contactos prioritarios (socios, directivos, urgencias). <strong>El bot NO les mostrará menú</strong>: escribirán libremente y sus mensajes, fotos o PDFs llegarán directo con alerta sonora y notificación de escritorio.</p>
             <p style="font-size: 0.78rem; color: #38bdf8; margin-top: 4px;">💡 <em>Nota: Podés ingresar el número de teléfono (ej: 3516123456) O el ID de WhatsApp (ej: 205948144619633@lid).</em></p>
           </div>
-          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto VIP</button>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto Prioritario</button>
         </div>
 
         <div id="vipEditorList" style="display: flex; flex-direction: column; gap: 14px;">
@@ -771,7 +776,7 @@
         </div>
 
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveVipContactsConfig()">
-          💾 Guardar Contactos VIP & Prioritarios
+          💾 Guardar Contactos Prioritarios
         </button>
       </div>
 
@@ -857,6 +862,35 @@
       items: []
     };
 
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        alert('Tu navegador no soporta notificaciones de escritorio.');
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          alert('🔔 ¡Notificaciones de Escritorio activadas exitosamente!');
+          updateNotificationBtn();
+        } else {
+          alert('Las notificaciones de escritorio fueron bloqueadas en el navegador.');
+        }
+      });
+    }
+
+    function updateNotificationBtn() {
+      const btn = document.getElementById('btnNotifyPermission');
+      if (btn) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          btn.innerText = '🔔 Notificaciones Activas';
+          btn.style.background = 'rgba(52, 211, 153, 0.2)';
+          btn.style.color = '#34d399';
+          btn.style.borderColor = '#34d399';
+        } else {
+          btn.innerText = '🔔 Activar Notificaciones de Escritorio';
+        }
+      }
+    }
+
     function normalizePhone(str) {
       if (!str) return '';
       let digits = str.replace(/[^0-9]/g, '');
@@ -937,6 +971,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      updateNotificationBtn();
       fetchScheduleConfig();
       fetchBotConfig();
       fetchTagConfig();
@@ -976,8 +1011,8 @@
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <input type="text" value="${vip.name}" onchange="updateVipName(${idx}, this.value)" placeholder="Nombre del Contacto (ej: Dr. López)..." style="font-weight: 700; flex: 1; min-width: 200px;">
               <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono o ID @lid..." style="width: 230px; color: #facc15; font-weight: 700;">
-              <select onchange="updateVipPriority(${idx}, this.value)" style="width: 150px;">
-                <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ VIP / Socio</option>
+              <select onchange="updateVipPriority(${idx}, this.value)" style="width: 170px;">
+                <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ Contacto Prioritario</option>
                 <option value="urgente" ${vip.priority === 'urgente' ? 'selected' : ''}>🚨 Urgencia Médica</option>
               </select>
               <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeVipContact(${idx})">🗑️</button>
@@ -998,7 +1033,7 @@
       vipContactsList.push({
         id: `vip_${Date.now()}`,
         phone: '351',
-        name: 'Nuevo Contacto VIP',
+        name: 'Nuevo Contacto Prioritario',
         role: 'Socio / Directivo',
         priority: 'vip'
       });
@@ -1020,10 +1055,10 @@
         const data = await res.json();
         if (data.success) {
           renderConsultas(true);
-          alert('✅ Lista de contactos VIP y prioritarios guardada exitosamente.');
+          alert('✅ Lista de contactos prioritarios guardada exitosamente.');
         }
       } catch (e) {
-        alert('Error al guardar contactos VIP.');
+        alert('Error al guardar contactos prioritarios.');
       }
     }
 
@@ -1571,12 +1606,29 @@
         const data = await res.json();
         allConsultas = data.consultas || [];
 
-        // Detectar si ingresó una consulta VIP o Urgente nueva para reproducir alarma sonora
+        // Detectar si ingresó una consulta Prioritaria nueva para reproducir alarma y notificación de escritorio
         let hasNewVipOrUrgent = false;
         allConsultas.forEach(c => {
           if (!previousConsultaIds.has(c.id)) {
-            const isVip = vipContactsList.some(v => isVipMatch(c, v));
-            if (isVip) hasNewVipOrUrgent = true;
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+            if (vipMatch) {
+              hasNewVipOrUrgent = true;
+
+              // Disparar Notificación de Escritorio OS
+              if ('Notification' in window && Notification.permission === 'granted') {
+                const contactName = vipMatch.name || c.datos?.pushName || c.remitente;
+                const roleText = vipMatch.role ? ` (${vipMatch.role})` : '';
+                const msgBody = c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido';
+
+                try {
+                  new Notification(`⭐ Mensaje Prioritario: ${contactName}${roleText}`, {
+                    body: msgBody,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
+                    requireInteraction: true
+                  });
+                } catch (nErr) {}
+              }
+            }
           }
         });
 
@@ -1595,11 +1647,15 @@
     function updateStats(totalArray) {
       const pendientes = totalArray.filter(c => (c.estado || 'pendiente') === 'pendiente').length;
       const atendidas = totalArray.filter(c => c.estado === 'atendido').length;
-      
+      const prioritarios = totalArray.filter(c => vipContactsList.some(v => isVipMatch(c, v)) && (c.estado || 'pendiente') === 'pendiente').length;
+
       document.getElementById('numPendientes').innerText = pendientes;
       document.getElementById('numAtendidas').innerText = atendidas;
       document.getElementById('numTotal').innerText = totalArray.length;
       document.getElementById('countBadge').innerText = pendientes;
+
+      const prioBadge = document.getElementById('numPrioritariosBadge');
+      if (prioBadge) prioBadge.innerText = prioritarios;
     }
 
     function setFilter(filter, btn) {
@@ -1690,7 +1746,9 @@
 
       let filtered = [...allConsultas];
 
-      if (currentFilter !== 'todos') {
+      if (currentFilter === 'prioritarios') {
+        filtered = filtered.filter(c => vipContactsList.some(v => isVipMatch(c, v)));
+      } else if (currentFilter !== 'todos') {
         filtered = filtered.filter(c => (c.estado || 'pendiente') === currentFilter);
       }
 
@@ -1712,7 +1770,7 @@
         const vipA = vipContactsList.find(v => isVipMatch(a, v));
         const vipB = vipContactsList.find(v => isVipMatch(b, v));
 
-        // 1. VIPs y Urgencias siempre flotan primero (#1)
+        // 1. Prioritarios y Urgencias siempre flotan primero (#1)
         if (vipA && !vipB) return -1;
         if (!vipA && vipB) return 1;
         if (vipA && vipB) {
@@ -1778,8 +1836,8 @@
 
             ${vipMatch ? `
               <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO VIP / SOCIO'}</span>
-                <span><strong>${vipMatch.name || 'VIP'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
+                <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO PRIORITARIO'}</span>
+                <span><strong>${vipMatch.name || 'Prioritario'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
               </div>
             ` : ''}
 

@@ -43,7 +43,35 @@ export class StateEngine {
     const menuTree = await firestore.getMenuTree();
     const saludoBienvenidaMsg = buildFullMenuMessage(menuTree);
 
-    // 1. FUERA DE HORARIO DE ATENCIÓN
+    // 1. CHECK SI EL REMITENTE ES UN CONTACTO PRIORITARIO (VIP)
+    // Para contactos prioritarios, BYPASS COMPLETO DEL BOT: escriben libremente y se envía directo a secretaría.
+    const vipContacts = await firestore.getVipContacts();
+    const vipMatch = vipContacts.find(v => {
+      const vPhone = (v.phone || '').trim().toLowerCase();
+      if (!vPhone) return false;
+      const rLower = remitente.toLowerCase();
+      const altLower = (altRemitente || '').toLowerCase();
+      const vDigitsOnly = vPhone.replace(/[^0-9]/g, '');
+
+      if (vPhone.includes('@lid') || (vDigitsOnly.length > 10 && !vPhone.startsWith('54'))) {
+        if (rLower.includes(vDigitsOnly) || altLower.includes(vDigitsOnly)) return true;
+      }
+      const rDigits = rLower.replace(/[^0-9]/g, '');
+      const altDigits = altLower.replace(/[^0-9]/g, '');
+      if (vDigitsOnly.length >= 6) {
+        if (rDigits && (rDigits.includes(vDigitsOnly) || vDigitsOnly.includes(rDigits))) return true;
+        if (altDigits && (altDigits.includes(vDigitsOnly) || vDigitsOnly.includes(altDigits))) return true;
+      }
+      if (v.name && pushName && pushName.toLowerCase().includes(v.name.toLowerCase())) return true;
+      return false;
+    });
+
+    if (vipMatch) {
+      console.log(`⭐ [CONTACTO PRIORITARIO DETECTADO] ${pushName || vipMatch.name} (${remitente}). Bypass de menú automático.`);
+      return await this.guardarConsultaFinal(remitente, altRemitente, pushName || vipMatch.name, 'Prioritario', mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore, true);
+    }
+
+    // 2. FUERA DE HORARIO DE ATENCIÓN (SOLO APLICA A PACIENTES NORMALES)
     if (!scheduleInfo.isWithinHours) {
       await firestore.saveSesion(remitente, 'inicio');
       return {
@@ -61,7 +89,7 @@ export class StateEngine {
     // Reset comandos globales ("hola", "inicio", "menu")
     const esSaludoExplicit = msgClean === 'hola' || msgClean === 'inicio' || msgClean === 'menu' || msgClean === 'cancelar' || msgClean === 'reset';
 
-    // 2. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL SI EL PACIENTE HABLA)
+    // 3. ATENCIÓN HUMANA ACTIVA (SILENCIO TOTAL SI EL PACIENTE HABLA)
     if (sesion.estado === 'esperando_atencion_humana' && !esSaludoExplicit) {
       if (mensaje.length > 0 || imagenBase64 || pdfBase64) {
         await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
@@ -75,7 +103,7 @@ export class StateEngine {
       };
     }
 
-    // 3. SALUDO INICIAL / RESET DE CONVERSACIÓN
+    // 4. SALUDO INICIAL / RESET DE CONVERSACIÓN
     if (esSaludoExplicit || sesion.estado === 'inicio') {
       await firestore.saveSesion(remitente, 'esperando_opcion_principal');
       return {
@@ -190,7 +218,8 @@ export class StateEngine {
     pdfNombre: string | undefined,
     env: Env | undefined,
     timestamp: string,
-    firestore: FirestoreService
+    firestore: FirestoreService,
+    esPrioritario: boolean = false
   ): Promise<WebhookResponse> {
     const consultasExistentes = await firestore.getConsultas();
     const consultaActiva = consultasExistentes.find(c => (c.remitente === remitente || (altRemitente && c.remitente === altRemitente)) && c.estado === 'pendiente');
@@ -242,7 +271,10 @@ export class StateEngine {
     await firestore.crearConsulta(remitente, opcionElegida, datosEstructurados);
     await firestore.saveSesion(remitente, 'esperando_atencion_humana');
 
-    let confirmacionMsg = MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
+    let confirmacionMsg = esPrioritario
+      ? `⭐ *¡Hola! Recibimos tu mensaje prioritario.*\nUn operador de secretaría procesará tu solicitud a la brevedad.`
+      : MESSAGES.CONFIRMACION_CONSULTA_RECIBIDA;
+
     if (pdfBase64) {
       confirmacionMsg += `\n\n📄 *Documento PDF adjunto (${pdfNombre || 'archivo.pdf'}) recibido correctamente.*`;
     } else if (imagenSubidaUrl && proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') {
