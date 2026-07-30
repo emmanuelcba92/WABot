@@ -2270,9 +2270,56 @@
       }
     }
 
-    function selectChat(id) {
-      selectedChatId = id;
-      renderConsultas(true);
+    function formatTextForWhatsApp(text, datos) {
+      if (!text) text = '';
+
+      if (datos && (datos.dni || datos.obraSocial || datos.tipoSolicitud || datos.estudioDeseado || datos.cirugiaPropuesta)) {
+        const parts = [];
+        if (datos.tipoSolicitud) parts.push(`📋 *Solicitud:* ${datos.tipoSolicitud}`);
+        if (datos.pushName || datos.nombre) parts.push(`👤 *Nombre:* ${datos.pushName || datos.nombre}`);
+        if (datos.dni) parts.push(`🪪 *DNI:* ${datos.dni}`);
+        if (datos.fechaNacimiento) parts.push(`📅 *Fecha Nac.:* ${datos.fechaNacimiento}`);
+        if (datos.obraSocial) parts.push(`🏥 *Obra Social:* ${datos.obraSocial}`);
+        if (datos.especialidad) parts.push(`🩺 *Especialidad:* ${datos.especialidad}`);
+        if (datos.estudioDeseado) parts.push(`🔬 *Estudio:* ${datos.estudioDeseado}`);
+        if (datos.cirugiaPropuesta) parts.push(`🏥 *Cirugía:* ${datos.cirugiaPropuesta}`);
+        if (datos.medicoPreferido || datos.medicoTratante) parts.push(`👨‍⚕️ *Médico:* ${datos.medicoPreferido || datos.medicoTratante}`);
+        if (datos.motivo) parts.push(`📝 *Motivo:* ${datos.motivo}`);
+        if (datos.numeroAfiliadoPami) parts.push(`👵 *Afiliado PAMI:* ${datos.numeroAfiliadoPami}`);
+
+        if (parts.length > 0) return parts.join('\n');
+      }
+
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      const LABELS = [
+        '🪪 *DNI*',
+        '👤 *Nombre completo*',
+        '📅 *Fecha de nacimiento*',
+        '🏥 *Obra social*',
+        '🩺 *Motivo de consulta*',
+        '📱 *Celular*',
+        '📧 *E-mail*',
+        '👨‍⚕️ *Médico (Preferencia)*',
+        '⏰ *Preferencia horaria*'
+      ];
+
+      if (lines.length >= 3 && lines.length <= 9 && !text.includes(':')) {
+        return lines.map((line, i) => `${LABELS[i] || `📌 *Dato ${i+1}*`}: ${line}`).join('\n');
+      }
+
+      return text;
+    }
+
+    function renderWhatsAppFormattedText(text) {
+      if (!text) return '';
+      let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>');
+      return html;
     }
 
     function renderConsultas(forceRedraw = false) {
@@ -2564,7 +2611,6 @@
                 <div style="font-size: 0.78rem; color: var(--muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
                   ${lastMsg}
                 </div>
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; align-items: center;">
                   <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">
                     ${c.opcion || 'Consulta'}
                   </span>
@@ -2580,6 +2626,7 @@
           });
           containerChatSidebar.innerHTML = sideHtml;
         }
+      }
 
         // Si no hay chat seleccionado o el seleccionado fue filtrado, seleccionar el primero automáticamente
         if (filtered.length > 0 && (!selectedChatId || !filtered.some(c => c.id === selectedChatId))) {
@@ -2604,11 +2651,12 @@
           const allStreamMsgs = [];
           const baseTime = new Date(c.timestamp || c.createdAt).getTime();
 
-          if (datos.contenidoMensaje || datos.mensajeRaw) {
+          const initMsgFormatted = formatTextForWhatsApp(datos.contenidoMensaje || datos.mensajeRaw, datos);
+          if (initMsgFormatted) {
             allStreamMsgs.push({
               type: 'init',
               senderName: '📥 Mensaje Inicial del Paciente',
-              text: datos.contenidoMensaje || datos.mensajeRaw,
+              text: initMsgFormatted,
               timestamp: baseTime,
               cssClass: 'chat-bubble-patient',
               headerColor: '#38bdf8'
@@ -2632,7 +2680,7 @@
             allStreamMsgs.push({
               type: 'pac',
               senderName: '🟢 Paciente',
-              text: r.texto,
+              text: formatTextForWhatsApp(r.texto, null),
               timestamp: ts,
               pdfBase64: r.pdfBase64,
               pdfNombre: r.pdfNombre,
@@ -2725,10 +2773,10 @@
               ${allStreamMsgs.map(m => `
                 <div class="${m.cssClass}">
                   <div style="font-size: 0.72rem; color: ${m.headerColor}; font-weight: 700; margin-bottom: 4px;">
-                    ${m.senderName} (${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):
+                    ${m.senderName}
                   </div>
 
-                  ${m.text ? `<div style="white-space: pre-wrap; word-break: break-word; line-height: 1.5;">${m.text}</div>` : ''}
+                  ${m.text ? `<div style="white-space: pre-wrap; word-break: break-word; line-height: 1.45; font-size: 0.88rem;">${renderWhatsAppFormattedText(m.text)}</div>` : ''}
 
                   ${m.imagenBase64 ? `
                     <div style="margin-top: 6px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px;">
@@ -2744,6 +2792,21 @@
                   ${m.pdfBase64 ? `
                     <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                       <button onclick="openPdfViewer('${m.pdfBase64}', '${m.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        👁️ Ver PDF: ${m.pdfNombre || 'pedido_medico.pdf'}
+                      </button>
+                      <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline;">
+                        ⬇️ Descargar
+                      </a>
+                    </div>
+                  ` : ''}
+
+                  <div style="font-size: 0.68rem; color: #8696a0; text-align: right; margin-top: 4px;">
+                    ${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    ${m.type === 'sec' ? '<span style="color: #53bdeb; font-weight: bold; margin-left: 3px;">✓✓</span>' : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>tton onclick="openPdfViewer('${m.pdfBase64}', '${m.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                         👁️ Ver PDF: ${m.pdfNombre || 'pedido_medico.pdf'}
                       </button>
                       <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline;">
