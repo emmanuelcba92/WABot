@@ -246,6 +246,16 @@
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     }
 
+    .card.vip-card {
+      border: 2px solid #facc15;
+      box-shadow: 0 0 25px rgba(250, 204, 21, 0.25);
+    }
+
+    .card.urgent-card {
+      border: 2px solid #ef4444;
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.3);
+    }
+
     .card-header {
       display: flex;
       justify-content: space-between;
@@ -598,6 +608,7 @@
         <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
         <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
         <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
+        <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos VIP & Prioritarios</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -744,6 +755,25 @@
         </button>
       </div>
 
+      <!-- SUB-SECCIÓN 6: CONTACTOS VIP & PRIORITARIOS -->
+      <div id="subSettingsVip" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos VIP / Socios / Urgencias</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura números telefónicos prioritarios. Cuando escriban, subirán automáticamente a la cima (#1) con alerta sonora.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto VIP</button>
+        </div>
+
+        <div id="vipEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de VIPs dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveVipContactsConfig()">
+          💾 Guardar Contactos VIP & Prioritarios
+        </button>
+      </div>
+
     </div>
 
   </div>
@@ -794,6 +824,7 @@
     let currentScheduleMode = 'auto';
 
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
+    let previousConsultaIds = new Set();
 
     let tagDefinitions = {
       'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
@@ -802,6 +833,10 @@
       'pami': { key: 'pami', label: '🟣 PAMI', color: '#7c3aed' },
       'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
     };
+
+    let vipContactsList = [
+      { id: 'v1', phone: '3516123456', name: 'Dr. López (Director)', role: 'Socio Directivo', priority: 'vip' }
+    ];
 
     let quickRepliesList = [
       { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
@@ -821,18 +856,47 @@
       items: []
     };
 
+    function normalizePhone(str) {
+      if (!str) return '';
+      return str.replace(/[^0-9]/g, '');
+    }
+
+    function isVipMatch(remitente, vipPhone) {
+      const rClean = normalizePhone(remitente);
+      const vClean = normalizePhone(vipPhone);
+      if (!rClean || !vClean) return false;
+      return rClean.includes(vClean) || vClean.includes(rClean);
+    }
+
+    function playVipChimeSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch (e) {}
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       fetchScheduleConfig();
       fetchBotConfig();
       fetchTagConfig();
+      fetchVipContactsConfig();
       fetchQuickRepliesConfig();
       fetchPdfItemsConfig();
       fetchMenuTree();
       fetchConsultas();
-      setInterval(fetchConsultas, 5000);
+      setInterval(fetchConsultas, 4000);
       setInterval(fetchScheduleConfig, 10000);
 
-      // TECLA ESCAPE PARA CERRAR FOTO EN ALTA DEFINICIÓN O MODALES
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           closeLightbox();
@@ -840,6 +904,77 @@
         }
       });
     });
+
+    async function fetchVipContactsConfig() {
+      try {
+        const res = await fetch('/api/vip-contacts');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items && Array.isArray(data.items)) {
+          vipContactsList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderVipEditor() {
+      const container = document.getElementById('vipEditorList');
+      let html = '';
+      vipContactsList.forEach((vip, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <input type="text" value="${vip.name}" onchange="updateVipName(${idx}, this.value)" placeholder="Nombre del Contacto (ej: Dr. López)..." style="font-weight: 700; flex: 1; min-width: 200px;">
+              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono (ej: 3516123456)..." style="width: 180px; color: #facc15; font-weight: 700;">
+              <select onchange="updateVipPriority(${idx}, this.value)" style="width: 150px;">
+                <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ VIP / Socio</option>
+                <option value="urgente" ${vip.priority === 'urgente' ? 'selected' : ''}>🚨 Urgencia Médica</option>
+              </select>
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeVipContact(${idx})">🗑️</button>
+            </div>
+            <input type="text" value="${vip.role || ''}" onchange="updateVipRole(${idx}, this.value)" placeholder="Cargo / Nota (ej: Socio Directivo, Auditor PAMI)..." style="font-size: 0.82rem; color: var(--muted);">
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateVipName(idx, val) { vipContactsList[idx].name = val.trim(); }
+    function updateVipPhone(idx, val) { vipContactsList[idx].phone = val.trim(); }
+    function updateVipPriority(idx, val) { vipContactsList[idx].priority = val; }
+    function updateVipRole(idx, val) { vipContactsList[idx].role = val.trim(); }
+
+    function addNewVipContact() {
+      vipContactsList.push({
+        id: `vip_${Date.now()}`,
+        phone: '351',
+        name: 'Nuevo Contacto VIP',
+        role: 'Socio / Directivo',
+        priority: 'vip'
+      });
+      renderVipEditor();
+    }
+
+    function removeVipContact(idx) {
+      vipContactsList.splice(idx, 1);
+      renderVipEditor();
+    }
+
+    async function saveVipContactsConfig() {
+      try {
+        const res = await fetch('/api/vip-contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: vipContactsList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Lista de contactos VIP y prioritarios guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar contactos VIP.');
+      }
+    }
 
     async function limpiarTodasConsultas() {
       if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
@@ -1017,16 +1152,17 @@
       const secTags = document.getElementById('subSettingsTags');
       const secQuick = document.getElementById('subSettingsQuick');
       const secPdf = document.getElementById('subSettingsPdf');
+      const secVip = document.getElementById('subSettingsVip');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
       const btnTags = document.getElementById('subTabTagsBtn');
       const btnQuick = document.getElementById('subTabQuickBtn');
       const btnPdf = document.getElementById('subTabPdfBtn');
+      const btnVip = document.getElementById('subTabVipBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf].forEach(b => b.classList.remove('active'));
-
-      [secSched, secTree, secTags, secQuick, secPdf].forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip].forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip].forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -1043,6 +1179,10 @@
         secPdf.style.display = 'flex';
         btnPdf.classList.add('active');
         renderPdfEditor();
+      } else if (subTab === 'vip') {
+        secVip.style.display = 'flex';
+        btnVip.classList.add('active');
+        renderVipEditor();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
@@ -1379,6 +1519,21 @@
         if (!res.ok) return;
         const data = await res.json();
         allConsultas = data.consultas || [];
+
+        // Detectar si ingresó una consulta VIP o Urgente nueva para reproducir alarma sonora
+        let hasNewVipOrUrgent = false;
+        allConsultas.forEach(c => {
+          if (!previousConsultaIds.has(c.id)) {
+            const isVip = vipContactsList.some(v => isVipMatch(c.remitente, v.phone));
+            if (isVip) hasNewVipOrUrgent = true;
+          }
+        });
+
+        previousConsultaIds = new Set(allConsultas.map(c => c.id));
+        if (hasNewVipOrUrgent) {
+          playVipChimeSound();
+        }
+
         updateStats(allConsultas);
         renderConsultas(forceRedraw);
       } catch (err) {
@@ -1470,7 +1625,7 @@
     function renderConsultas(forceRedraw = false) {
       const container = document.getElementById('consultasGrid');
 
-      // PROTECCIÓN 100% CONTRA PÉRDIDA DE FOCO AL ESCRIBIR:
+      // PROTECCIÓN CONTRA PÉRDIDA DE FOCO AL ESCRIBIR
       if (!forceRedraw && document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) {
         return;
       }
@@ -1482,7 +1637,7 @@
         }
       });
 
-      let filtered = allConsultas;
+      let filtered = [...allConsultas];
 
       if (currentFilter !== 'todos') {
         filtered = filtered.filter(c => (c.estado || 'pendiente') === currentFilter);
@@ -1499,6 +1654,31 @@
           return rem.includes(searchQuery) || msg.includes(searchQuery);
         });
       }
+
+      // SISTEMA DE ORDENAMIENTO DE COLA INTELIGENTE (FIFO + PRIORIDAD VIP + CONVERSACIÓN ACTIVA):
+      filtered.sort((a, b) => {
+        const vipA = vipContactsList.find(v => isVipMatch(a.remitente, v.phone));
+        const vipB = vipContactsList.find(v => isVipMatch(b.remitente, v.phone));
+
+        // 1. VIPs y Urgencias siempre flotan primero (#1)
+        if (vipA && !vipB) return -1;
+        if (!vipA && vipB) return 1;
+        if (vipA && vipB) {
+          if (vipA.priority === 'urgente' && vipB.priority !== 'urgente') return -1;
+          if (vipA.priority !== 'urgente' && vipB.priority === 'urgente') return 1;
+        }
+
+        // 2. Conversación activa (el paciente respondió tras un mensaje de la secretaria) sube arriba
+        const activeA = a.datos && a.datos.respuestasPaciente && a.datos.respuestasPaciente.length > 0;
+        const activeB = b.datos && b.datos.respuestasPaciente && b.datos.respuestasPaciente.length > 0;
+        if (activeA && !activeB) return -1;
+        if (!activeA && activeB) return 1;
+
+        // 3. FIFO: Los mensajes más antiguos primero (para atender a quien lleva más tiempo esperando)
+        const timeA = new Date(a.timestamp || a.createdAt).getTime();
+        const timeB = new Date(b.timestamp || b.createdAt).getTime();
+        return timeA - timeB;
+      });
 
       if (filtered.length === 0) {
         container.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">No hay solicitudes en esta sección. (¡Bandeja al día!)</div>`;
@@ -1522,11 +1702,17 @@
           : (displayImg ? [displayImg] : []);
 
         const listPdfs = datos.pdfsAdjuntos || [];
+        const vipMatch = vipContactsList.find(v => isVipMatch(c.remitente, v.phone));
 
         const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
 
+        let cardClass = 'card';
+        if (vipMatch) {
+          cardClass += vipMatch.priority === 'urgente' ? ' urgent-card' : ' vip-card';
+        }
+
         html += `
-          <div class="card" id="card_${c.id}">
+          <div class="${cardClass}" id="card_${c.id}">
             <div class="card-header">
               <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
                 ${c.opcion || 'Consulta'}
@@ -1535,6 +1721,13 @@
                 ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
               </span>
             </div>
+
+            ${vipMatch ? `
+              <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 6px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO VIP / SOCIO'}</span>
+                <span>${vipMatch.name} (${vipMatch.role})</span>
+              </div>
+            ` : ''}
 
             <div class="patient-info">
               <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${c.remitente}</span></div>
@@ -1602,7 +1795,7 @@
               </div>
             ` : ''}
 
-            <!-- 📷 GALERÍA MULTI-FOTO DE PEDIDOS MÉDICOS ADJUNTOS -->
+            <!-- 📷 GALERÍA MULTI-FOTO CON LAZY LOADING -->
             ${(() => {
               if (listImagenes.length === 0 && !imgUrl) return '';
               return `
@@ -1611,7 +1804,7 @@
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
                     ${listImagenes.map((imgSrc, idx) => `
                       <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
-                        <img src="${imgSrc}" class="card-img-preview" alt="Foto ${idx + 1}">
+                        <img src="${imgSrc}" class="card-img-preview" loading="lazy" alt="Foto ${idx + 1}">
                         <div class="card-img-overlay">
                           <span>🔍 Foto ${idx + 1}</span>
                         </div>

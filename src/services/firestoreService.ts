@@ -41,6 +41,14 @@ export interface PredefinedPdfItem {
   base64?: string;
 }
 
+export interface VipContactItem {
+  id: string;
+  phone: string;
+  name: string;
+  role: string;
+  priority: 'vip' | 'urgente';
+}
+
 export const DEFAULT_QUICK_REPLIES: QuickReplyItem[] = [
   { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
   { id: 'qr_2', title: '📷 Pedir Foto Legible', text: '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.' },
@@ -95,6 +103,7 @@ export class FirestoreService {
   private static globalTags: Record<string, TagDefinition> | null = null;
   private static globalQuickReplies: QuickReplyItem[] | null = null;
   private static globalPdfConfig: PredefinedPdfItem[] | null = null;
+  private static globalVipContacts: VipContactItem[] | null = null;
 
   constructor(env?: Env) {
     this.projectId = env?.FIREBASE_PROJECT_ID || 'wabot-cc80f';
@@ -141,6 +150,44 @@ export class FirestoreService {
       else if ('nullValue' in valueObj) result[key] = null;
     }
     return result;
+  }
+
+  public async getVipContacts(): Promise<VipContactItem[]> {
+    if (FirestoreService.globalVipContacts) return FirestoreService.globalVipContacts;
+    if (!this.projectId) return [];
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/vip_contacts${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.items && Array.isArray(fields.items)) {
+          FirestoreService.globalVipContacts = fields.items as VipContactItem[];
+          return fields.items as VipContactItem[];
+        }
+      }
+    } catch (e) {}
+
+    return [];
+  }
+
+  public async saveVipContacts(items: VipContactItem[]): Promise<void> {
+    FirestoreService.globalVipContacts = items;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/vip_contacts${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ items, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al guardar vip_contacts en Firestore:', e);
+    }
   }
 
   public async getQuickReplies(): Promise<QuickReplyItem[]> {

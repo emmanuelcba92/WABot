@@ -23,6 +23,27 @@ app.get('/api/status', async (c) => {
   });
 });
 
+app.get('/api/vip-contacts', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const items = await firestore.getVipContacts();
+  return c.json({ items });
+});
+
+app.post('/api/vip-contacts', async (c) => {
+  try {
+    const body = await c.req.json();
+    const items = body.items || body;
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveVipContacts(items);
+    return c.json({
+      success: true,
+      mensaje: 'Lista de contactos VIP / prioritarios actualizada exitosamente.'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar contactos VIP', details: e?.message }, 500);
+  }
+});
+
 app.get('/api/schedule-config', async (c) => {
   const firestore = new FirestoreService(c.env);
   const mode = await firestore.getScheduleMode();
