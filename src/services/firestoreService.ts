@@ -1014,6 +1014,124 @@ export class FirestoreService {
     }
   }
 
+  public async seedConsultas(): Promise<number> {
+    const nombres = [
+      "María Elena Rossi", "Carlos Gómez", "Lucía Fernández", "Santiago Peralta", "Florencia Benítez",
+      "Gonzalo Martínez", "Valentina Soria", "Joaquín Almada", "Camila Bustos", "Agustín Quiroga",
+      "Sofia Domínguez", "Mateo Carrizo", "Isabella Mansilla", "Lucas Maidana", "Martina Herrera",
+      "Facundo Godoy", "Victoria Olmos", "Nico Romero", "Delfina Ferreyra", "Enzo Navarro",
+      "Paula Villalba", "Tomas Agüero", "Micaela Paz", "Lautaro Acosta", "Rocío Ledesma",
+      "Gabriel Moyano", "Juana Mercado", "Mariano Toledo", "Abril Ibáñez", "Julian Cabrera",
+      "Josefina Lucero", "Ramiro Ojeda", "Constanza Miranda", "Bautista Silva", "Candela Funes",
+      "Ignacio Varela", "Milagros Ponce", "Thiago Coronel", "Zoe Duarte", "Santino Luque",
+      "Melina Bravo", "Ezequiel Juárez", "Clara Morales", "Manuel Castillo", "Lourdes Sosa",
+      "Maximiliano Nieva", "Ana Laura Giménez", "Federico Roldán", "Griselda Páez", "Esteban Peralta"
+    ];
+
+    const opciones = [
+      "Solicitar Turno - ORL (Otorrinolaringología)",
+      "Solicitar Turno - Estudios Médicos",
+      "Solicitar Turno - Cirugías",
+      "Autorización de Estudios / Órdenes Médicas",
+      "Consultas Generales / Ayuda",
+      "Atenciones Afiliados PAMI",
+      "Reprogramación o Cancelación de Turno",
+      "Contacto Directo Secretaría"
+    ];
+
+    const obrasSociales = ["OSDE 210", "Swiss Medical", "PAMI", "Apross", "Medifé", "Galeno", "Sancor Salud", "Particular", "OSPAC", "Unión Personal"];
+    const especialidades = ["Otorrinolaringología (ORL)", "Cirugía Cabeza y Cuello", "Estudios ORL", "Audiometría", "Rinofibroscopía"];
+    const medicos = ["Dra. Venier", "Dr. López", "Dra. Rodríguez", "Dr. Sánchez"];
+
+    const now = Date.now();
+    const seeded: Array<Record<string, any>> = [];
+
+    for (let i = 0; i < 50; i++) {
+      const name = nombres[i % nombres.length];
+      const phoneDigits = `549351${Math.floor(1000000 + Math.random() * 9000000)}`;
+      const opcion = opciones[i % opciones.length];
+      const obra = obrasSociales[i % obrasSociales.length];
+      const dni = `${Math.floor(28000000 + Math.random() * 15000000)}`;
+      const timestamp = new Date(now - (i * 12 * 60 * 1000) - Math.floor(Math.random() * 300000)).toISOString();
+      const consultaId = `seed_${now}_${i + 1}`;
+
+      let etiquetas: string[] = [];
+      if (opcion.includes("PAMI") || obra === "PAMI") etiquetas.push("pami");
+      if (i % 7 === 0) etiquetas.push("urgente");
+      if (i % 5 === 0) etiquetas.push("falta_foto");
+      if (i % 4 === 0) etiquetas.push("en_revision");
+      if (i % 9 === 0) etiquetas.push("turno_confirmado");
+
+      let datos: Record<string, any> = {
+        pushName: name,
+        dni,
+        obraSocial: obra,
+        etiquetas,
+        respuestasPaciente: [],
+        respuestasSecretaria: []
+      };
+
+      if (opcion.includes("ORL")) {
+        datos.tipoSolicitud = "Turno ORL";
+        datos.especialidad = especialidades[0];
+        datos.medicoPreferido = medicos[i % medicos.length];
+        datos.contenidoMensaje = `📌 Solicitud de Turno ORL para ${name}.\nDNI: ${dni}\nObra Social: ${obra}\nDoctor/a: ${datos.medicoPreferido}`;
+      } else if (opcion.includes("Estudios")) {
+        datos.tipoSolicitud = "Estudios Médicos";
+        datos.estudioDeseado = (i % 2 === 0) ? "Audiometría + Tonal" : "Rinofibroscopía Laringea";
+        datos.contenidoMensaje = `🔬 Solicitud de Estudio: ${datos.estudioDeseado}\nPaciente: ${name} (DNI ${dni})\nObra Social: ${obra}`;
+      } else if (opcion.includes("Cirugías")) {
+        datos.tipoSolicitud = "Cirugía Programada";
+        datos.cirugiaPropuesta = (i % 2 === 0) ? "Septoplastia Funcional" : "Amigdalectomía";
+        datos.contenidoMensaje = `🏥 Consulta sobre Cirugía: ${datos.cirugiaPropuesta}\nPaciente: ${name} - Obra Social: ${obra}`;
+      } else if (opcion.includes("PAMI")) {
+        datos.tipoSolicitud = "Atención PAMI";
+        datos.numeroAfiliadoPami = `150${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+        datos.contenidoMensaje = `👵 Solicitud PAMI - N° Afiliado: ${datos.numeroAfiliadoPami}\nPaciente: ${name} - DNI: ${dni}`;
+      } else if (opcion.includes("Autorización")) {
+        datos.tipoSolicitud = "Autorización Orden Médica";
+        datos.contenidoMensaje = `📋 Adjunto orden médica para autorizar por ${obra}.\nPaciente: ${name}`;
+      } else if (opcion.includes("Reprogramación")) {
+        datos.tipoSolicitud = "Reprogramación de Turno";
+        datos.motivo = "Motivos personales de trabajo";
+        datos.contenidoMensaje = `🔄 Solicito reprogramar mi turno del día viernes.\nPaciente: ${name}`;
+      } else {
+        datos.tipoSolicitud = "Contacto Directo / Consulta";
+        datos.contenidoMensaje = `💬 Consulta general de ${name}: "Hola, quería consultar horarios de guardia este fin de semana."`;
+      }
+
+      const item = {
+        id: consultaId,
+        remitente: phoneDigits,
+        opcion,
+        estado: "pendiente",
+        datos,
+        timestamp,
+        createdAt: timestamp
+      };
+
+      FirestoreService.inMemoryConsultas.push(item);
+      seeded.push(item);
+    }
+
+    if (this.projectId) {
+      try {
+        for (const item of seeded) {
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?documentId=${item.id}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: this.toFirestoreFields(item) })
+          });
+        }
+      } catch (e) {
+        console.error("Error al sembrar consultas en Firestore:", e);
+      }
+    }
+
+    return seeded.length;
+  }
+
   public static getConsultasGuardadasMemoria(): Array<Record<string, any>> {
     return [...this.inMemoryConsultas];
   }

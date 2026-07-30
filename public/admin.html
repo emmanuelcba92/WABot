@@ -669,6 +669,9 @@
           <button class="btn btn-excel" onclick="exportToCsv()">
             📊 Exportar a Excel (CSV)
           </button>
+          <button class="btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba variadas">
+            ⚡ Cargar 50 Chats de Prueba
+          </button>
           <button class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
             🗑️ Limpiar Todo (Pruebas)
           </button>
@@ -1584,6 +1587,22 @@
         } catch (e) {
           alert('Error al limpiar solicitudes.');
         }
+      }
+    }
+
+    async function cargar50ChatsPrueba() {
+      if (!confirm('⚡ ¿Deseas generar 50 solicitudes de prueba variadas (ORL, Estudios, Cirugías, PAMI, etc.) con estado PENDIENTE?')) return;
+      try {
+        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Se cargaron ${data.count || 50} chats de prueba exitosamente.`);
+          fetchConsultas(true);
+        } else {
+          alert('❌ Error al cargar solicitudes de prueba: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('❌ Error de red al conectar con el servidor.');
       }
     }
 

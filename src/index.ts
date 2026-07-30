@@ -326,6 +326,16 @@ app.post('/api/clear-consultas', async (c) => {
   return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
 });
 
+app.post('/api/seed-consultas', async (c) => {
+  try {
+    const firestore = new FirestoreService(c.env);
+    const count = await firestore.seedConsultas();
+    return c.json({ success: true, count, message: `Se generaron ${count} consultas de prueba exitosamente.` });
+  } catch (err: any) {
+    return c.json({ error: 'Error al generar consultas de prueba', details: err?.message }, 500);
+  }
+});
+
 app.post('/api/iniciar-chat', async (c) => {
   try {
     const body = await c.req.json();
