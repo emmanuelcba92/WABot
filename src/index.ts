@@ -369,7 +369,7 @@ app.post('/api/forward-telemedicina', async (c) => {
     const datos = target.datos || {};
     const patientName = datos.pushName ? `${datos.pushName} (${target.remitente})` : target.remitente;
 
-    const headerMsg = `🏥 *DERIVACIÓN DE TELEMEDICINA - CLÍNICA MÉDICA*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
+    const headerMsg = `🏥 *DERIVACIÓN PARA TELEMEDICINA - CLÍNICA COAT*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
 
     // 1. Enviar Encabezado al Médico
     await firestore.addPendingOutgoing(doctorPhone, headerMsg, idConsulta);
