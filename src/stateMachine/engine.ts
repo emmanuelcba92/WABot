@@ -175,7 +175,7 @@ export class StateEngine {
       }
 
       case 'esperando_sub_a': {
-        const parentKey = sesion.datosTemporales.parentKey || 'a';
+        const parentKey = sesion.datosTemporales?.parentKey || 'a';
         const parentItem = (menuTree.items || []).find(i => i.key.toLowerCase() === parentKey.toLowerCase());
         const subItems = parentItem?.subItems || [];
 
@@ -217,7 +217,7 @@ export class StateEngine {
       }
 
       case 'esperando_datos_a_1': {
-        return await this.guardarConsultaFinal(remitente, altRemitente, pushName, sesion.datosTemporales.label || 'Solicitud', mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
+        return await this.guardarConsultaFinal(remitente, altRemitente, pushName, sesion.datosTemporales?.label || 'Solicitud', mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
       }
 
       default: {
@@ -254,7 +254,7 @@ export class StateEngine {
     let uploadedImgUrl: string | undefined = undefined;
     if (imagenBase64) {
       const uploadResult = await ImageUploadService.uploadImage(imagenBase64, imagenNombre, env);
-      if (uploadResult.success && uploadResult.url) {
+      if (uploadResult && uploadResult.url) {
         uploadedImgUrl = uploadResult.url;
       } else {
         uploadedImgUrl = imagenBase64;
@@ -282,9 +282,7 @@ export class StateEngine {
       await fs.saveSesion(altRemitente, 'esperando_atencion_humana');
     }
 
-    const respText = isVipBypass
-      ? MESSAGES.CONFIRMACION_DATOS_RECIBIDOS
-      : MESSAGES.CONFIRMACION_DATOS_RECIBIDOS;
+    const respText = MESSAGES.CONFIRMACION_SOLICITUD_RECIBIDA;
 
     return {
       remitente,
@@ -292,7 +290,6 @@ export class StateEngine {
       estadoActual: 'esperando_atencion_humana',
       enHorario: true,
       timestamp: ts,
-      idConsulta,
       imagenSubidaUrl: uploadedImgUrl
     };
   }
