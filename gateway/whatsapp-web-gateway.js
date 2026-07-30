@@ -217,7 +217,8 @@ async function startWhatsAppGateway() {
 
       for (const msg of messages) {
         try {
-          const targetJid = msg.remitente.includes('@') ? msg.remitente : `${msg.remitente}@s.whatsapp.net`;
+          let rawTarget = msg.targetJid || msg.remitente;
+          let targetJid = rawTarget.includes('@') ? rawTarget : `${rawTarget}@s.whatsapp.net`;
 
           if (msg.pdfBase64 && msg.pdfNombre) {
             const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
@@ -228,7 +229,7 @@ async function startWhatsAppGateway() {
               fileName: msg.pdfNombre,
               caption: msg.text || undefined
             });
-            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado exitosamente a ${targetJid}.`);
+            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
           } else if (msg.imagenBase64) {
             const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
             const buffer = Buffer.from(base64Data, 'base64');
@@ -236,10 +237,17 @@ async function startWhatsAppGateway() {
               image: buffer,
               caption: msg.text || undefined
             });
-            console.log(`📤 Imagen / Pedido médico enviado exitosamente a ${targetJid}.`);
+            console.log(`📤 Imagen enviada a ${targetJid}.`);
           } else if (msg.text) {
             await sock.sendMessage(targetJid, { text: msg.text });
             console.log(`📤 Mensaje enviado a ${targetJid}: "${msg.text}"`);
+          }
+
+          // Si el remitente original era un número pero hay un altRemitente @lid que no se envió, enviar también al altRemitente
+          if (msg.altRemitente && msg.altRemitente.includes('@lid') && targetJid !== msg.altRemitente) {
+            try {
+              if (msg.text) await sock.sendMessage(msg.altRemitente, { text: msg.text });
+            } catch (e) {}
           }
         } catch (sendErr) {
           console.error(`❌ Error al enviar mensaje saliente a ${msg.remitente}:`, sendErr?.message || sendErr);

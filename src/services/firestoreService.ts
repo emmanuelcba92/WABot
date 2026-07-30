@@ -6,6 +6,8 @@ import { MESSAGES } from '../templates/messages';
 export interface PendingOutgoingMsg {
   id: string;
   remitente: string;
+  altRemitente?: string;
+  targetJid?: string;
   text: string;
   timestamp: string;
   pdfUrl?: string;
@@ -565,11 +567,15 @@ export class FirestoreService {
     imagenBase64?: string,
     pdfBase64?: string,
     pdfNombre?: string,
-    altRemitente?: string
+    altRemitente?: string,
+    pushName?: string
   ): Promise<void> {
     const consultas = await this.getConsultas();
 
-    // BÚSQUEDA EXHAUSTIVA DE CONSULTA PENDIENTE (UNIFICA TODOS LOS MENSAJES DEL MISMO PACIENTE)
+    const rDigits = remitente.replace(/[^0-9]/g, '');
+    const altDigits = (altRemitente || '').replace(/[^0-9]/g, '');
+
+    // BÚSQUEDA EXHAUSTIVA DE CONSULTA PENDIENTE CON SOPORTE LID Y TELÉFONO
     const consultaPaciente = consultas.find(c => {
       if (c.estado !== 'pendiente') return false;
 
@@ -577,18 +583,34 @@ export class FirestoreService {
       if (altRemitente && (c.remitente === altRemitente || c.datos?.altRemitente === altRemitente)) return true;
       if (c.datos?.altRemitente === remitente) return true;
 
-      // Coincidencia por teléfono normalizado
-      const rDigits = remitente.replace(/[^0-9]/g, '');
       const cDigits = (c.remitente || '').replace(/[^0-9]/g, '');
-      if (rDigits.length >= 7 && cDigits.length >= 7) {
-        if (rDigits.slice(-8) === cDigits.slice(-8)) return true;
+      const cAltDigits = (c.datos?.altRemitente || '').replace(/[^0-9]/g, '');
+
+      if (cDigits.length >= 7) {
+        if (rDigits.length >= 7 && rDigits.slice(-8) === cDigits.slice(-8)) return true;
+        if (altDigits.length >= 7 && altDigits.slice(-8) === cDigits.slice(-8)) return true;
       }
+
+      if (cAltDigits.length >= 7) {
+        if (rDigits.length >= 7 && rDigits.slice(-8) === cAltDigits.slice(-8)) return true;
+        if (altDigits.length >= 7 && altDigits.slice(-8) === cAltDigits.slice(-8)) return true;
+      }
+
+      if (pushName && c.datos?.pushName && pushName.toLowerCase() === c.datos.pushName.toLowerCase()) return true;
 
       return false;
     });
 
     if (consultaPaciente) {
       const datos = consultaPaciente.datos || {};
+      
+      // Guardar el LID para poder responder al usuario por su ID de WhatsApp
+      if (remitente.includes('@lid')) {
+        datos.altRemitente = remitente;
+      } else if (altRemitente && altRemitente.includes('@lid')) {
+        datos.altRemitente = altRemitente;
+      }
+
       const respAnteriores = datos.respuestasPaciente || [];
 
       let imagenesAdjuntas = Array.isArray(datos.imagenesAdjuntas) ? [...datos.imagenesAdjuntas] : [];
@@ -621,6 +643,7 @@ export class FirestoreService {
         texto: `${textoMensaje} ${tagDesc}`.trim(),
         pdfBase64: pdfBase64 || null,
         pdfNombre: pdfNombre || null,
+        imagenBase64: imagenBase64 || null,
         timestamp: new Date().toISOString()
       };
       datos.respuestasPaciente = [...respAnteriores, nuevaResp];
@@ -726,11 +749,25 @@ export class FirestoreService {
     pdfUrl?: string,
     pdfNombre?: string,
     pdfBase64?: string,
-    imagenBase64?: string
+    imagenBase64?: string,
+    altRemitente?: string
   ): Promise<void> {
+    let targetJid = remitente;
+    if (idConsulta) {
+      const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
+      if (itemMem && itemMem.datos?.altRemitente) {
+        altRemitente = itemMem.datos.altRemitente;
+        if (altRemitente.includes('@lid')) {
+          targetJid = altRemitente;
+        }
+      }
+    }
+
     const item: PendingOutgoingMsg = {
       id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       remitente,
+      altRemitente,
+      targetJid,
       text,
       pdfUrl,
       pdfNombre,
