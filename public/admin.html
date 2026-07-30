@@ -410,6 +410,9 @@
       max-width: 78%;
       font-size: 0.92rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
     }
 
     .chat-bubble-sec {
@@ -421,6 +424,9 @@
       max-width: 78%;
       font-size: 0.92rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
     }
 
     .lightbox-modal {
@@ -2722,7 +2728,7 @@
                     ${m.senderName} (${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}):
                   </div>
 
-                  ${m.text ? `<div>${m.text}</div>` : ''}
+                  ${m.text ? `<div style="white-space: pre-wrap; word-break: break-word; line-height: 1.5;">${m.text}</div>` : ''}
 
                   ${m.imagenBase64 ? `
                     <div style="margin-top: 6px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px;">
