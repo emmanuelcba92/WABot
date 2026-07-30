@@ -922,14 +922,35 @@ export class FirestoreService {
 
     if (this.projectId) {
       try {
-        const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json.documents) {
-            items = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
-            FirestoreService.inMemoryConsultas = items;
+        let pageToken: string | undefined = undefined;
+        let hasMore = true;
+        const allFetched: Array<Record<string, any>> = [];
+
+        while (hasMore) {
+          let url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+          if (pageToken) {
+            url += `&pageToken=${encodeURIComponent(pageToken)}`;
           }
+          const res = await fetch(url);
+          if (res.ok) {
+            const json: any = await res.json();
+            if (json.documents) {
+              const pageItems = json.documents.map((doc: any) => this.fromFirestoreFields(doc.fields || {}));
+              allFetched.push(...pageItems);
+            }
+            if (json.nextPageToken) {
+              pageToken = json.nextPageToken;
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allFetched.length > 0) {
+          items = allFetched;
+          FirestoreService.inMemoryConsultas = items;
         }
       } catch (e) {
         items = [...FirestoreService.inMemoryConsultas];
@@ -975,38 +996,55 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      // 1. Borrar todas las consultas de /consultas
-      const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-      const resC = await fetch(urlC);
-      if (resC.ok) {
-        const jsonC: any = await resC.json();
-        if (jsonC.documents) {
-          for (const doc of jsonC.documents) {
-            await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+      // 1. Borrar todas las consultas de /consultas (paginación completa)
+      let hasMoreC = true;
+      while (hasMoreC) {
+        const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+        const resC = await fetch(urlC);
+        if (resC.ok) {
+          const jsonC: any = await resC.json();
+          if (jsonC.documents && jsonC.documents.length > 0) {
+            for (const doc of jsonC.documents) {
+              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+            }
+          } else {
+            hasMoreC = false;
           }
+        } else {
+          hasMoreC = false;
         }
       }
 
       // 2. Borrar todas las sesiones activas de usuarios en /sesiones (conservando las configuraciones)
-      const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-      const resS = await fetch(urlS);
-      if (resS.ok) {
-        const jsonS: any = await resS.json();
-        if (jsonS.documents) {
-          for (const doc of jsonS.documents) {
-            if (
-              !doc.name.includes('/sesiones/bot_') &&
-              !doc.name.includes('/sesiones/global_') &&
-              !doc.name.includes('/sesiones/tag_') &&
-              !doc.name.includes('/sesiones/quick_') &&
-              !doc.name.includes('/sesiones/pdf_') &&
-              !doc.name.includes('/sesiones/vip_') &&
-              !doc.name.includes('/sesiones/doctor_') &&
-              !doc.name.includes('/sesiones/pending_')
-            ) {
-              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+      let hasMoreS = true;
+      while (hasMoreS) {
+        const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+        const resS = await fetch(urlS);
+        if (resS.ok) {
+          const jsonS: any = await resS.json();
+          let deletedInThisPage = 0;
+          if (jsonS.documents && jsonS.documents.length > 0) {
+            for (const doc of jsonS.documents) {
+              if (
+                !doc.name.includes('/sesiones/bot_') &&
+                !doc.name.includes('/sesiones/global_') &&
+                !doc.name.includes('/sesiones/tag_') &&
+                !doc.name.includes('/sesiones/quick_') &&
+                !doc.name.includes('/sesiones/pdf_') &&
+                !doc.name.includes('/sesiones/vip_') &&
+                !doc.name.includes('/sesiones/doctor_') &&
+                !doc.name.includes('/sesiones/pending_')
+              ) {
+                await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
+                deletedInThisPage++;
+              }
             }
           }
+          if (deletedInThisPage === 0) {
+            hasMoreS = false;
+          }
+        } else {
+          hasMoreS = false;
         }
       }
     } catch (e) {
