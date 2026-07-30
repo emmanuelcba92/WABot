@@ -410,9 +410,8 @@
       max-width: 78%;
       font-size: 0.92rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      white-space: pre-wrap;
       word-break: break-word;
-      line-height: 1.5;
+      line-height: 1.45;
     }
 
     .chat-bubble-sec {
@@ -424,9 +423,8 @@
       max-width: 78%;
       font-size: 0.92rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      white-space: pre-wrap;
       word-break: break-word;
-      line-height: 1.5;
+      line-height: 1.45;
     }
 
     .lightbox-modal {
@@ -2841,7 +2839,11 @@
 
           const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
           if (streamBox) {
-            streamBox.scrollTop = streamBox.scrollHeight;
+            if (allStreamMsgs.length <= 2) {
+              streamBox.scrollTop = 0;
+            } else {
+              streamBox.scrollTop = streamBox.scrollHeight;
+            }
           }
         }
       }
