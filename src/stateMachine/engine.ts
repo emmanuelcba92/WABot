@@ -23,6 +23,8 @@ export class StateEngine {
   ): Promise<WebhookResponse> {
     const firestore = new FirestoreService(env);
     const remitente = payload.remitente.trim();
+    const altRemitente = payload.altRemitente ? payload.altRemitente.trim() : undefined;
+    const pushName = payload.pushName ? payload.pushName.trim() : undefined;
     const mensaje = payload.mensaje.trim();
     const imagenBase64 = payload.imagenBase64;
     const imagenNombre = payload.imagenNombre;
@@ -162,7 +164,7 @@ export class StateEngine {
     // 7. RECEPCIÓN DE DATOS / FOTOS / PDFS FINAL DE LA SOLICITUD
     if (typeof sesion.estado === 'string' && (sesion.estado.startsWith('esperando_datos_') || sesion.estado.startsWith('esperando_datos'))) {
       const opcionElegida = sesion.estado.replace('esperando_datos_', '').toUpperCase();
-      return await this.guardarConsultaFinal(remitente, opcionElegida, mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
+      return await this.guardarConsultaFinal(remitente, altRemitente, pushName, opcionElegida, mensaje, imagenBase64, imagenNombre, pdfBase64, pdfNombre, env, timestamp, firestore);
     }
 
     // Fallback al menú principal
@@ -178,6 +180,8 @@ export class StateEngine {
 
   private static async guardarConsultaFinal(
     remitente: string,
+    altRemitente: string | undefined,
+    pushName: string | undefined,
     opcionElegida: string,
     mensaje: string,
     imagenBase64: string | undefined,
@@ -189,7 +193,7 @@ export class StateEngine {
     firestore: FirestoreService
   ): Promise<WebhookResponse> {
     const consultasExistentes = await firestore.getConsultas();
-    const consultaActiva = consultasExistentes.find(c => c.remitente === remitente && c.estado === 'pendiente');
+    const consultaActiva = consultasExistentes.find(c => (c.remitente === remitente || (altRemitente && c.remitente === altRemitente)) && c.estado === 'pendiente');
 
     if (consultaActiva) {
       await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre);
@@ -224,6 +228,8 @@ export class StateEngine {
     const datosEstructurados = {
       tipoSolicitud: opcionElegida,
       contenidoMensaje: mensaje,
+      pushName: pushName || null,
+      altRemitente: altRemitente || null,
       lineasParseadas: mensaje.split('\n').map(l => l.trim()).filter(l => l.length > 0),
       imagenUrl: (proveedorAlmacenamiento && proveedorAlmacenamiento !== 'simulated') ? imagenSubidaUrl : null,
       imagenBase64: imagenBase64 || null,

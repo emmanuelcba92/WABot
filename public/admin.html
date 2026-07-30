@@ -760,7 +760,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos VIP / Socios / Urgencias</h3>
-            <p style="font-size: 0.85rem; color: var(--muted);">Configura números telefónicos prioritarios. Cuando escriban, subirán automáticamente a la cima (#1) con alerta sonora.</p>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura números telefónicos o IDs prioritarios. Cuando escriban, subirán automáticamente a la cima (#1) con alerta sonora.</p>
           </div>
           <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto VIP</button>
         </div>
@@ -866,17 +866,50 @@
       return digits;
     }
 
-    function isVipMatch(remitente, vipPhone) {
+    function isVipMatch(consultaOrRemitente, vipContact) {
+      if (!consultaOrRemitente || !vipContact) return false;
+
+      let remitente = '';
+      let altRemitente = '';
+      let pushName = '';
+
+      if (typeof consultaOrRemitente === 'object') {
+        remitente = consultaOrRemitente.remitente || '';
+        const datos = consultaOrRemitente.datos || {};
+        altRemitente = datos.altRemitente || '';
+        pushName = datos.pushName || '';
+      } else {
+        remitente = String(consultaOrRemitente);
+      }
+
+      const vPhone = vipContact.phone || '';
+      const vClean = normalizePhone(vPhone);
+
+      // 1. Coincidencia por JID directo o LID (ej: "205948144619633@lid" o "205948...")
+      if (vPhone.length > 10) {
+        const rawV = vPhone.toLowerCase().trim();
+        if (remitente.toLowerCase().includes(rawV) || altRemitente.toLowerCase().includes(rawV)) return true;
+      }
+
+      // 2. Coincidencia por Teléfono (normalizado)
       const rClean = normalizePhone(remitente);
-      const vClean = normalizePhone(vipPhone);
-      if (!rClean || !vClean) return false;
+      const altClean = normalizePhone(altRemitente);
 
-      if (rClean === vClean) return true;
-      if (rClean.includes(vClean) || vClean.includes(rClean)) return true;
+      if (vClean.length >= 6) {
+        if (rClean && (rClean === vClean || rClean.includes(vClean) || vClean.includes(rClean))) return true;
+        if (altClean && (altClean === vClean || altClean.includes(vClean) || vClean.includes(altClean))) return true;
 
-      const rTail = rClean.slice(-8);
-      const vTail = vClean.slice(-8);
-      if (rTail.length >= 7 && rTail === vTail) return true;
+        const vTail = vClean.slice(-8);
+        if (vTail.length >= 7) {
+          if (rClean && rClean.slice(-8) === vTail) return true;
+          if (altClean && altClean.slice(-8) === vTail) return true;
+        }
+      }
+
+      // 3. Coincidencia por Nombre de WhatsApp (pushName)
+      if (vipContact.name && pushName && pushName.toLowerCase().includes(vipContact.name.toLowerCase())) {
+        return true;
+      }
 
       return false;
     }
@@ -937,7 +970,7 @@
           <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <input type="text" value="${vip.name}" onchange="updateVipName(${idx}, this.value)" placeholder="Nombre del Contacto (ej: Dr. López)..." style="font-weight: 700; flex: 1; min-width: 200px;">
-              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono (ej: 3516123456)..." style="width: 180px; color: #facc15; font-weight: 700;">
+              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono o ID (ej: 3516123456 o 205948...)..." style="width: 220px; color: #facc15; font-weight: 700;">
               <select onchange="updateVipPriority(${idx}, this.value)" style="width: 150px;">
                 <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ VIP / Socio</option>
                 <option value="urgente" ${vip.priority === 'urgente' ? 'selected' : ''}>🚨 Urgencia Médica</option>
@@ -1537,7 +1570,7 @@
         let hasNewVipOrUrgent = false;
         allConsultas.forEach(c => {
           if (!previousConsultaIds.has(c.id)) {
-            const isVip = vipContactsList.some(v => isVipMatch(c.remitente, v.phone));
+            const isVip = vipContactsList.some(v => isVipMatch(c, v));
             if (isVip) hasNewVipOrUrgent = true;
           }
         });
@@ -1664,14 +1697,15 @@
         filtered = filtered.filter(c => {
           const rem = (c.remitente || '').toLowerCase();
           const msg = (c.datos && c.datos.contenidoMensaje ? c.datos.contenidoMensaje : '').toLowerCase();
-          return rem.includes(searchQuery) || msg.includes(searchQuery);
+          const pName = (c.datos && c.datos.pushName ? c.datos.pushName : '').toLowerCase();
+          return rem.includes(searchQuery) || msg.includes(searchQuery) || pName.includes(searchQuery);
         });
       }
 
       // SISTEMA DE ORDENAMIENTO DE COLA INTELIGENTE (FIFO + PRIORIDAD VIP + CONVERSACIÓN ACTIVA):
       filtered.sort((a, b) => {
-        const vipA = vipContactsList.find(v => isVipMatch(a.remitente, v.phone));
-        const vipB = vipContactsList.find(v => isVipMatch(b.remitente, v.phone));
+        const vipA = vipContactsList.find(v => isVipMatch(a, v));
+        const vipB = vipContactsList.find(v => isVipMatch(b, v));
 
         // 1. VIPs y Urgencias siempre flotan primero (#1)
         if (vipA && !vipB) return -1;
@@ -1715,7 +1749,7 @@
           : (displayImg ? [displayImg] : []);
 
         const listPdfs = datos.pdfsAdjuntos || [];
-        const vipMatch = vipContactsList.find(v => isVipMatch(c.remitente, v.phone));
+        const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
         const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
 
@@ -1736,14 +1770,14 @@
             </div>
 
             ${vipMatch ? `
-              <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 6px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+              <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                 <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO VIP / SOCIO'}</span>
-                <span>${vipMatch.name} (${vipMatch.role})</span>
+                <span><strong>${vipMatch.name || 'VIP'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
               </div>
             ` : ''}
 
             <div class="patient-info">
-              <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${c.remitente}</span></div>
+              <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}</span></div>
               <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
 
               <!-- ETIQUETAS Y ETIQUETADOR -->

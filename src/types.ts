@@ -41,6 +41,8 @@ export interface UserSession {
 
 export interface WebhookPayload {
   remitente: string;
+  altRemitente?: string;
+  pushName?: string;
   mensaje: string;
   simulatedTime?: string;
   imagenBase64?: string;

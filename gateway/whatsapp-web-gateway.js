@@ -93,8 +93,25 @@ async function startWhatsAppGateway() {
       try {
         if (!msg.message || msg.key.fromMe) continue;
 
-        const remoteJid = msg.key.remoteJid;
-        if (!remoteJid || remoteJid.includes('@g.us') || remoteJid === 'status@broadcast') continue;
+        const rawRemoteJid = msg.key.remoteJid;
+        if (!rawRemoteJid || rawRemoteJid.includes('@g.us') || rawRemoteJid === 'status@broadcast') continue;
+
+        // Extraer JID del número o LID
+        let remitente = rawRemoteJid;
+        let altRemitente = null;
+
+        if (rawRemoteJid.endsWith('@lid')) {
+          altRemitente = rawRemoteJid;
+          if (msg.key.participant && msg.key.participant.includes('@s.whatsapp.net')) {
+            remitente = msg.key.participant;
+          } else if (msg.key.remoteJidAlt && msg.key.remoteJidAlt.includes('@s.whatsapp.net')) {
+            remitente = msg.key.remoteJidAlt;
+          }
+        } else if (msg.key.participant) {
+          altRemitente = msg.key.participant;
+        }
+
+        const pushName = msg.pushName || null;
 
         const msgId = msg.key.id;
         if (msgId) {
@@ -122,7 +139,7 @@ async function startWhatsAppGateway() {
 
         if (isImage) {
           try {
-            console.log(`📸 [Desencriptando HD] Capturando foto nativa de ${remoteJid}...`);
+            console.log(`📸 [Desencriptando HD] Capturando foto nativa de ${remitente} (${pushName || 'sin nombre'})...`);
             const rawBuffer = await downloadMediaMessage(
               msg,
               'buffer',
@@ -158,7 +175,7 @@ async function startWhatsAppGateway() {
             const mimetype = docMsg?.mimetype || 'application/pdf';
             const fileName = docMsg?.fileName || `documento_${Date.now()}.pdf`;
 
-            console.log(`📄 [Descargando Documento] Recibiendo PDF/Documento (${fileName}) de ${remoteJid}...`);
+            console.log(`📄 [Descargando Documento] Recibiendo PDF (${fileName}) de ${remitente}...`);
             const docBuffer = await downloadMediaMessage(
               msg,
               'buffer',
@@ -172,43 +189,46 @@ async function startWhatsAppGateway() {
             if (docBuffer && docBuffer.length > 100) {
               pdfBase64 = `data:${mimetype};base64,${docBuffer.toString('base64')}`;
               pdfNombre = fileName;
-              console.log(`📄 [PDF RECIBIDO EXITOSAMENTE] ${fileName} (${docBuffer.length} bytes)`);
+              console.log(`📄 [DOCUMENTO PDF CAPTURADO] ${fileName} (${docBuffer.length} bytes) listo para enviar a secretaría.`);
             }
           } catch (docErr) {
-            console.error('❌ Error al procesar documento PDF entrante:', docErr?.message || docErr);
+            console.error('❌ Error al procesar documento PDF:', docErr?.message || docErr);
           }
         }
 
-        console.log(`📩 Mensaje recibido de ${remoteJid}: "${mensajeTexto || (imagenBase64 ? '📷 (Foto)' : (pdfBase64 ? '📄 (PDF)' : ''))}"`);
+        console.log(`📩 Mensaje recibido de ${pushName ? `${pushName} (${remitente})` : remitente}: "${mensajeTexto}" ${imagenBase64 ? '[FOTO NATIVA HD]' : ''} ${pdfBase64 ? '[PDF ADJUNTO]' : ''}`);
 
-        // Enviar payload al Webhook de Cloudflare Worker
+        const webhookPayload = {
+          remitente,
+          altRemitente,
+          pushName,
+          mensaje: mensajeTexto,
+          imagenBase64,
+          imagenNombre,
+          pdfBase64,
+          pdfNombre
+        };
+
         const res = await fetchWithRetry(WORKER_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            remitente: remoteJid,
-            mensaje: mensajeTexto,
-            imagenBase64,
-            imagenNombre,
-            pdfBase64,
-            pdfNombre
-          })
+          body: JSON.stringify(webhookPayload)
         });
 
         const data = await res.json();
+        console.log(`🤖 Respuesta de Engine State: "${data.respuesta || '(Silencio en atención)'}" [Estado: ${data.estadoActual}]`);
 
-        // Si el bot generó respuesta automática inmediata, enviarla por WhatsApp
-        if (data.respuesta) {
-          console.log(`🤖 Enviando respuesta automática del bot a ${remoteJid}...`);
-          await sock.sendMessage(remoteJid, { text: data.respuesta });
+        if (data.respuesta && data.respuesta.trim().length > 0) {
+          await sock.sendMessage(remitente, { text: data.respuesta });
+          console.log(`📤 Respuesta enviada por WhatsApp a ${remitente}`);
         }
       } catch (err) {
-        console.error('❌ Error procesando mensaje de WhatsApp:', err?.message || err);
+        console.error('❌ Error procesando mensaje entrante:', err);
       }
     }
   });
 
-  // Polling para enviar respuestas escritas por las secretarias desde el Panel Web (admin.html)
+  // Polling continuo de respuestas pendientes salientes generadas por la secretaria
   setInterval(async () => {
     try {
       const res = await fetch(WORKER_PENDING_URL);
@@ -217,28 +237,34 @@ async function startWhatsAppGateway() {
       const data = await res.json();
       const messages = data.messages || [];
 
-      for (const item of messages) {
-        if (item.remitente) {
-          console.log(`👩‍⚕️ [SECRETARÍA -> WA] Enviando mensaje manual a ${item.remitente}...`);
+      for (const msg of messages) {
+        try {
+          const targetJid = msg.remitente.includes('@') ? msg.remitente : `${msg.remitente}@s.whatsapp.net`;
 
-          // Si la secretaria adjuntó un archivo PDF personalizado o de plantilla
-          if (item.pdfBase64) {
-            const buffer = Buffer.from(item.pdfBase64.split(',')[1] || item.pdfBase64, 'base64');
-            await sock.sendMessage(item.remitente, {
+          if (msg.pdfBase64 && msg.pdfNombre) {
+            const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            await sock.sendMessage(targetJid, {
               document: buffer,
               mimetype: 'application/pdf',
-              fileName: item.pdfNombre || 'Indicaciones_Medicas.pdf',
-              caption: item.text
+              fileName: msg.pdfNombre,
+              caption: msg.text || undefined
             });
-          } else {
-            await sock.sendMessage(item.remitente, { text: item.text });
+            console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado exitosamente a ${targetJid} por secretaría.`);
+          } else if (msg.text) {
+            await sock.sendMessage(targetJid, { text: msg.text });
+            console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
           }
-
-          console.log(`✅ Mensaje de Secretaría enviado exitosamente a ${item.remitente}`);
+        } catch (sendErr) {
+          console.error(`❌ Error al enviar mensaje saliente a ${msg.remitente}:`, sendErr?.message || sendErr);
         }
       }
-    } catch (e) {}
-  }, 4000);
+    } catch (pollErr) {
+      // Ignorar errores temporales de red en el polling saliente
+    }
+  }, 3000);
 }
 
-startWhatsAppGateway().catch((err) => console.error('❌ Error fatal en Gateway:', err));
+startWhatsAppGateway().catch((err) => {
+  console.error('❌ Error fatal en WhatsApp Gateway:', err);
+});
