@@ -26,11 +26,14 @@ const sentMsgHistory = new Map(); // id -> timestamp
 // 1. LATIDO (HEARTBEAT) CADA 15 SEGUNDOS AL SERVIDOR
 async function sendHeartbeatPing() {
   try {
-    await fetch(WORKER_HEARTBEAT_URL, {
+    const res = await fetch(WORKER_HEARTBEAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'online', timestamp: Date.now() })
     });
+    if (res.ok) {
+      console.log('💚 [SEÑAL EN LÍNEA] Ping enviado a la Web App');
+    }
   } catch (err) {
     // Silencioso si hay corte temporal de red
   }

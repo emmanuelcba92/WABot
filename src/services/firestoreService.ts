@@ -405,7 +405,6 @@ export class FirestoreService {
   }
 
   public async getMenuTree(): Promise<MenuTreeConfig> {
-    if (FirestoreService.globalMenuTree) return FirestoreService.globalMenuTree;
     if (!this.projectId) return DEFAULT_MENU_TREE;
 
     try {
@@ -415,9 +414,7 @@ export class FirestoreService {
         const data: any = await res.json();
         const fields = this.fromFirestoreFields(data.fields || {});
         if (fields && fields.items && Array.isArray(fields.items)) {
-          const config = fields as unknown as MenuTreeConfig;
-          FirestoreService.globalMenuTree = config;
-          return config;
+          return fields as unknown as MenuTreeConfig;
         }
       }
     } catch (e) {}
