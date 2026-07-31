@@ -897,7 +897,8 @@ export class FirestoreService {
       createdAt: timestamp
     };
 
-    FirestoreService.inMemoryConsultas.push(payload);
+    FirestoreService.inMemoryConsultas.unshift(payload);
+    FirestoreService.consultasCache.lastFetch = 0;
 
     if (!this.projectId) return consultaId;
 

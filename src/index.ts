@@ -414,18 +414,13 @@ let lastGlobalHeartbeatPing = 0;
 
 app.post('/api/heartbeat', async (c) => {
   lastGlobalHeartbeatPing = Date.now();
-  const db = DBFactory.createService(c.env);
-  await db.saveHeartbeatPing();
-  return c.json({ ok: true, timestamp: Date.now() });
+  return c.json({ ok: true, timestamp: lastGlobalHeartbeatPing });
 });
 
 app.get('/api/heartbeat-status', async (c) => {
-  const db = DBFactory.createService(c.env);
-  const dbPing = await db.getHeartbeatPing();
-  const lastPing = Math.max(dbPing || 0, lastGlobalHeartbeatPing || 0);
-  const elapsed = lastPing > 0 ? Date.now() - lastPing : 999999999;
+  const elapsed = lastGlobalHeartbeatPing > 0 ? Date.now() - lastGlobalHeartbeatPing : 999999999;
   const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
-  const isOnline = lastPing > 0 && elapsed <= 60000;
+  const isOnline = lastGlobalHeartbeatPing > 0 && elapsed <= 60000;
 
   if (!isOnline) {
     if (Date.now() - lastAlertSentTimestamp > 600000) {
@@ -439,7 +434,7 @@ app.get('/api/heartbeat-status', async (c) => {
   return c.json({
     online: isOnline,
     elapsedSeconds,
-    lastPing: lastPing > 0 ? new Date(lastPing).toISOString() : null
+    lastPing: lastGlobalHeartbeatPing > 0 ? new Date(lastGlobalHeartbeatPing).toISOString() : null
   });
 });
 
