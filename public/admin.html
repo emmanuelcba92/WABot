@@ -1061,6 +1061,9 @@
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
     let previousConsultaIds = new Set();
     let processedVipMsgIds = new Set();
+    let openTagDropdowns = new Set();
+    let lastRenderedChatId = null;
+    let lastRenderedChatJson = '';
 
     let doctorList = [
       { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
@@ -2293,6 +2296,11 @@
       if (drop) {
         const isHidden = drop.style.display === 'none' || !drop.style.display;
         drop.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+          openTagDropdowns.add(id);
+        } else {
+          openTagDropdowns.delete(id);
+        }
       }
     }
 
@@ -2761,21 +2769,9 @@
           const draftValue = draftResponses[c.id] || '';
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
 
-          // CONSTRUIR STREAM UNIFICADO 100% CRONOLÓGICO POR TIMESTAMP E INTEGRADO (FOTOS + PDFS + TEXTO)
+          // CONSTRUIR STREAM UNIFICADO E INTEGRADO (SECUENCIA Y MENSAJE INICIAL SIEMPRE ARRIBA)
           const allStreamMsgs = [];
           const baseTime = new Date(c.timestamp || c.createdAt).getTime();
-
-          const initMsgFormatted = formatTextForWhatsApp(datos.contenidoMensaje || datos.mensajeRaw, datos);
-          if (initMsgFormatted) {
-            allStreamMsgs.push({
-              type: 'init',
-              senderName: '📥 Mensaje Inicial del Paciente',
-              text: initMsgFormatted,
-              timestamp: baseTime,
-              cssClass: 'chat-bubble-patient',
-              headerColor: '#38bdf8'
-            });
-          }
 
           respuestasSecretaria.forEach((r, idx) => {
             const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 1) * 1000);
@@ -2840,8 +2836,23 @@
             }
           });
 
+          // Ordenar los mensajes de seguimiento cronológicamente
           allStreamMsgs.sort((a, b) => a.timestamp - b.timestamp);
 
+          // INSERTAR EL MENSAJE INICIAL DEL PACIENTE SIEMPRE EN LA POSICIÓN 0 (ARRIBA DE TODO)
+          const initMsgFormatted = formatTextForWhatsApp(datos.contenidoMensaje || datos.mensajeRaw, datos);
+          if (initMsgFormatted) {
+            allStreamMsgs.unshift({
+              type: 'init',
+              senderName: '📥 Mensaje Inicial del Paciente',
+              text: initMsgFormatted,
+              timestamp: 0,
+              cssClass: 'chat-bubble-patient',
+              headerColor: '#38bdf8'
+            });
+          }
+
+          const isTagOpen = openTagDropdowns.has(c.id);
           const tagBtnLabel = etiquetas.length === 0
             ? '🏷️ Etiquetas ▼'
             : (etiquetas.length === 1 ? tagDefinitions[etiquetas[0]]?.label || '🏷️ 1 Etiqueta ▼' : `🏷️ ${etiquetas.length} Etiquetas ▼`);
@@ -2870,7 +2881,7 @@
                   <button class="btn btn-secondary" style="font-size: 0.8rem; background: rgba(124, 58, 237, 0.2); color: #c4b5fd; font-weight: 700; border: 1px solid rgba(124, 58, 237, 0.4);" onclick="toggleTagDropdown('${c.id}')">
                     ${tagBtnLabel}
                   </button>
-                  <div id="tagDropdown_${c.id}" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 6px; background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 170px; flex-direction: column; gap: 4px;">
+                  <div id="tagDropdown_${c.id}" style="display: ${isTagOpen ? 'flex' : 'none'}; position: absolute; top: 100%; right: 0; margin-top: 6px; background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 170px; flex-direction: column; gap: 4px;">
                     ${Object.entries(tagDefinitions).map(([key, def]) => {
                       const isSel = etiquetas.includes(key);
                       return `
@@ -2971,12 +2982,18 @@
             </div>
           `;
 
-          containerChatMain.innerHTML = mainHtml;
+          const chatJson = JSON.stringify(c);
+          const shouldUpdateMain = forceRedraw || (lastRenderedChatId !== c.id) || (lastRenderedChatJson !== chatJson);
 
-          // AUTO-SCROLL AL FINAL DEL CHAT ESTILO WHATSAPP WEB
-          const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
-          if (streamBox) {
-            streamBox.scrollTop = streamBox.scrollHeight;
+          if (shouldUpdateMain) {
+            lastRenderedChatId = c.id;
+            lastRenderedChatJson = chatJson;
+            containerChatMain.innerHTML = mainHtml;
+
+            const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
+            if (streamBox) {
+              streamBox.scrollTop = streamBox.scrollHeight;
+            }
           }
         }
       }
