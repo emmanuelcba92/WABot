@@ -1054,19 +1054,23 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
           <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">➕ Crear Nuevo Usuario</h4>
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
-            <div style="flex: 1; min-width: 140px;">
+            <div style="flex: 1; min-width: 130px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Usuario (sin @)</label>
               <input type="text" id="newUsernameInput" placeholder="ej: egomez" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
             </div>
-            <div style="flex: 1; min-width: 140px;">
-              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Nombre para Mostrar</label>
+            <div style="flex: 1; min-width: 130px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Nombre Visible</label>
               <input type="text" id="newDisplayNameInput" placeholder="ej: Emmanuel" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
             </div>
-            <div style="flex: 1; min-width: 140px;">
+            <div style="flex: 1.3; min-width: 170px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Email Real (para recuperar)</label>
+              <input type="email" id="newUserEmailInput" value="secretaria@coat.com.ar" placeholder="secretaria@coat.com.ar" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #38bdf8; font-weight: 600; font-size: 0.88rem; outline: none;">
+            </div>
+            <div style="flex: 1; min-width: 120px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Contraseña</label>
               <input type="password" id="newUserPasswordInput" placeholder="••••••••" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
             </div>
-            <div style="width: 140px;">
+            <div style="width: 130px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Rol de Acceso</label>
               <select id="newUserRoleSelect" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
                 <option value="secretaria">Secretaría</option>
@@ -2487,11 +2491,13 @@
     async function createNewUserSubmit() {
       const usernameInput = document.getElementById('newUsernameInput');
       const displayNameInput = document.getElementById('newDisplayNameInput');
+      const userEmailInput = document.getElementById('newUserEmailInput');
       const passwordInput = document.getElementById('newUserPasswordInput');
       const roleSelect = document.getElementById('newUserRoleSelect');
 
       const username = usernameInput.value.trim().toLowerCase();
       const displayName = displayNameInput ? displayNameInput.value.trim() : '';
+      const email = (userEmailInput ? userEmailInput.value.trim() : '').toLowerCase() || `${username}@coat.com.ar`;
       const password = passwordInput.value;
       const role = roleSelect.value;
 
@@ -2499,8 +2505,6 @@
         alert('Por favor completá usuario y contraseña.');
         return;
       }
-
-      const email = `${username}@coat.com.ar`;
 
       try {
         // 1. Crear el usuario en Firebase Auth usando una instancia secundaria

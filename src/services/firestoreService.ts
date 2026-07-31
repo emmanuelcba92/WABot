@@ -369,7 +369,7 @@ export class FirestoreService {
   }
 
   public static globalUsersList: Array<{ username: string; displayName?: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }> = [
-    { username: 'egomez', displayName: 'Emmanuel', email: 'egomez@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
+    { username: 'egomez', displayName: 'Emmanuel', email: 'secretaria@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
   ];
 
   public async getUsers(): Promise<Array<{ username: string; displayName?: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }>> {

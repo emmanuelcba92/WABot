@@ -388,6 +388,24 @@
       });
     }
 
+    async function getEmailCandidates(username) {
+      const list = [];
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          const data = await res.json();
+          const users = data.users || [];
+          const match = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+          if (match && match.email) list.push(match.email);
+        }
+      } catch(e) {}
+
+      const userDomainEmail = `${username}@coat.com.ar`;
+      if (!list.includes(userDomainEmail)) list.push(userDomainEmail);
+      if (!list.includes('secretaria@coat.com.ar')) list.push('secretaria@coat.com.ar');
+      return list;
+    }
+
     async function handleLogin(e) {
       e.preventDefault();
       hideError();
@@ -400,7 +418,6 @@
         return;
       }
 
-      const email = `${username}@coat.com.ar`;
       setLoading(true);
 
       try {
@@ -409,21 +426,41 @@
           if (!ok) { setLoading(false); return; }
         }
 
-        await firebase.auth().signInWithEmailAndPassword(email, password);
-        // Éxito → redirigir al panel principal
-        window.location.replace('/');
+        const emailCandidates = await getEmailCandidates(username);
+        let loggedIn = false;
+        let lastError = null;
+
+        for (const email of emailCandidates) {
+          try {
+            await firebase.auth().signInWithEmailAndPassword(email, password);
+            loggedIn = true;
+            break;
+          } catch(err) {
+            lastError = err;
+            if (err.code !== 'auth/user-not-found' && err.code !== 'auth/invalid-credential') {
+              break;
+            }
+          }
+        }
+
+        if (loggedIn) {
+          window.location.replace('/');
+        } else {
+          setLoading(false);
+          const code = lastError?.code || '';
+          if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+            showError('❌ Usuario o contraseña incorrectos. Verificá tus datos.');
+          } else if (code === 'auth/too-many-requests') {
+            showError('⏳ Demasiados intentos. Esperá unos minutos e intentá de nuevo.');
+          } else if (code === 'auth/network-request-failed') {
+            showError('🌐 Sin conexión a internet. Verificá tu red.');
+          } else {
+            showError('⚠️ Error al iniciar sesión: ' + (lastError?.message || code));
+          }
+        }
       } catch (err) {
         setLoading(false);
-        const code = err.code || '';
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-          showError('❌ Usuario o contraseña incorrectos. Verificá tus datos.');
-        } else if (code === 'auth/too-many-requests') {
-          showError('⏳ Demasiados intentos. Esperá unos minutos e intentá de nuevo.');
-        } else if (code === 'auth/network-request-failed') {
-          showError('🌐 Sin conexión a internet. Verificá tu red.');
-        } else {
-          showError('⚠️ Error al iniciar sesión: ' + (err.message || code));
-        }
+        showError('⚠️ Error al iniciar sesión.');
       }
     }
 
@@ -435,16 +472,17 @@
         return;
       }
 
-      const email = `${username}@coat.com.ar`;
-
       try {
         if (!firebaseReady) {
           const ok = await initFirebase();
           if (!ok) return;
         }
 
-        await firebase.auth().sendPasswordResetEmail(email);
-        alert(`📧 Se envió un correo con el enlace de restablecimiento a ${email}.\n\nSi no tenés acceso a esa casilla, contactá a secretaria@coat.com.ar o a un Administrador.`);
+        const candidates = await getEmailCandidates(username);
+        const targetEmail = candidates[0] || `${username}@coat.com.ar`;
+
+        await firebase.auth().sendPasswordResetEmail(targetEmail);
+        alert(`📧 Se envió un correo con el enlace de restablecimiento a:\n👉 ${targetEmail}\n\nRevisá la bandeja de entrada para crear tu nueva contraseña.`);
       } catch (err) {
         const code = err.code || '';
         if (code === 'auth/user-not-found') {
