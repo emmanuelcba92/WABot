@@ -2483,22 +2483,40 @@
       const cleanText = text.trim();
       if (!cleanText) return '';
 
+      // Si el paciente ya incluyó etiquetas con dos puntos (Nombre:, DNI:), o numeración (1., 2.), devolver el texto 100% tal cual lo envió
+      if (cleanText.includes(':') || cleanText.includes('1.') || cleanText.includes('2.')) {
+        if (datos && (datos.tipoSolicitud || datos.opcion) && !cleanText.toLowerCase().includes('solicitud')) {
+          return `📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}\n${cleanText}`;
+        }
+        return cleanText;
+      }
+
       const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
+      // Orden exacto de etiquetas COINCIDENTE 100% con la plantilla que se le envía al paciente por WhatsApp:
+      // 1. Nombre y Apellido
+      // 2. DNI
+      // 3. Fecha de Nacimiento (DD/MM/AAAA)
+      // 4. Obra Social / Prepaga
+      // 5. N° de Afiliado
+      // 6. Celular / Teléfono de contacto
+      // 7. Email
+      // 8. ¿El turno es para titular o familiar?
+      // 9. Médico preferido o motivo de consulta
       const LABELS_PLANTILLA = [
+        '👤 *Nombre y Apellido*',
         '🪪 *DNI*',
-        '👤 *Nombre completo*',
         '📅 *Fecha de nacimiento*',
-        '🏥 *Obra social*',
-        '🩺 *Motivo de consulta*',
-        '📱 *Celular*',
+        '🏥 *Obra social / Prepaga*',
+        '🔢 *N° de Afiliado*',
+        '📱 *Celular / Teléfono*',
         '📧 *E-mail*',
-        '👨‍⚕️ *Médico (Preferencia)*',
-        '⏰ *Preferencia horaria*'
+        '👥 *Titular o Familiar*',
+        '🩺 *Motivo de consulta*'
       ];
 
-      // Si el mensaje consiste en respuestas en varias líneas sin los dos puntos ':', aparear CADA línea con su etiqueta
-      if (lines.length >= 2 && lines.length <= 12 && !cleanText.includes(':')) {
+      // Si el mensaje consiste en respuestas línea a línea sin dos puntos ':', aparear con el orden correcto
+      if (lines.length >= 2 && lines.length <= 12) {
         const formattedLines = lines.map((line, i) => {
           const label = LABELS_PLANTILLA[i] || `📌 *Dato ${i+1}*`;
           return `${label}: ${line}`;
@@ -2510,7 +2528,6 @@
         return formattedLines.join('\n');
       }
 
-      // Si ya tiene etiquetas o es texto libre, conservar el 100% del texto intacto
       if (datos && (datos.tipoSolicitud || datos.opcion) && !cleanText.toLowerCase().includes('solicitud')) {
         return `📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}\n${cleanText}`;
       }
