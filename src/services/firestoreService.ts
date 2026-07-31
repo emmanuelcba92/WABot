@@ -1017,7 +1017,53 @@ export class FirestoreService {
       return res.ok;
     } catch (e) {
       return false;
+  }
+
+  public static lastHeartbeatTimestamp = Date.now();
+
+  public async saveHeartbeatPing(): Promise<boolean> {
+    FirestoreService.lastHeartbeatTimestamp = Date.now();
+    if (!this.projectId) return true;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/botConfig/heartbeat${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            lastPing: { integerValue: String(Date.now()) }
+          }
+        })
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
     }
+  }
+
+  public async getHeartbeatPing(): Promise<number> {
+    if (FirestoreService.lastHeartbeatTimestamp > 0 && Date.now() - FirestoreService.lastHeartbeatTimestamp < 60000) {
+      return FirestoreService.lastHeartbeatTimestamp;
+    }
+
+    if (!this.projectId) return FirestoreService.lastHeartbeatTimestamp || Date.now();
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/botConfig/heartbeat${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json: any = await res.json();
+        const pingVal = json.fields?.lastPing?.integerValue;
+        if (pingVal) {
+          const ts = parseInt(pingVal, 10);
+          FirestoreService.lastHeartbeatTimestamp = ts;
+          return ts;
+        }
+      }
+    } catch (e) {}
+
+    return FirestoreService.lastHeartbeatTimestamp || Date.now();
   }
 
   public async clearAllConsultas(): Promise<void> {

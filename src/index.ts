@@ -381,30 +381,31 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
 }
 
 app.post('/api/heartbeat', async (c) => {
-  lastGatewayPingTimestamp = Date.now();
-  return c.json({ ok: true, timestamp: lastGatewayPingTimestamp });
+  const firestore = new FirestoreService(c.env);
+  await firestore.saveHeartbeatPing();
+  return c.json({ ok: true, timestamp: Date.now() });
 });
 
 app.get('/api/heartbeat-status', async (c) => {
-  const elapsed = Date.now() - lastGatewayPingTimestamp;
-  const elapsedSeconds = Math.floor(elapsed / 1000);
-  const isOnline = elapsed <= 60000;
+  const firestore = new FirestoreService(c.env);
+  const lastPing = await firestore.getHeartbeatPing();
+  const elapsed = Date.now() - lastPing;
+  const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
+  const isOnline = elapsed <= 90000;
 
   if (!isOnline) {
-    // Si pasaron más de 60s sin señal y no notificamos en los últimos 10 minutos
     if (Date.now() - lastAlertSentTimestamp > 600000) {
       lastAlertSentTimestamp = Date.now();
       c.executionCtx.waitUntil(sendDisconnectionAlerts(c.env, elapsedSeconds));
     }
   } else {
-    // Resetear timestamp de alerta al volver a estar online
     lastAlertSentTimestamp = 0;
   }
 
   return c.json({
     online: isOnline,
     elapsedSeconds,
-    lastPing: new Date(lastGatewayPingTimestamp).toISOString()
+    lastPing: new Date(lastPing).toISOString()
   });
 });
 
