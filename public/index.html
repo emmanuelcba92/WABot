@@ -1060,6 +1060,7 @@
 
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
     let previousConsultaIds = new Set();
+    let previousMsgCounts = new Map();
 
     let doctorList = [
       { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
@@ -2170,23 +2171,30 @@
         const data = await res.json();
         allConsultas = data.consultas || [];
 
-        // Detectar si ingresó una consulta Prioritaria nueva para reproducir alarma y notificación de escritorio
+        // Detectar si ingresó una consulta u otro mensaje Prioritario nuevo para reproducir alarma y notificación de escritorio
         let hasNewVipOrUrgent = false;
         allConsultas.forEach(c => {
-          if (!previousConsultaIds.has(c.id)) {
-            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
-            if (vipMatch) {
+          const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+          const isUrgentTag = (c.datos?.etiquetas || []).includes('urgente');
+
+          if (vipMatch || isUrgentTag) {
+            const respuestasPaciente = c.datos?.respuestasPaciente || [];
+            const currentCount = 1 + respuestasPaciente.length;
+            const prevCount = previousMsgCounts.get(c.id) || 0;
+
+            if (!previousConsultaIds.has(c.id) || currentCount > prevCount) {
               hasNewVipOrUrgent = true;
 
-              // Disparar Notificación de Escritorio OS
               if ('Notification' in window && Notification.permission === 'granted') {
-                const contactName = vipMatch.name || c.datos?.pushName || c.remitente;
-                const roleText = vipMatch.role ? ` (${vipMatch.role})` : '';
-                const msgBody = c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido';
+                const contactName = vipMatch ? (vipMatch.name || c.datos?.pushName || c.remitente) : (c.datos?.pushName || c.remitente);
+                const roleText = vipMatch?.role ? ` (${vipMatch.role})` : '';
+                const lastMsg = respuestasPaciente.length > 0
+                  ? respuestasPaciente[respuestasPaciente.length - 1].texto
+                  : (c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido');
 
                 try {
                   new Notification(`⭐ Mensaje Prioritario: ${contactName}${roleText}`, {
-                    body: msgBody,
+                    body: lastMsg,
                     icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
                     requireInteraction: true
                   });
@@ -2194,6 +2202,9 @@
               }
             }
           }
+
+          const respPac = c.datos?.respuestasPaciente || [];
+          previousMsgCounts.set(c.id, 1 + respPac.length);
         });
 
         previousConsultaIds = new Set(allConsultas.map(c => c.id));
@@ -2941,11 +2952,7 @@
 
           const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
           if (streamBox) {
-            if (allStreamMsgs.length <= 2) {
-              streamBox.scrollTop = 0;
-            } else {
-              streamBox.scrollTop = streamBox.scrollHeight;
-            }
+            streamBox.scrollTop = 0;
           }
         }
       }
