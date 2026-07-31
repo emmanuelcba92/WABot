@@ -6,7 +6,7 @@ export type DBProviderType = 'd1' | 'local' | 'firebase';
 
 export class DBFactory {
   // Configuración global del servidor (100% Cloudflare D1 por defecto)
-  private static globalProvider: DBProviderType = 'd1';
+  private static globalProvider: DBProviderType = 'firebase';
 
   public static setProvider(provider: DBProviderType) {
     this.globalProvider = provider;

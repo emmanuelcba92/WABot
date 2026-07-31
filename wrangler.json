@@ -10,7 +10,7 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "botwa-524e8",
     "FIREBASE_API_KEY": "",
-    "DB_PROVIDER": "d1"
+    "DB_PROVIDER": "firebase"
   },
   "d1_databases": [
     {
