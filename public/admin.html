@@ -862,14 +862,18 @@
         </button>
       </div>
 
-      <!-- SUB-SECCIÓN 5: PDFS PREDETERMINADOS -->
+      <!-- SUB-SECCIÓN 5: PDFS PREDETERMINADOS & BACKUP HÍBRIDO -->
       <div id="subSettingsPdf" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <div>
-            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">📄 Gestión de PDFs Predeterminados</h3>
-            <p style="font-size: 0.85rem; color: var(--muted);">Agrega o modifica los documentos PDF que las secretarias adjuntan en los envíos.</p>
+            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">📄 Gestión de PDFs Predeterminados (Respaldo Híbrido)</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Los PDFs se leen directo del disco rígido local de la PC (<code>C:\Archivos_Clinica\Plantillas_PDF\</code>) y se respaldan gratis en la nube de Cloudflare.</p>
+            <div style="font-size: 0.78rem; color: #34d399; font-weight: 700; margin-top: 4px;">☁️ Estado del Respaldo: Activo & Gratis de Por Vida en Cloudflare (10 GB gratis)</div>
           </div>
-          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewPdfItem()">➕ Agregar Documento PDF</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.82rem; border: 1px solid rgba(167, 139, 250, 0.4); color: #a78bfa;" onclick="restorePdfBackupFromCloudflare()">📥 Restaurar desde Cloudflare</button>
+            <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewPdfItem()">➕ Agregar Documento PDF</button>
+          </div>
         </div>
 
         <div id="pdfEditorList" style="display: flex; flex-direction: column; gap: 14px;">
@@ -877,7 +881,7 @@
         </div>
 
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="savePdfItemsConfig()">
-          💾 Guardar Lista de PDFs
+          💾 Guardar y Respaldar en la Nube de Cloudflare
         </button>
       </div>
 
@@ -1839,6 +1843,39 @@
 
     function updatePdfTitle(idx, val) { predefinedPdfsList[idx].title = val.trim(); }
     function updatePdfName(idx, val) { predefinedPdfsList[idx].name = val.trim(); }
+
+    async function savePdfItemsConfig() {
+      try {
+        const res = await fetch('/api/pdf-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: predefinedPdfsList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Lista de PDFs guardada y respaldada exitosamente en la nube de Cloudflare.');
+        }
+      } catch (e) {
+        alert('Error al guardar lista de PDFs.');
+      }
+    }
+
+    async function restorePdfBackupFromCloudflare() {
+      try {
+        const res = await fetch('/api/pdf-config');
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          predefinedPdfsList = data.items;
+          renderPdfEditor();
+          alert(`✅ ¡${data.items.length} plantilla(s) PDF restauradas exitosamente desde la nube de Cloudflare!`);
+        } else {
+          alert('ℹ️ No se encontraron plantillas de respaldo en la nube aún.');
+        }
+      } catch (e) {
+        alert('⚠️ Error al consultar el respaldo en Cloudflare.');
+      }
+    }
+
     function addNewPdfItem() {
       const id = `pdf_${Date.now()}`;
       predefinedPdfsList.push({ id, title: '📄 Nuevo Instructivo PDF', name: 'Documento_Instrucciones.pdf' });

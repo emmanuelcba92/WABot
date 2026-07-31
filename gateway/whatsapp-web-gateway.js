@@ -20,6 +20,14 @@ if (!fs.existsSync(mediaDir)) {
   fs.mkdirSync(mediaDir, { recursive: true });
 }
 
+const clinicPdfDir = 'C:\\Archivos_Clinica\\Plantillas_PDF';
+const fallbackPdfDir = path.join(__dirname, 'pdf_templates');
+try {
+  if (!fs.existsSync(clinicPdfDir)) fs.mkdirSync(clinicPdfDir, { recursive: true });
+} catch (e) {
+  if (!fs.existsSync(fallbackPdfDir)) fs.mkdirSync(fallbackPdfDir, { recursive: true });
+}
+
 const processedMsgIds = new Set();
 const sentMsgHistory = new Map(); // id -> timestamp
 

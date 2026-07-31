@@ -112,8 +112,8 @@ app.post('/api/quick-replies', async (c) => {
 });
 
 app.get('/api/pdf-config', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const items = await firestore.getPdfConfig();
+  const db = DBFactory.createService(c.env);
+  const items = await db.getPdfConfig();
   return c.json({ items });
 });
 
@@ -121,11 +121,24 @@ app.post('/api/pdf-config', async (c) => {
   try {
     const body = await c.req.json();
     const items = body.items || [];
-    const firestore = new FirestoreService(c.env);
-    await firestore.savePdfConfig(items);
+    const db = DBFactory.createService(c.env);
+    await db.savePdfConfig(items);
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar configuración de PDFs', details: e?.message }, 500);
+  }
+});
+
+app.post('/api/pdf-config/backup-template', async (c) => {
+  try {
+    const body = await c.req.json();
+    const db = DBFactory.createService(c.env);
+    const existing = await db.getPdfConfig();
+    const updated = [...existing.filter((p: any) => p.id !== body.id), body];
+    await db.savePdfConfig(updated);
+    return c.json({ success: true, message: 'PDF respaldado exitosamente en la nube de Cloudflare' });
+  } catch (e: any) {
+    return c.json({ error: 'Error al respaldar PDF en Cloudflare', details: e?.message }, 500);
   }
 });
 
