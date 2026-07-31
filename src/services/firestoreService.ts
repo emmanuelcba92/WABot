@@ -79,11 +79,11 @@ export const DEFAULT_TAGS: Record<string, TagDefinition> = {
 };
 
 export const DEFAULT_MENU_TREE: MenuTreeConfig = {
-  welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
+  welcomeMessage: `🟢 *Bienvenido al canal digital de COAT*\n\nHorario Lunes a Viernes de 8:00 a 20:00 hs. Guardia de ORL de 9:00 a 18:00 hs.\nSábados y Domingos cerrado.\n\n🚩 *Este número solo recibe mensajes escritos.*\n\nSu consulta será respondida dentro de las 48 hs hábiles.\n\nPor favor, responda con la letra de la opción que necesite:`,
   items: [
     {
       key: 'a',
-      label: 'Solicitar Turno (Consultas, Estudios o Cirugías)',
+      label: 'Si necesita solicitar turno',
       type: 'submenu',
       subItems: [
         { key: '1', label: 'Médico ORL (Otorrinolaringología)', type: 'form', responseTemplate: MESSAGES.PLANTILLA_A1_ORL },
@@ -91,10 +91,11 @@ export const DEFAULT_MENU_TREE: MenuTreeConfig = {
         { key: '3', label: 'Cirugías', type: 'form', responseTemplate: MESSAGES.PLANTILLA_A3_CIRUGIAS }
       ]
     },
-    { key: 'b', label: 'Autorización de Estudios / Órdenes Médicas', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_B },
+    { key: 'b', label: 'Si necesita autorización de estudios', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_B },
     { key: 'c', label: 'Consultas Generales / Ayuda', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_C },
-    { key: 'd', label: 'Atenciones Afiliados PAMI', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_D },
-    { key: 'e', label: 'Reprogramación o Cancelación de Turno', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_E }
+    { key: 'd', label: 'Consulta sobre cirugías programadas', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_D },
+    { key: 'e', label: 'Reprogramación o Cancelación de Turno', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_E },
+    { key: 'f', label: 'Si es afiliado de PAMI y quiere que lo contacten', type: 'form', responseTemplate: MESSAGES.PLANTILLA_OPCION_F }
   ]
 };
 
