@@ -8,7 +8,7 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "FIREBASE_PROJECT_ID": "wabot-cc80f",
+    "FIREBASE_PROJECT_ID": "botwa-524e8",
     "FIREBASE_API_KEY": "",
     "DB_PROVIDER": "d1"
   },
