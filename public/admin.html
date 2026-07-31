@@ -2304,6 +2304,24 @@
       }
     }
 
+    function getPhoneDisplay(c) {
+      if (!c) return '';
+      const datos = c.datos || {};
+      let num = '';
+
+      if (datos.altRemitente) {
+        num = datos.altRemitente.replace('@s.whatsapp.net', '').replace('@lid', '').trim();
+      } else if (c.remitente && !c.remitente.includes('@lid')) {
+        num = c.remitente.replace('@s.whatsapp.net', '').trim();
+      }
+
+      if (num && /^\d+$/.test(num)) {
+        return `+${num}`;
+      }
+
+      return c.remitente ? c.remitente.replace('@s.whatsapp.net', '') : '';
+    }
+
     function handleCustomFileUpload(cardId, fileInput) {
       const file = fileInput.files[0];
       if (file) {
@@ -2705,7 +2723,8 @@
             const etiquetas = datos.etiquetas || [];
             const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
             const isSel = selectedChatId === c.id;
-            const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName || c.remitente);
+            const phoneNum = getPhoneDisplay(c);
+            const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName ? `${datos.pushName} (${phoneNum})` : phoneNum);
             const lastMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje)';
             const fechaStr = new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
@@ -2866,7 +2885,7 @@
                 </div>
                 <div>
                   <h3 style="font-size: 1rem; font-weight: 700; color: #e9edef;">
-                    ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}
+                    ${datos.pushName ? `${datos.pushName} (${getPhoneDisplay(c)})` : getPhoneDisplay(c)}
                   </h3>
                   <div style="font-size: 0.75rem; color: #00a884; font-weight: 600;">
                     ${vipMatch ? `${vipMatch.name} (${vipMatch.role || 'Prioritario'})` : `Opción: ${c.opcion || 'Consulta'}`}

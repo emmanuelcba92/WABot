@@ -138,6 +138,11 @@ async function startWhatsAppGateway() {
           altRemitente = msg.key.participant;
         }
 
+        const realPhone = resolveRealPhone(remitente) || resolveRealPhone(altRemitente);
+        if (realPhone) {
+          altRemitente = `${realPhone}@s.whatsapp.net`;
+        }
+
         const pushName = msg.pushName || null;
 
         const msgId = msg.key.id;
