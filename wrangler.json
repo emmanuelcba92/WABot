@@ -10,13 +10,6 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "wabot-cc80f",
     "FIREBASE_API_KEY": "",
-    "DB_PROVIDER": "d1"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "wabot_coat_db",
-      "database_id": "wabot_coat_db_id"
-    }
-  ]
+    "DB_PROVIDER": "firebase"
+  }
 }
