@@ -98,6 +98,39 @@ app.post('/api/vip-contacts', async (c) => {
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar contactos VIP', details: e?.message }, 500);
+  app.get('/api/users', async (c) => {
+  const firestore = new FirestoreService(c.env);
+  const users = await firestore.getUsers();
+  return c.json({ users });
+});
+
+app.post('/api/users', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { username, email, role } = body;
+    if (!username || !role) {
+      return c.json({ error: 'Username y rol son requeridos' }, 400);
+    }
+    const firestore = new FirestoreService(c.env);
+    await firestore.saveUser({
+      username: username.toLowerCase().trim(),
+      email: (email || `${username}@coat.com.ar`).toLowerCase().trim(),
+      role: role === 'admin' ? 'admin' : 'secretaria'
+    });
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar usuario', details: e?.message }, 500);
+  }
+});
+
+app.delete('/api/users/:username', async (c) => {
+  try {
+    const username = c.req.param('username');
+    const firestore = new FirestoreService(c.env);
+    await firestore.deleteUser(username);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: 'Error al eliminar usuario', details: e?.message }, 500);
   }
 });
 

@@ -781,6 +781,7 @@
         <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
         <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
         <button class="sub-nav-btn" id="subTabDbBtn" onclick="switchSettingsSubTab('db')">🗄️ 8. Motor de Base de Datos</button>
+        <button class="sub-nav-btn" id="subTabUsersBtn" onclick="switchSettingsSubTab('users')">👥 9. Gestión de Usuarios & Roles</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -992,6 +993,57 @@
             <div style="font-size: 1.1rem; font-weight: 700; color: #f87171; margin-bottom: 6px;">🔥 Firebase Firestore</div>
             <div style="font-size: 0.82rem; color: #fbbf24; font-weight: 700; margin-bottom: 8px;">⚠️ Límite: 50.000 lecturas/día</div>
             <div style="font-size: 0.78rem; color: var(--muted);">Base de datos en la nube de Google Firebase (Plan Gratuito Spark).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-SECCIÓN 9: GESTIÓN DE USUARIOS Y ROLES (SOLO ADMINS) -->
+      <div id="subSettingsUsers" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">👥 Gestión de Usuarios y Roles</h3>
+          <p style="font-size: 0.86rem; color: var(--muted);">Crea y administra los accesos para el personal de la clínica. El dominio <strong>@coat.com.ar</strong> se agrega automáticamente.</p>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+          <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">➕ Crear Nuevo Usuario</h4>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 160px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Usuario (sin @)</label>
+              <input type="text" id="newUsernameInput" placeholder="ej: mgarcia" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+            </div>
+            <div style="flex: 1; min-width: 160px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Contraseña</label>
+              <input type="password" id="newUserPasswordInput" placeholder="••••••••" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+            </div>
+            <div style="width: 160px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Rol de Acceso</label>
+              <select id="newUserRoleSelect" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+                <option value="secretaria">Secretaría</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); color: #fff; font-weight: 700; height: 38px;" onclick="createNewUserSubmit()">
+              ➕ Crear Usuario
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700; margin-bottom: 12px;">📋 Usuarios Registrados</h4>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border); color: var(--muted);">
+                  <th style="padding: 10px;">Usuario</th>
+                  <th style="padding: 10px;">Email</th>
+                  <th style="padding: 10px;">Rol</th>
+                  <th style="padding: 10px; text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--muted);">Cargando usuarios...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1976,6 +2028,7 @@
     }
 
     function switchSettingsSubTab(subTab) {
+      window._currentSubTab = subTab;
       const secSched = document.getElementById('subSettingsSchedule');
       const secTree = document.getElementById('subSettingsTree');
       const secTags = document.getElementById('subSettingsTags');
@@ -1984,6 +2037,7 @@
       const secVip = document.getElementById('subSettingsVip');
       const secDoc = document.getElementById('subSettingsDoctor');
       const secDb = document.getElementById('subSettingsDb');
+      const secUsers = document.getElementById('subSettingsUsers');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
@@ -1993,9 +2047,10 @@
       const btnVip = document.getElementById('subTabVipBtn');
       const btnDoc = document.getElementById('subTabDocBtn');
       const btnDb = document.getElementById('subTabDbBtn');
+      const btnUsers = document.getElementById('subTabUsersBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb].filter(Boolean).forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb].filter(Boolean).forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers].filter(Boolean).forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers].filter(Boolean).forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -2023,6 +2078,10 @@
       } else if (subTab === 'db') {
         if (secDb) secDb.style.display = 'flex';
         if (btnDb) btnDb.classList.add('active');
+      } else if (subTab === 'users') {
+        if (secUsers) secUsers.style.display = 'flex';
+        if (btnUsers) btnUsers.classList.add('active');
+        renderUsersEditor();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
@@ -2350,6 +2409,116 @@
         }
       } catch (e) {
         alert('Error al guardar el menú del bot.');
+      }
+    }
+
+    async function renderUsersEditor() {
+      const tbody = document.getElementById('usersTableBody');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch('/api/users');
+        const data = await res.json();
+        const users = data.users || [];
+
+        if (users.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--muted);">No hay usuarios registrados aún.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => {
+          const isAdmin = u.role === 'admin';
+          const roleBadge = isAdmin
+            ? `<span style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.75rem;">🛡️ Administrador</span>`
+            : `<span style="background: rgba(52, 211, 153, 0.2); color: #34d399; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 0.75rem;">👩‍💼 Secretaría</span>`;
+
+          return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <td style="padding: 12px; font-weight: 700; color: #fff;">👤 ${u.username}</td>
+              <td style="padding: 12px; color: var(--muted);">${u.email}</td>
+              <td style="padding: 12px;">${roleBadge}</td>
+              <td style="padding: 12px; text-align: right;">
+                <button class="btn btn-secondary" onclick="deleteUserSubmit('${u.username}')" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239,68,68,0.3); font-size: 0.78rem; padding: 4px 10px;">
+                  🗑️ Eliminar
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--error);">Error al cargar usuarios.</td></tr>`;
+      }
+    }
+
+    async function createNewUserSubmit() {
+      const usernameInput = document.getElementById('newUsernameInput');
+      const passwordInput = document.getElementById('newUserPasswordInput');
+      const roleSelect = document.getElementById('newUserRoleSelect');
+
+      const username = usernameInput.value.trim().toLowerCase();
+      const password = passwordInput.value;
+      const role = roleSelect.value;
+
+      if (!username || !password) {
+        alert('Por favor completá usuario y contraseña.');
+        return;
+      }
+
+      const email = `${username}@coat.com.ar`;
+
+      try {
+        const resConfig = await fetch('/api/firebase-config');
+        const config = await resConfig.json();
+
+        if (config.apiKey && typeof firebase !== 'undefined') {
+          let secondaryApp;
+          const appName = `SecApp_${Date.now()}`;
+          secondaryApp = firebase.initializeApp(config, appName);
+          await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+          await secondaryApp.delete();
+        }
+
+        const resSave = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, role })
+        });
+
+        if (resSave.ok) {
+          alert(`✅ Usuario "${username}" creado exitosamente con rol ${role.toUpperCase()}.`);
+          usernameInput.value = '';
+          passwordInput.value = '';
+          renderUsersEditor();
+        } else {
+          alert('⚠️ El usuario se creó en Firebase pero ocurrió un error guardando el rol.');
+        }
+      } catch(err) {
+        const code = err.code || '';
+        if (code === 'auth/email-already-in-use') {
+          alert(`ℹ️ El usuario "${username}" ya existe en Firebase. Actualizando rol a ${role.toUpperCase()}...`);
+          await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, role })
+          });
+          renderUsersEditor();
+        } else {
+          alert('⚠️ Error al crear usuario: ' + (err.message || code));
+        }
+      }
+    }
+
+    async function deleteUserSubmit(username) {
+      if (!confirm(`¿Estás seguro de eliminar al usuario "${username}"?`)) return;
+
+      try {
+        const res = await fetch(`/api/users/${username}`, { method: 'DELETE' });
+        if (res.ok) {
+          alert(`✅ Usuario "${username}" eliminado.`);
+          renderUsersEditor();
+        }
+      } catch(e) {
+        alert('⚠️ Error al eliminar usuario.');
       }
     }
 

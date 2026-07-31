@@ -363,8 +363,80 @@ export class FirestoreService {
           fields: this.toFirestoreFields({ tags, updatedAt: new Date().toISOString() })
         })
       });
+  public static globalUsersList: Array<{ username: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }> = [
+    { username: 'egomez', email: 'egomez@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
+  ];
+
+  public async getUsers(): Promise<Array<{ username: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }>> {
+    if (!this.projectId) return FirestoreService.globalUsersList;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/users_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: any = await res.json();
+        const fields = this.fromFirestoreFields(data.fields || {});
+        if (fields && fields.users && Array.isArray(fields.users)) {
+          FirestoreService.globalUsersList = fields.users;
+          return fields.users;
+        }
+      }
+    } catch (e) {}
+
+    return FirestoreService.globalUsersList;
+  }
+
+  public async saveUser(user: { username: string; email: string; role: 'admin' | 'secretaria' }): Promise<void> {
+    const users = await this.getUsers();
+    const existingIdx = users.findIndex(u => u.username.toLowerCase() === user.username.toLowerCase() || u.email.toLowerCase() === user.email.toLowerCase());
+    const newUserItem = {
+      username: user.username.toLowerCase().trim(),
+      email: user.email.toLowerCase().trim(),
+      role: user.role,
+      createdAt: new Date().toISOString()
+    };
+
+    if (existingIdx >= 0) {
+      users[existingIdx] = { ...users[existingIdx], role: user.role };
+    } else {
+      users.push(newUserItem);
+    }
+
+    FirestoreService.globalUsersList = users;
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/users_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ users, updatedAt: new Date().toISOString() })
+        })
+      });
     } catch (e) {
-      console.error('Error al guardar tag_config en Firestore:', e);
+      console.error('Error al guardar usuario en Firestore:', e);
+    }
+  }
+
+  public async deleteUser(username: string): Promise<void> {
+    let users = await this.getUsers();
+    users = users.filter(u => u.username.toLowerCase() !== username.toLowerCase() && u.email.toLowerCase() !== `${username.toLowerCase()}@coat.com.ar`);
+    FirestoreService.globalUsersList = users;
+
+    if (!this.projectId) return;
+
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones/users_config${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: this.toFirestoreFields({ users, updatedAt: new Date().toISOString() })
+        })
+      });
+    } catch (e) {
+      console.error('Error al eliminar usuario en Firestore:', e);
     }
   }
 
