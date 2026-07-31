@@ -363,6 +363,11 @@ export class FirestoreService {
           fields: this.toFirestoreFields({ tags, updatedAt: new Date().toISOString() })
         })
       });
+    } catch (e) {
+      console.error('Error al guardar tag_config en Firestore:', e);
+    }
+  }
+
   public static globalUsersList: Array<{ username: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }> = [
     { username: 'egomez', email: 'egomez@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
   ];

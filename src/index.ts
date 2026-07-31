@@ -98,7 +98,10 @@ app.post('/api/vip-contacts', async (c) => {
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar contactos VIP', details: e?.message }, 500);
-  app.get('/api/users', async (c) => {
+  }
+});
+
+app.get('/api/users', async (c) => {
   const firestore = new FirestoreService(c.env);
   const users = await firestore.getUsers();
   return c.json({ users });
