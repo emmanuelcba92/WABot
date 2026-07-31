@@ -6,13 +6,16 @@ export type DBProviderType = 'd1' | 'local' | 'firebase';
 
 export class DBFactory {
   // Configuración global del servidor para todas las PCs de la clínica
-  private static globalProvider: DBProviderType = 'd1';
+  private static globalProvider: DBProviderType = 'firebase';
 
   public static setProvider(provider: DBProviderType) {
     this.globalProvider = provider;
   }
 
   public static getProvider(env?: Env): DBProviderType {
+    if (env?.DB_PROVIDER && ['d1', 'local', 'firebase'].includes(env.DB_PROVIDER.toLowerCase())) {
+      return (env.DB_PROVIDER.toLowerCase() as DBProviderType) || this.globalProvider;
+    }
     return this.globalProvider;
   }
 
