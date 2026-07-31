@@ -369,12 +369,14 @@ export class D1Service {
     D1Service.lastHeartbeatTs = now;
     if (!this.db) return true;
     try {
+      await this.initTables();
       await this.db
         .prepare('INSERT INTO heartbeat (id, lastPing) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET lastPing = ?')
         .bind('ping', now, now)
         .run();
       return true;
     } catch (e) {
+      console.error('Error saving heartbeat to D1:', e);
       return false;
     }
   }
@@ -385,6 +387,7 @@ export class D1Service {
     }
     if (!this.db) return D1Service.lastHeartbeatTs;
     try {
+      await this.initTables();
       const row = await this.db.prepare('SELECT lastPing FROM heartbeat WHERE id = ?').bind('ping').first();
       if (row && row.lastPing) {
         D1Service.lastHeartbeatTs = row.lastPing;
