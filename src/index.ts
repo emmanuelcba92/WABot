@@ -391,7 +391,7 @@ app.get('/api/heartbeat-status', async (c) => {
   const lastPing = await firestore.getHeartbeatPing();
   const elapsed = Date.now() - lastPing;
   const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
-  const isOnline = elapsed <= 90000;
+  const isOnline = elapsed <= 60000;
 
   if (!isOnline) {
     if (Date.now() - lastAlertSentTimestamp > 600000) {
