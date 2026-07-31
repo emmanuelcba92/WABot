@@ -1,6 +1,8 @@
 export interface Env {
   FIREBASE_PROJECT_ID?: string;
   FIREBASE_API_KEY?: string;
+  DB_PROVIDER?: string;
+  DB?: any;
   SUPABASE_URL?: string;
   SUPABASE_KEY?: string;
   SUPABASE_BUCKET?: string;

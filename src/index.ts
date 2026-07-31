@@ -4,6 +4,7 @@ import { Env, WebhookPayload } from './types';
 import { StateEngine } from './stateMachine/engine';
 import { MESSAGES } from './templates/messages';
 import { FirestoreService, DEFAULT_MENU_TREE } from './services/firestoreService';
+import { DBFactory, DBProviderType } from './services/dbFactory';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -19,6 +20,22 @@ app.get('/health', (c) => {
     timestamp: new Date().toISOString(),
     service: 'WA Bot Clínica Worker'
   });
+});
+
+app.get('/api/db-provider', (c) => {
+  const provider = DBFactory.getProvider(c.env);
+  return c.json({ provider });
+});
+
+app.post('/api/db-provider', async (c) => {
+  try {
+    const body = await c.req.json();
+    const provider = (body.provider || 'd1').toLowerCase() as DBProviderType;
+    DBFactory.setProvider(provider);
+    return c.json({ success: true, provider });
+  } catch (e: any) {
+    return c.json({ error: 'Error al cambiar proveedor de base de datos', details: e?.message }, 500);
+  }
 });
 
 // RUTAS PRINCIPALES DE NAVEGACIÓN DE LA WEB APP
