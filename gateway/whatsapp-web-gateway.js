@@ -11,9 +11,9 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-const WORKER_WEBHOOK_URL = 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
-const WORKER_PENDING_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
-const WORKER_HEARTBEAT_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/heartbeat';
+const WORKER_WEBHOOK_URL = 'https://app.cpcoat.workers.dev/webhook';
+const WORKER_PENDING_URL = 'https://app.cpcoat.workers.dev/api/pending-outgoing';
+const WORKER_HEARTBEAT_URL = 'https://app.cpcoat.workers.dev/api/heartbeat';
 
 const mediaDir = path.join(__dirname, 'media');
 if (!fs.existsSync(mediaDir)) {
