@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión — Clínica COAT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b141a;
+      --card: #1e293b;
+      --accent: #00a884;
+      --accent-glow: rgba(0, 168, 132, 0.35);
+      --text: #f8fafc;
+      --muted: #64748b;
+      --border: rgba(255,255,255,0.1);
+      --error: #f87171;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated background blobs */
+    .bg-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      animation: blobFloat 8s ease-in-out infinite alternate;
+    }
+    .bg-blob-1 { width: 500px; height: 500px; background: #00a884; top: -150px; left: -150px; animation-delay: 0s; }
+    .bg-blob-2 { width: 400px; height: 400px; background: #6366f1; bottom: -100px; right: -100px; animation-delay: 3s; }
+    .bg-blob-3 { width: 300px; height: 300px; background: #0ea5e9; top: 50%; left: 50%; transform: translate(-50%,-50%); animation-delay: 1.5s; }
+
+    @keyframes blobFloat {
+      from { transform: scale(1) translate(0,0); }
+      to   { transform: scale(1.12) translate(20px, 15px); }
+    }
+
+    .login-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 440px;
+      padding: 24px;
+    }
+
+    .login-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px;
+      padding: 48px 40px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,168,132,0.08);
+    }
+
+    .logo-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #00a884, #059669);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 8px 32px var(--accent-glow);
+    }
+
+    .logo-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, #00a884);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 0.95rem;
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 500;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .domain-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .domain-hint span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .pass-toggle {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 0;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .pass-toggle:hover { color: var(--accent); }
+
+    input[type="password"] { padding-right: 44px; }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #00a884, #059669);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      cursor: pointer;
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+      transition: opacity 0.2s, transform 0.15s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      letter-spacing: 0.3px;
+    }
+
+    .btn-login:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-login:active:not(:disabled) { transform: translateY(0); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-login .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-login.loading .btn-text { display: none; }
+    .btn-login.loading .spinner { display: block; }
+
+    .error-msg {
+      display: none;
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.83rem;
+      color: var(--error);
+      font-weight: 500;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .error-msg.show { display: block; }
+
+    .footer-info {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .footer-info strong { color: rgba(255,255,255,0.35); }
+
+    /* Live preview of full email */
+    #emailPreview {
+      font-style: italic;
+      color: rgba(148, 163, 184, 0.6);
+    }
+    #emailPreviewUser {
+      color: var(--accent);
+      font-style: normal;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-blob bg-blob-3"></div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="logo-area">
+        <div class="logo-icon">🏥</div>
+        <div class="logo-title">Clínica COAT</div>
+        <div class="logo-subtitle">Sistema de Gestión de Turnos y WhatsApp</div>
+      </div>
+
+      <div id="errorMsg" class="error-msg"></div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="usernameInput">👤 Usuario</label>
+          <input
+            type="text"
+            id="usernameInput"
+            placeholder="ej: emmanuel"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          >
+          <div class="domain-hint">
+            📧 Accedés como:
+            <span id="emailPreview"><span id="emailPreviewUser">tu_usuario</span>@coat.com.ar</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="passwordInput">🔑 Contraseña</label>
+          <div class="input-wrapper">
+            <input
+              type="password"
+              id="passwordInput"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              required
+            >
+            <button type="button" class="pass-toggle" onclick="togglePassword()" title="Mostrar/ocultar contraseña">
+              <span id="eyeIcon">👁️</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-login" id="loginBtn">
+          <span class="btn-text">Iniciar Sesión →</span>
+          <span class="spinner"></span>
+        </button>
+      </form>
+
+      <div class="footer-info">
+        ¿Olvidaste tu contraseña? Contactá al <strong>administrador del sistema</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+  <script>
+    let firebaseReady = false;
+
+    // Actualizar preview en tiempo real
+    const usernameInput = document.getElementById('usernameInput');
+    const emailPreviewUser = document.getElementById('emailPreviewUser');
+    usernameInput.addEventListener('input', () => {
+      const val = usernameInput.value.trim() || 'tu_usuario';
+      emailPreviewUser.textContent = val;
+    });
+
+    // Toggle contraseña
+    function togglePassword() {
+      const inp = document.getElementById('passwordInput');
+      const icon = document.getElementById('eyeIcon');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.textContent = '🙈';
+      } else {
+        inp.type = 'password';
+        icon.textContent = '👁️';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function hideError() {
+      document.getElementById('errorMsg').classList.remove('show');
+    }
+
+    function setLoading(val) {
+      const btn = document.getElementById('loginBtn');
+      if (val) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    // Inicializar Firebase desde el endpoint del servidor
+    async function initFirebase() {
+      try {
+        const res = await fetch('/api/firebase-config');
+        const config = await res.json();
+        if (!config.apiKey) {
+          showError('⚠️ Configuración de Firebase incompleta. Contactá al administrador.');
+          return false;
+        }
+        if (!firebase.apps.length) {
+          firebase.initializeApp(config);
+        }
+        firebaseReady = true;
+        return true;
+      } catch (e) {
+        showError('⚠️ No se pudo conectar con el servidor. Verificá tu conexión.');
+        return false;
+      }
+    }
+
+    // Verificar si ya está autenticado → redirigir
+    async function checkAlreadyLoggedIn() {
+      const ok = await initFirebase();
+      if (!ok) return;
+      firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+          window.location.replace('/');
+        }
+      });
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      hideError();
+
+      const username = document.getElementById('usernameInput').value.trim().toLowerCase();
+      const password = document.getElementById('passwordInput').value;
+
+      if (!username || !password) {
+        showError('Completá usuario y contraseña.');
+        return;
+      }
+
+      const email = `${username}@coat.com.ar`;
+      setLoading(true);
+
+      try {
+        if (!firebaseReady) {
+          const ok = await initFirebase();
+          if (!ok) { setLoading(false); return; }
+        }
+
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+        // Éxito → redirigir al panel principal
+        window.location.replace('/');
+      } catch (err) {
+        setLoading(false);
+        const code = err.code || '';
+        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+          showError('❌ Usuario o contraseña incorrectos. Verificá tus datos.');
+        } else if (code === 'auth/too-many-requests') {
+          showError('⏳ Demasiados intentos. Esperá unos minutos e intentá de nuevo.');
+        } else if (code === 'auth/network-request-failed') {
+          showError('🌐 Sin conexión a internet. Verificá tu red.');
+        } else {
+          showError('⚠️ Error al iniciar sesión: ' + (err.message || code));
+        }
+      }
+    }
+
+    // Al cargar la página
+    checkAlreadyLoggedIn();
+  </script>
+</body>
+</html>

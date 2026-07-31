@@ -603,8 +603,58 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
   </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+  <script>
+    // AUTH GUARD: verificar sesión antes de mostrar la página
+    (async function() {
+      try {
+        const res = await fetch('/api/firebase-config');
+        const config = await res.json();
+        if (config.apiKey) {
+          if (!firebase.apps.length) firebase.initializeApp(config);
+          firebase.auth().onAuthStateChanged((user) => {
+            if (!user) {
+              window.location.replace('/login.html');
+            } else {
+              // Guardar info del usuario globalmente
+              window._currentUser = user;
+              window._currentUserName = user.displayName || user.email.split('@')[0];
+              document.getElementById('authLoadingOverlay').style.display = 'none';
+              // Actualizar badge de usuario
+              const nameEl = document.getElementById('currentUserName');
+              if (nameEl) nameEl.textContent = window._currentUserName;
+            }
+          });
+        } else {
+          // Sin apiKey → modo sin auth, ocultar overlay
+          document.getElementById('authLoadingOverlay').style.display = 'none';
+        }
+      } catch(e) {
+        document.getElementById('authLoadingOverlay').style.display = 'none';
+      }
+    })();
+
+    function logout() {
+      if (confirm('¿Cerrar sesión?')) {
+        firebase.auth().signOut().then(() => {
+          window.location.replace('/login.html');
+        });
+      }
+    }
+  </script>
 </head>
 <body>
+
+  <!-- Loading overlay mientras verifica auth -->
+  <div id="authLoadingOverlay" style="position:fixed;inset:0;background:#0b141a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px;">
+    <div style="width:44px;height:44px;border:3px solid rgba(0,168,132,0.3);border-top-color:#00a884;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <p style="color:#64748b;font-family:sans-serif;font-size:0.9rem;">Verificando sesión...</p>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  </div>
 
   <header>
     <div class="brand">
@@ -633,11 +683,12 @@
         🗄️ BD: Cloudflare D1 (5M/día)
       </div>
 
-      <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 4px 12px; border-radius: 20px; display: flex; align-items: center; gap: 6px;">
-        <span>👤 Mi Nombre:</span>
-        <input type="text" id="operatorNameInput" style="background: transparent; border: none; color: #fff; font-weight: 700; font-size: 0.82rem; width: 110px; outline: none;" onchange="updateOperatorName(this.value)" placeholder="Tu nombre...">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px;">
+        <span>👤</span>
+        <span id="currentUserName" style="color:#fff;">Cargando...</span>
       </div>
       <button class="btn btn-secondary" onclick="fetchConsultas(true)">🔄 Actualizar</button>
+      <button class="btn btn-secondary" onclick="logout()" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.4);color:#f87171;" title="Cerrar sesión">🚪 Salir</button>
     </div>
   </header>
 

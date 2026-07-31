@@ -38,6 +38,14 @@ app.post('/api/db-provider', async (c) => {
   }
 });
 
+app.get('/api/firebase-config', (c) => {
+  return c.json({
+    apiKey: c.env.FIREBASE_API_KEY || '',
+    authDomain: `${c.env.FIREBASE_PROJECT_ID || 'botwa-524e8'}.firebaseapp.com`,
+    projectId: c.env.FIREBASE_PROJECT_ID || 'botwa-524e8'
+  });
+});
+
 // RUTAS PRINCIPALES DE NAVEGACIÓN DE LA WEB APP
 app.get('/test', async (c) => {
   if (c.env.ASSETS) {
