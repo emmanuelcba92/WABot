@@ -1099,19 +1099,16 @@
     let openTagDropdowns = new Set();
     let lastRenderedChatId = null;
     let lastRenderedChatJson = '';
-    let currentDbProvider = localStorage.getItem('wabot_db_provider') || 'd1';
+    let currentDbProvider = 'd1';
 
     async function checkDbProvider() {
       try {
-        const res = await fetch('/api/db-provider', {
-          headers: { 'x-db-provider': currentDbProvider }
-        });
+        const res = await fetch('/api/db-provider');
         const data = await res.json();
-        if (data.provider && !localStorage.getItem('wabot_db_provider')) {
+        if (data.provider) {
           currentDbProvider = data.provider.toLowerCase();
-          localStorage.setItem('wabot_db_provider', currentDbProvider);
+          updateDbProviderBadge();
         }
-        updateDbProviderBadge();
       } catch (e) {
         updateDbProviderBadge();
       }
@@ -1121,17 +1118,17 @@
       const badge = document.getElementById('dbProviderBadge');
       if (badge) {
         if (currentDbProvider === 'd1') {
-          badge.innerHTML = '🗄️ BD: Cloudflare D1 (5M/día)';
+          badge.innerHTML = '🗄️ BD General: Cloudflare D1 (5M/día)';
           badge.style.color = '#a78bfa';
           badge.style.borderColor = 'rgba(167, 139, 250, 0.4)';
           badge.style.background = 'rgba(167, 139, 250, 0.15)';
         } else if (currentDbProvider === 'local') {
-          badge.innerHTML = '💻 BD: PC Local (Ilimitado)';
+          badge.innerHTML = '💻 BD General: PC Local (Ilimitado)';
           badge.style.color = '#34d399';
           badge.style.borderColor = 'rgba(52, 211, 153, 0.4)';
           badge.style.background = 'rgba(52, 211, 153, 0.15)';
         } else {
-          badge.innerHTML = '🔥 BD: Firebase Firestore (50k/día)';
+          badge.innerHTML = '🔥 BD General: Firebase Firestore (50k/día)';
           badge.style.color = '#f87171';
           badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
           badge.style.background = 'rgba(248, 113, 113, 0.15)';
@@ -1147,23 +1144,22 @@
     }
 
     async function selectDbProvider(targetProvider) {
-      currentDbProvider = targetProvider;
-      localStorage.setItem('wabot_db_provider', targetProvider);
-      updateDbProviderBadge();
-
       try {
-        await fetch('/api/db-provider', {
+        const res = await fetch('/api/db-provider', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-db-provider': targetProvider
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ provider: targetProvider })
         });
-      } catch (e) {}
-
-      alert(`🗄️ Base de Datos cambiada exitosamente a: ${targetProvider.toUpperCase()}`);
-      fetchConsultas(true);
+        const data = await res.json();
+        if (data.success) {
+          currentDbProvider = targetProvider;
+          updateDbProviderBadge();
+          alert(`🌐 Base de Datos GENERAL del Servidor cambiada a: ${targetProvider.toUpperCase()}.\nTodas las PCs de la clínica ahora usarán esta base de datos.`);
+          fetchConsultas(true);
+        }
+      } catch (e) {
+        alert('⚠️ Error al guardar la configuración global de Base de Datos.');
+      }
     }
 
     async function cycleDbProvider() {
