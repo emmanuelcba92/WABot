@@ -1031,11 +1031,17 @@ export class FirestoreService {
     }
   }
 
-  public static lastHeartbeatTimestamp = Date.now();
+  public static lastHeartbeatTimestamp = 0;
 
   public async saveHeartbeatPing(): Promise<boolean> {
-    FirestoreService.lastHeartbeatTimestamp = Date.now();
+    const now = Date.now();
+    FirestoreService.lastHeartbeatTimestamp = now;
     if (!this.projectId) return true;
+
+    // Throttle writes a Firestore a 1 vez cada 3 minutos para ahorrar cuotas gratis
+    if (now - FirestoreService.lastHeartbeatFirestoreWrite < 180000) {
+      return true;
+    }
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/botConfig/heartbeat${this.apiKey ? `?key=${this.apiKey}` : ''}`;
@@ -1044,10 +1050,13 @@ export class FirestoreService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fields: {
-            lastPing: { integerValue: String(Date.now()) }
+            lastPing: { integerValue: String(now) }
           }
         })
       });
+      if (res.ok) {
+        FirestoreService.lastHeartbeatFirestoreWrite = now;
+      }
       return res.ok;
     } catch (e) {
       return false;
@@ -1059,7 +1068,7 @@ export class FirestoreService {
       return FirestoreService.lastHeartbeatTimestamp;
     }
 
-    if (!this.projectId) return FirestoreService.lastHeartbeatTimestamp || Date.now();
+    if (!this.projectId) return FirestoreService.lastHeartbeatTimestamp;
 
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/botConfig/heartbeat${this.apiKey ? `?key=${this.apiKey}` : ''}`;
@@ -1075,7 +1084,7 @@ export class FirestoreService {
       }
     } catch (e) {}
 
-    return FirestoreService.lastHeartbeatTimestamp || Date.now();
+    return FirestoreService.lastHeartbeatTimestamp;
   }
 
   public async clearAllConsultas(): Promise<void> {

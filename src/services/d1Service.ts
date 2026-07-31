@@ -331,12 +331,16 @@ export class D1Service {
     } catch (e) {}
   }
 
+  private static lastHeartbeatTs = 0;
+
   public async saveHeartbeatPing(): Promise<boolean> {
+    const now = Date.now();
+    D1Service.lastHeartbeatTs = now;
     if (!this.db) return true;
     try {
       await this.db
         .prepare('INSERT INTO heartbeat (id, lastPing) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET lastPing = ?')
-        .bind('ping', Date.now(), Date.now())
+        .bind('ping', now, now)
         .run();
       return true;
     } catch (e) {
@@ -345,14 +349,18 @@ export class D1Service {
   }
 
   public async getHeartbeatPing(): Promise<number> {
-    if (!this.db) return Date.now();
+    if (D1Service.lastHeartbeatTs > 0 && Date.now() - D1Service.lastHeartbeatTs < 60000) {
+      return D1Service.lastHeartbeatTs;
+    }
+    if (!this.db) return D1Service.lastHeartbeatTs;
     try {
       const row = await this.db.prepare('SELECT lastPing FROM heartbeat WHERE id = ?').bind('ping').first();
       if (row && row.lastPing) {
+        D1Service.lastHeartbeatTs = row.lastPing;
         return row.lastPing;
       }
     } catch (e) {}
-    return Date.now();
+    return D1Service.lastHeartbeatTs;
   }
 
   public async saveSesion(remitente: string, estado: string, datosTemporales?: Record<string, any>): Promise<void> {}

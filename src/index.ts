@@ -411,17 +411,17 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
 }
 
 app.post('/api/heartbeat', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  await firestore.saveHeartbeatPing();
+  const db = DBFactory.createService(c.env);
+  await db.saveHeartbeatPing();
   return c.json({ ok: true, timestamp: Date.now() });
 });
 
 app.get('/api/heartbeat-status', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const lastPing = await firestore.getHeartbeatPing();
-  const elapsed = Date.now() - lastPing;
+  const db = DBFactory.createService(c.env);
+  const lastPing = await db.getHeartbeatPing();
+  const elapsed = lastPing > 0 ? Date.now() - lastPing : 999999999;
   const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
-  const isOnline = elapsed <= 60000;
+  const isOnline = lastPing > 0 && elapsed <= 60000;
 
   if (!isOnline) {
     if (Date.now() - lastAlertSentTimestamp > 600000) {
@@ -435,7 +435,7 @@ app.get('/api/heartbeat-status', async (c) => {
   return c.json({
     online: isOnline,
     elapsedSeconds,
-    lastPing: new Date(lastPing).toISOString()
+    lastPing: lastPing > 0 ? new Date(lastPing).toISOString() : null
   });
 });
 
