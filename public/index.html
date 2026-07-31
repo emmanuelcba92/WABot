@@ -1099,61 +1099,77 @@
     let openTagDropdowns = new Set();
     let lastRenderedChatId = null;
     let lastRenderedChatJson = '';
-    let currentDbProvider = 'd1';
+    let currentDbProvider = localStorage.getItem('wabot_db_provider') || 'd1';
 
     async function checkDbProvider() {
       try {
-        const res = await fetch('/api/db-provider');
+        const res = await fetch('/api/db-provider', {
+          headers: { 'x-db-provider': currentDbProvider }
+        });
         const data = await res.json();
-        if (data.provider) {
+        if (data.provider && !localStorage.getItem('wabot_db_provider')) {
           currentDbProvider = data.provider.toLowerCase();
-          updateDbProviderBadge();
+          localStorage.setItem('wabot_db_provider', currentDbProvider);
         }
-      } catch (e) {}
+        updateDbProviderBadge();
+      } catch (e) {
+        updateDbProviderBadge();
+      }
     }
 
     function updateDbProviderBadge() {
       const badge = document.getElementById('dbProviderBadge');
-      if (!badge) return;
-      if (currentDbProvider === 'd1') {
-        badge.innerHTML = '🗄️ BD: Cloudflare D1 (5M/día)';
-        badge.style.color = '#a78bfa';
-        badge.style.borderColor = 'rgba(167, 139, 250, 0.4)';
-        badge.style.background = 'rgba(167, 139, 250, 0.15)';
-      } else if (currentDbProvider === 'local') {
-        badge.innerHTML = '💻 BD: PC Local (Ilimitado)';
-        badge.style.color = '#34d399';
-        badge.style.borderColor = 'rgba(52, 211, 153, 0.4)';
-        badge.style.background = 'rgba(52, 211, 153, 0.15)';
-      } else {
-        badge.innerHTML = '🔥 BD: Firebase Firestore (50k/día)';
-        badge.style.color = '#f87171';
-        badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
-        badge.style.background = 'rgba(248, 113, 113, 0.15)';
+      if (badge) {
+        if (currentDbProvider === 'd1') {
+          badge.innerHTML = '🗄️ BD: Cloudflare D1 (5M/día)';
+          badge.style.color = '#a78bfa';
+          badge.style.borderColor = 'rgba(167, 139, 250, 0.4)';
+          badge.style.background = 'rgba(167, 139, 250, 0.15)';
+        } else if (currentDbProvider === 'local') {
+          badge.innerHTML = '💻 BD: PC Local (Ilimitado)';
+          badge.style.color = '#34d399';
+          badge.style.borderColor = 'rgba(52, 211, 153, 0.4)';
+          badge.style.background = 'rgba(52, 211, 153, 0.15)';
+        } else {
+          badge.innerHTML = '🔥 BD: Firebase Firestore (50k/día)';
+          badge.style.color = '#f87171';
+          badge.style.borderColor = 'rgba(248, 113, 113, 0.4)';
+          badge.style.background = 'rgba(248, 113, 113, 0.15)';
+        }
       }
+
+      const cardD1 = document.getElementById('dbCardD1');
+      const cardLocal = document.getElementById('dbCardLocal');
+      const cardFirebase = document.getElementById('dbCardFirebase');
+      if (cardD1) cardD1.style.border = currentDbProvider === 'd1' ? '2px solid #a78bfa' : '2px solid var(--border)';
+      if (cardLocal) cardLocal.style.border = currentDbProvider === 'local' ? '2px solid #34d399' : '2px solid var(--border)';
+      if (cardFirebase) cardFirebase.style.border = currentDbProvider === 'firebase' ? '2px solid #f87171' : '2px solid var(--border)';
+    }
+
+    async function selectDbProvider(targetProvider) {
+      currentDbProvider = targetProvider;
+      localStorage.setItem('wabot_db_provider', targetProvider);
+      updateDbProviderBadge();
+
+      try {
+        await fetch('/api/db-provider', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-db-provider': targetProvider
+          },
+          body: JSON.stringify({ provider: targetProvider })
+        });
+      } catch (e) {}
+
+      alert(`🗄️ Base de Datos cambiada exitosamente a: ${targetProvider.toUpperCase()}`);
+      fetchConsultas(true);
     }
 
     async function cycleDbProvider() {
       const providers = ['d1', 'local', 'firebase'];
       const nextIdx = (providers.indexOf(currentDbProvider) + 1) % providers.length;
-      const targetProvider = providers[nextIdx];
-
-      try {
-        const res = await fetch('/api/db-provider', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: targetProvider })
-        });
-        const data = await res.json();
-        if (data.success) {
-          currentDbProvider = targetProvider;
-          updateDbProviderBadge();
-          alert(`🗄️ Base de Datos cambiada exitosamente a: ${targetProvider.toUpperCase()}`);
-          fetchConsultas(true);
-        }
-      } catch (e) {
-        alert('⚠️ Error al cambiar el proveedor de Base de Datos.');
-      }
+      selectDbProvider(providers[nextIdx]);
     }
 
     let doctorList = [

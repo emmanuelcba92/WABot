@@ -11,15 +11,16 @@ export class DBFactory {
     this.activeProvider = provider;
   }
 
-  public static getProvider(env?: Env): DBProviderType {
-    if (env?.DB_PROVIDER && ['d1', 'local', 'firebase'].includes(env.DB_PROVIDER.toLowerCase())) {
-      return env.DB_PROVIDER.toLowerCase() as DBProviderType;
+  public static getProvider(env?: Env, headerProvider?: string): DBProviderType {
+    if (headerProvider && ['d1', 'local', 'firebase'].includes(headerProvider.toLowerCase())) {
+      this.activeProvider = headerProvider.toLowerCase() as DBProviderType;
+      return this.activeProvider;
     }
-    return this.activeProvider;
+    return this.activeProvider || 'd1';
   }
 
-  public static createService(env?: Env): any {
-    const provider = this.getProvider(env);
+  public static createService(env?: Env, headerProvider?: string): any {
+    const provider = this.getProvider(env, headerProvider);
 
     if (provider === 'd1' && env?.DB) {
       return new D1Service(env);
@@ -29,7 +30,6 @@ export class DBFactory {
       return new FirestoreService(env);
     }
 
-    // Default fallback to D1Service or FirestoreService
     return env?.DB ? new D1Service(env) : new FirestoreService(env);
   }
 }
