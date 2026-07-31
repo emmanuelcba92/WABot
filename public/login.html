@@ -479,17 +479,31 @@
         }
 
         const candidates = await getEmailCandidates(username);
-        const targetEmail = candidates[0] || `${username}@coat.com.ar`;
+        const targetEmail = candidates.find(e => e.includes('@') && !e.endsWith('@coat.com.ar')) || candidates[0] || 'secretaria@coat.com.ar';
 
-        await firebase.auth().sendPasswordResetEmail(targetEmail);
-        alert(`📧 Se envió un correo con el enlace de restablecimiento a:\n👉 ${targetEmail}\n\nRevisá la bandeja de entrada para crear tu nueva contraseña.`);
-      } catch (err) {
-        const code = err.code || '';
-        if (code === 'auth/user-not-found') {
-          showError(`El usuario "${username}" no existe en el sistema.`);
-        } else {
-          showError('Error enviando enlace: ' + (err.message || code));
+        try {
+          await firebase.auth().sendPasswordResetEmail(targetEmail);
+          alert(`📧 Se envió un correo con el enlace de restablecimiento a:\n👉 ${targetEmail}\n\nRevisá la bandeja de entrada para crear tu nueva contraseña.`);
+        } catch(err) {
+          if (err.code === 'auth/user-not-found') {
+            try {
+              const resConfig = await fetch('/api/firebase-config');
+              const config = await resConfig.json();
+              const appName = `SecReset_${Date.now()}`;
+              const secApp = firebase.initializeApp(config, appName);
+              await secApp.auth().createUserWithEmailAndPassword(targetEmail, 'Temp123456!');
+              await secApp.delete();
+              await firebase.auth().sendPasswordResetEmail(targetEmail);
+              alert(`📧 Se vinculó la casilla ${targetEmail} en Firebase Auth y se envió el enlace de restablecimiento.\n\nRevisá la bandeja de entrada.`);
+            } catch(createErr) {
+              showError(`Error al procesar recuperación para ${targetEmail}: ` + (createErr.message || createErr.code));
+            }
+          } else {
+            showError('Error enviando enlace: ' + (err.message || err.code));
+          }
         }
+      } catch (err) {
+        showError('⚠️ Error al iniciar recuperación de contraseña.');
       }
     }
 

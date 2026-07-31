@@ -2479,9 +2479,24 @@
 
     async function sendResetPasswordForUser(email) {
       try {
+        const targetEmail = (email && email.includes('@') && !email.endsWith('@coat.com.ar')) ? email : 'secretaria@coat.com.ar';
         if (typeof firebase !== 'undefined' && firebase.auth) {
-          await firebase.auth().sendPasswordResetEmail(email);
-          alert(`📧 Enlace de restablecimiento enviado exitosamente a ${email}.`);
+          try {
+            await firebase.auth().sendPasswordResetEmail(targetEmail);
+            alert(`📧 Enlace de restablecimiento enviado exitosamente a:\n👉 ${targetEmail}`);
+          } catch(err) {
+            if (err.code === 'auth/user-not-found') {
+              const resConfig = await fetch('/api/firebase-config');
+              const config = await resConfig.json();
+              const secApp = firebase.initializeApp(config, `SecReset_${Date.now()}`);
+              await secApp.auth().createUserWithEmailAndPassword(targetEmail, 'Temp123456!');
+              await secApp.delete();
+              await firebase.auth().sendPasswordResetEmail(targetEmail);
+              alert(`📧 Se vinculó la casilla ${targetEmail} en Firebase Auth y se envió el enlace de restablecimiento.`);
+            } else {
+              alert('⚠️ Error al enviar enlace: ' + (err.message || err.code));
+            }
+          }
         }
       } catch(e) {
         alert('⚠️ Error al enviar enlace: ' + (e.message || e));

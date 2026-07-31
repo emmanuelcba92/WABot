@@ -382,6 +382,15 @@ export class FirestoreService {
         const data: any = await res.json();
         const fields = this.fromFirestoreFields(data.fields || {});
         if (fields && fields.users && Array.isArray(fields.users)) {
+          let updated = false;
+          fields.users = fields.users.map((u: any) => {
+            if (u.username === 'egomez' && (u.email === 'egomez@coat.com.ar' || !u.email)) {
+              u.email = 'secretaria@coat.com.ar';
+              u.displayName = u.displayName || 'Emmanuel';
+              updated = true;
+            }
+            return u;
+          });
           FirestoreService.globalUsersList = fields.users;
           return fields.users;
         }
