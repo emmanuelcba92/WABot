@@ -2290,7 +2290,15 @@
       selectedPdfs[cardId] = val;
     }
 
-    function handleCustomPdfUpload(cardId, fileInput) {
+    function toggleTagDropdown(id) {
+      const drop = document.getElementById(`tagDropdown_${id}`);
+      if (drop) {
+        const isHidden = drop.style.display === 'none' || !drop.style.display;
+        drop.style.display = isHidden ? 'flex' : 'none';
+      }
+    }
+
+    function handleCustomFileUpload(cardId, fileInput) {
       const file = fileInput.files[0];
       if (file) {
         const reader = new FileReader();
@@ -2298,7 +2306,7 @@
           customPdfBase64[cardId] = e.target.result;
           customPdfNames[cardId] = file.name;
           selectedPdfs[cardId] = 'custom';
-          alert(`📎 Documento "${file.name}" cargado para enviar.`);
+          alert(`📎 Archivo "${file.name}" listo para enviar por WhatsApp.`);
         };
         reader.readAsDataURL(file);
       }
@@ -2837,8 +2845,12 @@
 
           allStreamMsgs.sort((a, b) => a.timestamp - b.timestamp);
 
+          const tagBtnLabel = etiquetas.length === 0
+            ? '🏷️ Etiquetas ▼'
+            : (etiquetas.length === 1 ? tagDefinitions[etiquetas[0]]?.label || '🏷️ 1 Etiqueta ▼' : `🏷️ ${etiquetas.length} Etiquetas ▼`);
+
           let mainHtml = `
-            <!-- ENCABEZADO CHAT CON ETIQUETADOR Y DERIVACIÓN A TELEMEDICINA -->
+            <!-- ENCABEZADO CHAT CON ACCIONES ACCESIBLES Y ETIQUETADOR COMPACTO -->
             <div style="background: #111b21; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 44px; height: 44px; background: ${vipMatch ? '#facc15' : '#00a884'}; color: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
@@ -2854,20 +2866,25 @@
                 </div>
               </div>
 
-              <!-- SELECTOR DE ETIQUETAS INTEGRADO EN EL ENCABEZADO -->
-              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <span style="font-size: 0.75rem; color: var(--muted); font-weight: 700;">Etiquetas:</span>
-                ${Object.entries(tagDefinitions).map(([key, def]) => {
-                  const isSel = etiquetas.includes(key);
-                  return `
-                    <button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color}; color:#fff; font-weight:700; border-color:transparent;` : ''}" onclick="toggleTag('${c.id}', '${key}')">
-                      ${def.label}
-                    </button>
-                  `;
-                }).join('')}
-              </div>
+              <!-- BOTONES DE ACCIÓN: ETIQUETAS, TELEMEDICINA Y FINALIZAR -->
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <!-- DESPLEGABLE COMPACTO DE ETIQUETAS -->
+                <div style="position: relative; display: inline-block;">
+                  <button class="btn btn-secondary" style="font-size: 0.8rem; background: rgba(124, 58, 237, 0.2); color: #c4b5fd; font-weight: 700; border: 1px solid rgba(124, 58, 237, 0.4);" onclick="toggleTagDropdown('${c.id}')">
+                    ${tagBtnLabel}
+                  </button>
+                  <div id="tagDropdown_${c.id}" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 6px; background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 170px; flex-direction: column; gap: 4px;">
+                    ${Object.entries(tagDefinitions).map(([key, def]) => {
+                      const isSel = etiquetas.includes(key);
+                      return `
+                        <button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="width: 100%; text-align: left; justify-content: flex-start; ${isSel ? `background:${def.color}; color:#fff; font-weight:700; border-color:transparent;` : ''}" onclick="toggleTag('${c.id}', '${key}')">
+                          ${isSel ? '✓ ' : ''}${def.label}
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
 
-              <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="btn btn-secondary" style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;" onclick="openTelemedicinaModal('${c.id}')">
                   🩺 Derivar Telemedicina
                 </button>
@@ -2917,12 +2934,20 @@
               `).join('')}
             </div>
 
-            <!-- PANEL INFERIOR DE RESPUESTA ESPACIOSO -->
+            <!-- PANEL INFERIOR DE RESPUESTA CON DESPLEGABLES COMPACTOS -->
             <div style="background: #111b21; padding: 14px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
-              <div class="quick-reply-chips">
-                ${quickRepliesList.map(qr => `
-                  <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
-                `).join('')}
+              <!-- SELECTOR COMPACTO DE RESPUESTAS RÁPIDAS Y UBICACIÓN -->
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select onchange="if(this.value){ insertTemplate('${c.id}', this.value); this.value=''; }" style="background: #2a3942; border: 1px solid var(--border); color: #e9edef; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none; flex: 1;">
+                  <option value="">⚡ Seleccionar Respuesta Rápida...</option>
+                  ${quickRepliesList.map(qr => `
+                    <option value="${qr.text.replace(/"/g, '&quot;')}">${qr.title}</option>
+                  `).join('')}
+                </select>
+
+                <button class="chip-btn" style="background: rgba(0, 168, 132, 0.2); color: #34d399; border: 1px solid #34d399; font-weight: 700; padding: 8px 12px;" onclick="insertTemplate('${c.id}', '📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 123, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333')">
+                  📍 Enviar Ubicación GPS
+                </button>
               </div>
 
               <div style="display: flex; gap: 12px; align-items: flex-end;">
@@ -2932,17 +2957,18 @@
                 </button>
               </div>
 
-              <div style="display: flex; gap: 12px; align-items: center;">
+              <!-- SELECCIÓN DE ARCHIVOS GENÉRICOS (PDF, FOTO, DOCS) -->
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #2a3942; border: 1px solid var(--border); color: #e9edef; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; flex: 1;">
-                  <option value="">-- Sin Archivo PDF Adjunto --</option>
+                  <option value="">-- Sin Indicaciones de Estudio (PDF Predefinido) --</option>
                   ${predefinedPdfsList.map(pdf => `
                     <option value="${pdf.id}">${pdf.title}</option>
                   `).join('')}
                 </select>
 
-                <div style="font-size: 0.75rem; color: var(--muted);">
-                  O subir PDF:
-                  <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted);">
+                <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                  <span>📎 Adjuntar Archivo (Foto, PDF, Doc):</span>
+                  <input type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" onchange="handleCustomFileUpload('${c.id}', this)" style="font-size: 0.78rem; color: #e9edef;">
                 </div>
               </div>
             </div>
@@ -2950,9 +2976,10 @@
 
           containerChatMain.innerHTML = mainHtml;
 
+          // AUTO-SCROLL AL FINAL DEL CHAT ESTILO WHATSAPP WEB
           const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
           if (streamBox) {
-            streamBox.scrollTop = 0;
+            streamBox.scrollTop = streamBox.scrollHeight;
           }
         }
       }
