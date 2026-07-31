@@ -153,6 +153,7 @@ export class D1Service {
 
     if (this.db) {
       try {
+        await this.initTables();
         await this.db
           .prepare(
             'INSERT INTO consultas (id, remitente, estado, opcion, datos, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)'
@@ -176,6 +177,7 @@ export class D1Service {
 
     if (this.db) {
       try {
+        await this.initTables();
         await this.db
           .prepare('UPDATE consultas SET datos = ? WHERE id = ?')
           .bind(JSON.stringify(target?.datos || nuevosDatos), id)
@@ -197,6 +199,7 @@ export class D1Service {
 
     if (this.db) {
       try {
+        await this.initTables();
         await this.db
           .prepare('UPDATE consultas SET estado = ? WHERE id = ?')
           .bind(nuevoEstado, id)
