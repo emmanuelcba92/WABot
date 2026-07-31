@@ -734,6 +734,7 @@
         <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
         <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
         <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
+        <button class="sub-nav-btn" id="subTabDbBtn" onclick="switchSettingsSubTab('db')">🗄️ 8. Motor de Base de Datos</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -917,6 +918,32 @@
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveDoctorsConfig()">
           💾 Guardar Directorio de Médicos
         </button>
+      </div>
+
+      <!-- SUB-SECCIÓN 8: PROVEEDOR DE BASE DE DATOS -->
+      <div id="subSettingsDb" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <h3 style="font-size: 1.1rem; color: #a78bfa; font-weight: 700;">🗄️ Motor y Proveedor de Base de Datos Activo</h3>
+        <p style="font-size: 0.85rem; color: var(--muted);">Selecciona dónde almacenar todas las solicitudes, conversaciones y configuraciones de la clínica. Puedes alternar en cualquier momento sin perder tus datos.</p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 8px;">
+          <div id="dbCardD1" onclick="selectDbProvider('d1')" style="background: #1e293b; border: 2px solid #a78bfa; border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s;">
+            <div style="font-size: 1.1rem; font-weight: 700; color: #a78bfa; margin-bottom: 6px;">🗄️ Cloudflare D1</div>
+            <div style="font-size: 0.82rem; color: #34d399; font-weight: 700; margin-bottom: 8px;">⭐ RECOMENDADO - 5.000.000 lecturas/día GRATIS</div>
+            <div style="font-size: 0.78rem; color: var(--muted);">Base de datos distribuida en la nube de Cloudflare. Cero latencia y 100 veces más capacidad que Firebase.</div>
+          </div>
+
+          <div id="dbCardLocal" onclick="selectDbProvider('local')" style="background: #1e293b; border: 2px solid var(--border); border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s;">
+            <div style="font-size: 1.1rem; font-weight: 700; color: #34d399; margin-bottom: 6px;">💻 Disco Local en PC</div>
+            <div style="font-size: 0.82rem; color: #38bdf8; font-weight: 700; margin-bottom: 8px;">🔒 100% PRIVADO & ILIMITADO</div>
+            <div style="font-size: 0.78rem; color: var(--muted);">Guarda los datos directamente en el disco SSD de la PC de recepción. Gratis y sin depender de la nube.</div>
+          </div>
+
+          <div id="dbCardFirebase" onclick="selectDbProvider('firebase')" style="background: #1e293b; border: 2px solid var(--border); border-radius: 12px; padding: 18px; cursor: pointer; transition: all 0.2s;">
+            <div style="font-size: 1.1rem; font-weight: 700; color: #f87171; margin-bottom: 6px;">🔥 Firebase Firestore</div>
+            <div style="font-size: 0.82rem; color: #fbbf24; font-weight: 700; margin-bottom: 8px;">⚠️ Límite: 50.000 lecturas/día</div>
+            <div style="font-size: 0.78rem; color: var(--muted);">Base de datos en la nube de Google Firebase (Plan Gratuito Spark).</div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -1861,6 +1888,7 @@
       const secPdf = document.getElementById('subSettingsPdf');
       const secVip = document.getElementById('subSettingsVip');
       const secDoc = document.getElementById('subSettingsDoctor');
+      const secDb = document.getElementById('subSettingsDb');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
@@ -1869,9 +1897,10 @@
       const btnPdf = document.getElementById('subTabPdfBtn');
       const btnVip = document.getElementById('subTabVipBtn');
       const btnDoc = document.getElementById('subTabDocBtn');
+      const btnDb = document.getElementById('subTabDbBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc].forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc].forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb].filter(Boolean).forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb].filter(Boolean).forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -1896,6 +1925,9 @@
         secDoc.style.display = 'flex';
         btnDoc.classList.add('active');
         renderDoctorEditor();
+      } else if (subTab === 'db') {
+        if (secDb) secDb.style.display = 'flex';
+        if (btnDb) btnDb.classList.add('active');
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
