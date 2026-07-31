@@ -10,10 +10,41 @@ export class D1Service {
     this.db = env?.DB;
   }
 
+  private static tablesInitialized = false;
+
+  private async initTables() {
+    if (!this.db || D1Service.tablesInitialized) return;
+    try {
+      await this.db.batch([
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS consultas (
+          id TEXT PRIMARY KEY,
+          remitente TEXT NOT NULL,
+          estado TEXT NOT NULL DEFAULT 'pendiente',
+          opcion TEXT,
+          datos TEXT,
+          timestamp INTEGER NOT NULL,
+          createdAt TEXT NOT NULL
+        )`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS bot_config (id TEXT PRIMARY KEY DEFAULT 'config', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS menu_tree (id TEXT PRIMARY KEY DEFAULT 'tree', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS vip_contacts (id TEXT PRIMARY KEY DEFAULT 'vip', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS quick_replies (id TEXT PRIMARY KEY DEFAULT 'replies', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS pdf_config (id TEXT PRIMARY KEY DEFAULT 'pdfs', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS tag_config (id TEXT PRIMARY KEY DEFAULT 'tags', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
+        this.db.prepare(`CREATE TABLE IF NOT EXISTS heartbeat (id TEXT PRIMARY KEY DEFAULT 'ping', lastPing INTEGER NOT NULL)`)
+      ]);
+      D1Service.tablesInitialized = true;
+    } catch (e) {
+      console.error('Error initializing D1 tables:', e);
+    }
+  }
+
   public async getConsultas(estadoFilter?: string): Promise<Array<Record<string, any>>> {
     if (!this.db) {
       return D1Service.inMemoryConsultas;
     }
+
+    await this.initTables();
 
     try {
       let query = 'SELECT * FROM consultas ORDER BY timestamp DESC';
