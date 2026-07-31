@@ -21,6 +21,25 @@ app.get('/health', (c) => {
   });
 });
 
+// RUTAS PRINCIPALES DE NAVEGACIÓN DE LA WEB APP
+app.get('/', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = '/admin.html';
+  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+});
+
+app.get('/admin', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = '/admin.html';
+  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+});
+
+app.get('/test', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = '/index.html';
+  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+});
+
 app.get('/api/doctors', async (c) => {
   const firestore = new FirestoreService(c.env);
   const items = await firestore.getDoctors();
