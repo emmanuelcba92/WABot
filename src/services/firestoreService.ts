@@ -764,31 +764,54 @@ export class FirestoreService {
   }
 
   public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string): Promise<void> {
-    const consultas = await this.getConsultas();
-    const target = consultas.find(c => c.id === idConsulta);
-    if (target) {
-      const datos = target.datos || {};
+    const nuevaRespuesta = {
+      texto: respuestaTexto,
+      timestamp: new Date().toISOString()
+    };
+
+    // Actualizar en memoria si existe
+    const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
+    if (targetMem) {
+      const datos = targetMem.datos || {};
       const respuestasSec = datos.respuestasSecretaria || [];
-      datos.respuestasSecretaria = [...respuestasSec, {
-        texto: respuestaTexto,
-        timestamp: new Date().toISOString()
-      }];
-      target.datos = datos;
+      datos.respuestasSecretaria = [...respuestasSec, nuevaRespuesta];
+      targetMem.datos = datos;
+    }
 
-      const targetMem = FirestoreService.inMemoryConsultas.find(c => c.id === idConsulta);
-      if (targetMem) {
-        targetMem.datos = datos;
-      }
+    // Siempre guardar directo en Firestore usando GET+PATCH para no perder datos
+    if (this.projectId) {
+      try {
+        // 1. Leer el documento actual de Firestore
+        const getUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+        const getRes = await fetch(getUrl);
+        let datos: any = {};
+        if (getRes.ok) {
+          const json: any = await getRes.json();
+          const rawDatos = json.fields?.datos?.mapValue?.fields;
+          if (rawDatos) {
+            datos = this.fromFirestoreFields(rawDatos);
+          }
+        }
 
-      if (this.projectId) {
-        try {
-          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
-          await fetch(url, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
-          });
-        } catch (e) {}
+        // 2. Agregar la nueva respuesta
+        const respuestasSec = datos.respuestasSecretaria || [];
+        datos.respuestasSecretaria = [...respuestasSec, nuevaRespuesta];
+
+        // 3. Actualizar en memoria también
+        if (targetMem) targetMem.datos = datos;
+
+        // 4. Guardar en Firestore
+        const patchUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${idConsulta}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+        await fetch(patchUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datos) } } } })
+        });
+
+        // 5. Invalidar la caché para que el próximo GET traiga datos frescos
+        FirestoreService.consultasCache.lastFetch = 0;
+      } catch (e) {
+        console.error('Error registrando respuesta secretaria en Firestore:', e);
       }
     }
   }
