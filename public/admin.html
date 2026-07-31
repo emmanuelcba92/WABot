@@ -2490,6 +2490,9 @@
               <td style="padding: 12px; color: var(--muted);">${u.email}</td>
               <td style="padding: 12px;">${roleBadge}</td>
               <td style="padding: 12px; text-align: right;">
+                <button class="btn btn-secondary" onclick="sendResetPasswordForUser('${u.email}')" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56,189,248,0.3); font-size: 0.78rem; padding: 4px 10px; margin-right: 6px;" title="Enviar correo de restablecimiento de contraseña">
+                  🔑 Restablecer
+                </button>
                 <button class="btn btn-secondary" onclick="deleteUserSubmit('${u.username}')" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239,68,68,0.3); font-size: 0.78rem; padding: 4px 10px;">
                   🗑️ Eliminar
                 </button>
@@ -2499,6 +2502,17 @@
         }).join('');
       } catch(e) {
         tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--error);">Error al cargar usuarios.</td></tr>`;
+      }
+    }
+
+    async function sendResetPasswordForUser(email) {
+      try {
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+          await firebase.auth().sendPasswordResetEmail(email);
+          alert(`📧 Enlace de restablecimiento enviado exitosamente a ${email}.`);
+        }
+      } catch(e) {
+        alert('⚠️ Error al enviar enlace: ' + (e.message || e));
       }
     }
 

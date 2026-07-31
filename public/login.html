@@ -303,7 +303,7 @@
       </form>
 
       <div class="footer-info">
-        ¿Olvidaste tu contraseña? Contactá al <strong>administrador del sistema</strong>
+        ¿Olvidaste tu contraseña? <a href="#" onclick="handleResetPassword(); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;">Restablecer aquí</a> o escribí a <strong>secretaria@coat.com.ar</strong>
       </div>
     </div>
   </div>
@@ -423,6 +423,34 @@
           showError('🌐 Sin conexión a internet. Verificá tu red.');
         } else {
           showError('⚠️ Error al iniciar sesión: ' + (err.message || code));
+        }
+      }
+    }
+
+    async function handleResetPassword() {
+      hideError();
+      const username = document.getElementById('usernameInput').value.trim().toLowerCase();
+      if (!username) {
+        showError('Escribí tu usuario en el campo de arriba y hacé clic de nuevo en "Restablecer aquí".');
+        return;
+      }
+
+      const email = `${username}@coat.com.ar`;
+
+      try {
+        if (!firebaseReady) {
+          const ok = await initFirebase();
+          if (!ok) return;
+        }
+
+        await firebase.auth().sendPasswordResetEmail(email);
+        alert(`📧 Se envió un correo con el enlace de restablecimiento a ${email}.\n\nSi no tenés acceso a esa casilla, contactá a secretaria@coat.com.ar o a un Administrador.`);
+      } catch (err) {
+        const code = err.code || '';
+        if (code === 'auth/user-not-found') {
+          showError(`El usuario "${username}" no existe en el sistema.`);
+        } else {
+          showError('Error enviando enlace: ' + (err.message || code));
         }
       }
     }
