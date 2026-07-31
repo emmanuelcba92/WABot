@@ -724,9 +724,10 @@
         🗄️ BD: Cloudflare D1 (5M/día)
       </div>
 
-      <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px;">
+      <div onclick="openMyProfileModal()" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;" title="Haz clic para modificar tu nombre, email o cambiar tu contraseña">
         <span>👤</span>
         <span id="currentUserName" style="color:#fff;">Cargando...</span>
+        <span style="font-size: 0.75rem; opacity: 0.7;">✏️</span>
       </div>
       <button class="btn btn-secondary" onclick="fetchConsultas(true)">🔄 Actualizar</button>
       <button class="btn btn-secondary" onclick="logout()" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.4);color:#f87171;" title="Cerrar sesión">🚪 Salir</button>
@@ -1124,6 +1125,50 @@
         </div>
       </div>
       <iframe id="pdfViewerFrame" style="width: 100%; flex: 1; border: none; border-radius: 8px; background: #ffffff;" src="about:blank"></iframe>
+    </div>
+  </div>
+
+  <!-- MODAL MI PERFIL Y CAMBIAR CONTRASEÑA -->
+  <div id="myProfileModal" class="lightbox-modal" style="display: none;" onclick="closeMyProfileModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.9);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;">👤 Mi Perfil & Contraseña</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeMyProfileModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label style="font-weight:600; font-size:0.82rem; color:var(--muted);">Usuario (Login):</label>
+        <input type="text" id="profUsername" readonly style="background: rgba(15,23,42,0.5); border: 1px solid var(--border); color: #94a3b8; font-weight: 700;">
+      </div>
+
+      <div class="settings-group">
+        <label style="font-weight:600; font-size:0.82rem;">Nombre Visible (Operador):</label>
+        <input type="text" id="profDisplayName" placeholder="Ej: Emmanuel...">
+      </div>
+
+      <div class="settings-group">
+        <label style="font-weight:600; font-size:0.82rem;">Email Real de Recuperación:</label>
+        <input type="email" id="profEmail" placeholder="secretaria@coat.com.ar" style="color: #38bdf8; font-weight: 600;">
+      </div>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 4px 0;">
+
+      <div class="settings-group">
+        <label style="font-weight:600; font-size:0.82rem; color:#fbbf24;">🔑 Nueva Contraseña (Opcional):</label>
+        <input type="password" id="profNewPassword" placeholder="Dejar en blanco si no quieres cambiarla">
+      </div>
+
+      <div class="settings-group">
+        <label style="font-weight:600; font-size:0.82rem; color:#fbbf24;">🔑 Confirmar Nueva Contraseña:</label>
+        <input type="password" id="profConfirmPassword" placeholder="Repite la nueva contraseña">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeMyProfileModal()">Cancelar</button>
+        <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); color: #fff; font-weight: 700;" onclick="submitMyProfileUpdate()">
+          💾 Guardar Cambios
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2532,6 +2577,77 @@
         }
       } catch(e) {
         alert('⚠️ Error al enviar enlace: ' + (e.message || e));
+      }
+    }
+
+    function openMyProfileModal() {
+      const modal = document.getElementById('myProfileModal');
+      if (!modal) return;
+      const user = window._currentUser || (typeof firebase !== 'undefined' ? firebase.auth().currentUser : null);
+
+      const username = user ? (user.email || '').split('@')[0] : 'egomez';
+      document.getElementById('profUsername').value = username;
+      document.getElementById('profDisplayName').value = window._currentUserName || username;
+      document.getElementById('profEmail').value = (user && user.email) ? user.email : 'secretaria@coat.com.ar';
+      document.getElementById('profNewPassword').value = '';
+      document.getElementById('profConfirmPassword').value = '';
+
+      modal.style.display = 'flex';
+    }
+
+    function closeMyProfileModal() {
+      const modal = document.getElementById('myProfileModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function submitMyProfileUpdate() {
+      const displayName = document.getElementById('profDisplayName').value.trim();
+      const email = document.getElementById('profEmail').value.trim().toLowerCase();
+      const newPass = document.getElementById('profNewPassword').value;
+      const confirmPass = document.getElementById('profConfirmPassword').value;
+
+      if (newPass && newPass !== confirmPass) {
+        alert('⚠️ Las nuevas contraseñas no coinciden.');
+        return;
+      }
+
+      if (newPass && newPass.length < 6) {
+        alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+
+      try {
+        const user = firebase.auth().currentUser;
+        if (user) {
+          if (displayName && displayName !== user.displayName) {
+            await user.updateProfile({ displayName });
+          }
+          if (newPass) {
+            await user.updatePassword(newPass);
+          }
+        }
+
+        const username = document.getElementById('profUsername').value;
+
+        await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            displayName,
+            email: email || 'secretaria@coat.com.ar',
+            role: window._currentUserRole || 'secretaria'
+          })
+        });
+
+        window._currentUserName = displayName || username;
+        const nameEl = document.getElementById('currentUserName');
+        if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
+
+        alert('✅ ¡Tu perfil y contraseña han sido actualizados con éxito!');
+        closeMyProfileModal();
+      } catch (err) {
+        alert('⚠️ Error al actualizar perfil/contraseña: ' + (err.message || err.code || err));
       }
     }
 
