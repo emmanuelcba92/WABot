@@ -915,7 +915,19 @@ export class FirestoreService {
     return consultaId;
   }
 
+  private static consultasCache: { items: Array<Record<string, any>>; lastFetch: number } = { items: [], lastFetch: 0 };
+  public static lastHeartbeatFirestoreWrite = 0;
+
   public async getConsultas(estadoFilter?: string): Promise<Array<Record<string, any>>> {
+    const nowMs = Date.now();
+    if (nowMs - FirestoreService.consultasCache.lastFetch < 3000 && FirestoreService.consultasCache.items.length > 0) {
+      let filtered = FirestoreService.consultasCache.items;
+      if (estadoFilter && estadoFilter !== 'todas') {
+        filtered = filtered.filter(c => c.estado === estadoFilter);
+      }
+      return filtered;
+    }
+
     let items: Array<Record<string, any>> = [];
 
     if (this.projectId) {
@@ -949,6 +961,7 @@ export class FirestoreService {
         if (allFetched.length > 0) {
           items = allFetched;
           FirestoreService.inMemoryConsultas = items;
+          FirestoreService.consultasCache = { items, lastFetch: nowMs };
         }
       } catch (e) {
         items = [...FirestoreService.inMemoryConsultas];
@@ -959,7 +972,7 @@ export class FirestoreService {
       items = [...FirestoreService.inMemoryConsultas];
     }
 
-    if (estadoFilter && estadoFilter !== 'todos') {
+    if (estadoFilter && estadoFilter !== 'todas') {
       items = items.filter(c => (c.estado || 'pendiente') === estadoFilter);
     }
 
