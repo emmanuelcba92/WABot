@@ -2323,6 +2323,8 @@
         .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
         .replace(/_(.*?)_/g, '<em>$1</em>');
       return html;
+    }
+
     let currentOperatorName = localStorage.getItem('wabot_operator_name') || 'Secretaría';
 
     function initOperatorNameUI() {
