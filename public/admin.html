@@ -2319,6 +2319,11 @@
       return html;
     }
 
+    function selectChat(id) {
+      selectedChatId = id;
+      renderConsultas(true);
+    }
+
     function renderConsultas(forceRedraw = false) {
       const containerGrid = document.getElementById('consultasGrid');
       const containerChatSidebar = document.getElementById('chatSidebarList');
