@@ -22,31 +22,22 @@ app.get('/health', (c) => {
 });
 
 // RUTAS PRINCIPALES DE NAVEGACIÓN DE LA WEB APP
-app.get('/', async (c) => {
+app.get('/test', async (c) => {
   if (c.env.ASSETS) {
     const url = new URL(c.req.url);
-    url.pathname = '/admin.html';
+    url.pathname = '/test.html';
     return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
   }
-  return c.text('Admin Panel Assets no disponibles');
+  return c.text('Test Simulator Assets no disponibles');
 });
 
 app.get('/admin', async (c) => {
   if (c.env.ASSETS) {
     const url = new URL(c.req.url);
-    url.pathname = '/admin.html';
-    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
-  }
-  return c.text('Admin Panel Assets no disponibles');
-});
-
-app.get('/test', async (c) => {
-  if (c.env.ASSETS) {
-    const url = new URL(c.req.url);
     url.pathname = '/index.html';
     return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
   }
-  return c.text('Test Simulator Assets no disponibles');
+  return c.text('Admin Panel Assets no disponibles');
 });
 
 app.get('/api/doctors', async (c) => {

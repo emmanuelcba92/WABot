@@ -3,22 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador de Bot de WhatsApp - Clínica Médica</title>
+  <title>Panel de Recepción / Secretarias - Clínica Médica</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      --chat-bg: #0b141a;
-      --bubble-out: #005c4b;
-      --bubble-in: #202c33;
-      --text-main: #e9edef;
-      --text-muted: #8696a0;
-      --accent-green: #00a884;
-      --accent-blue: #3b82f6;
-      --card-bg: rgba(30, 41, 59, 0.7);
-      --border-color: rgba(255, 255, 255, 0.1);
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #00a884;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
     }
 
     * {
@@ -29,24 +25,22 @@
     }
 
     body {
-      background: var(--bg-gradient);
-      color: var(--text-main);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
     header {
-      background: rgba(15, 23, 42, 0.9);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-color);
-      padding: 16px 24px;
+      background: #0b141a;
+      padding: 16px 32px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     .brand {
@@ -56,539 +50,557 @@
     }
 
     .brand-icon {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       background: linear-gradient(135deg, #00a884, #059669);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);
+      font-size: 22px;
     }
 
-    .brand-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-
-    .brand-subtitle {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .badge-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
-
-    .badge-open {
-      background: rgba(16, 185, 129, 0.15);
-      color: #10b981;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-
-    .badge-closed {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
-    .app-container {
-      display: grid;
-      grid-template-columns: 340px 1fr 340px;
-      gap: 20px;
-      max-width: 1600px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 20px;
-      flex: 1;
-    }
-
-    @media (max-width: 1200px) {
-      .app-container {
-        grid-template-columns: 300px 1fr;
-      }
-      .panel-firestore {
-        display: none;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .app-container {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .panel {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      backdrop-filter: blur(16px);
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow: hidden;
-    }
-
-    .panel-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #cbd5e1;
-    }
-
-    input, select {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 10px 12px;
-      color: var(--text-main);
-      font-size: 0.9rem;
-      outline: none;
-      transition: all 0.2s;
-    }
-
-    input:focus, select:focus {
-      border-color: var(--accent-green);
-      box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
-    }
-
-    .quick-actions {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--text-main);
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      text-align: center;
-    }
-
-    .btn:hover {
-      background: rgba(0, 168, 132, 0.2);
-      border-color: var(--accent-green);
-      color: #34d399;
-    }
-
-    .btn-primary {
-      background: var(--accent-green);
-      color: #ffffff;
-      grid-column: span 2;
-    }
-
-    .btn-primary:hover {
-      background: #008f70;
-      color: #ffffff;
-    }
-
-    .btn-secondary {
-      grid-column: span 2;
-      background: rgba(59, 130, 246, 0.15);
-      border-color: rgba(59, 130, 246, 0.3);
-      color: #60a5fa;
-    }
-
-    .btn-secondary:hover {
-      background: rgba(59, 130, 246, 0.3);
-    }
-
-    .chat-panel {
-      background: var(--chat-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    }
-
-    .chat-header {
-      background: #202c33;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .avatar {
-      width: 40px;
-      height: 40px;
-      background: #00a884;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-    }
-
-    .chat-title {
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .chat-subtitle {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-
-    .chat-messages {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-      background-size: 20px 20px;
-      min-height: 400px;
-      max-height: 550px;
-    }
-
-    .message {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 0.9rem;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-      position: relative;
-      animation: fadeIn 0.25s ease-out;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .message-out {
-      align-self: flex-end;
-      background: var(--bubble-out);
-      color: #e9edef;
-      border-bottom-right-radius: 2px;
-    }
-
-    .message-in {
-      align-self: flex-start;
-      background: var(--bubble-in);
-      color: #e9edef;
-      border-bottom-left-radius: 2px;
-    }
-
-    .message-img {
-      max-width: 100%;
-      max-height: 200px;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      display: block;
-      object-fit: cover;
-    }
-
-    .message-time {
-      font-size: 0.68rem;
-      color: rgba(233, 237, 239, 0.6);
-      text-align: right;
-      margin-top: 4px;
-    }
-
-    .image-preview-bar {
-      background: #182229;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .image-preview-thumb {
-      width: 44px;
-      height: 44px;
-      border-radius: 6px;
-      object-fit: cover;
-      border: 1px solid var(--accent-green);
-    }
-
-    .chat-input-area {
-      background: #202c33;
-      padding: 12px;
+    .nav-tabs {
       display: flex;
       gap: 8px;
-      align-items: center;
-    }
-
-    .chat-input-area textarea {
-      flex: 1;
-      background: #2a3942;
-      border: none;
-      border-radius: 8px;
-      padding: 11px 16px;
-      font-size: 0.92rem;
-      color: var(--text-main);
-      resize: none;
-      min-height: 44px;
-      max-height: 140px;
-      line-height: 1.4;
-      outline: none;
-      font-family: inherit;
-    }
-
-    .chat-input-area textarea:focus {
-      box-shadow: 0 0 0 1.5px var(--accent-green);
-    }
-
-    .btn-attach {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: color 0.2s;
-    }
-
-    .btn-attach:hover {
-      color: var(--accent-green);
-    }
-
-    .btn-send {
-      background: var(--accent-green);
-      color: white;
-      border: none;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .btn-send:hover {
-      transform: scale(1.05);
-    }
-
-    .state-card {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px;
       border-radius: 10px;
-      padding: 12px;
-      font-family: monospace;
-      font-size: 0.82rem;
+      border: 1px solid var(--border);
     }
 
-    .state-tag {
-      display: inline-block;
-      padding: 4px 8px;
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-      border-radius: 4px;
-      font-weight: bold;
-      margin-top: 4px;
-    }
-
-    .consultas-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 250px;
-      overflow-y: auto;
-    }
-
-    .consulta-item {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 0.78rem;
-    }
-
-    .consulta-header {
-      display: flex;
-      justify-content: space-between;
-      font-weight: 600;
-      color: #34d399;
-      margin-bottom: 4px;
-    }
-
-    .badge-drive {
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      display: inline-block;
-      margin-top: 4px;
-    }
-
-    /* ── Mensajes Interactivos WhatsApp ── */
-    .interactive-wrap {
-      margin-top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    /* Botones de respuesta rápida */
-    .interactive-btn {
+    .nav-tab-btn {
       background: transparent;
-      border: 1.5px solid rgba(0, 168, 132, 0.6);
-      color: #00a884;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
       border-radius: 8px;
-      padding: 9px 14px;
+      font-weight: 600;
       font-size: 0.88rem;
-      font-weight: 700;
       cursor: pointer;
-      text-align: center;
-      width: 100%;
-      transition: background 0.15s, color 0.15s;
-      letter-spacing: 0.2px;
+      transition: all 0.2s;
     }
 
-    .interactive-btn:hover {
-      background: #00a884;
+    .nav-tab-btn.active {
+      background: var(--accent);
       color: #fff;
     }
 
-    /* Botón para abrir lista */
-    .list-open-btn {
-      background: rgba(0, 168, 132, 0.12);
-      border: 1.5px solid rgba(0, 168, 132, 0.5);
-      color: #00a884;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      cursor: pointer;
-      width: 100%;
+    .sub-nav-tabs {
       display: flex;
-      align-items: center;
-      justify-content: center;
       gap: 8px;
-      transition: background 0.15s;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
     }
 
-    .list-open-btn:hover {
-      background: rgba(0, 168, 132, 0.25);
+    .sub-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: all 0.2s;
     }
 
-    /* Modal de Lista */
-    .list-modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      z-index: 100;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      animation: fadeIn 0.2s;
+    .sub-nav-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 700;
     }
 
-    .list-modal {
-      background: #1e293b;
-      border-radius: 20px 20px 0 0;
+    .container {
+      max-width: 1400px;
       width: 100%;
-      max-width: 560px;
+      margin: 24px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
       padding: 20px;
       display: flex;
       flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-title {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .stat-num {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 14px 20px;
+      border-radius: 14px;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      gap: 8px;
+      flex: 1;
+      max-width: 450px;
+    }
+
+    .search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      width: 100%;
+    }
+
+    .filters-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .tag-filter-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tag-filter-chip.active {
+      border-color: currentColor;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .consultas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .card.vip-card {
+      border: 2px solid #facc15;
+      box-shadow: 0 0 25px rgba(250, 204, 21, 0.25);
+    }
+
+    .card.urgent-card {
+      border: 2px solid #ef4444;
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
       gap: 10px;
-      max-height: 80vh;
+    }
+
+    .patient-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tag-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+
+    .tag-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .tag-chip-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tag-chip-btn.selected {
+      color: white;
+      border-color: transparent;
+    }
+
+    .card-img-container {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #0f172a;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .card-img-preview {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.2s;
+    }
+
+    .card-img-container:hover .card-img-preview {
+      transform: scale(1.02);
+    }
+
+    .card-img-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.85);
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(4px);
+    }
+
+    /* ESTILOS DE VISTA CHAT ESTILO WHATSAPP (ULTRA LIVIANO) */
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      height: 740px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .chat-sidebar {
+      background: #0f172a;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
     }
 
-    .list-modal-title {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #f8fafc;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 10px;
-      margin-bottom: 4px;
-    }
-
-    .list-modal-row {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      padding: 12px 14px;
+    .chat-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: background 0.15s;
     }
 
-    .list-modal-row:hover {
-      background: rgba(0, 168, 132, 0.15);
-      border-color: rgba(0, 168, 132, 0.4);
+    .chat-item:hover {
+      background: rgba(255, 255, 255, 0.04);
     }
 
-    .list-modal-row-title {
-      font-weight: 700;
+    .chat-item.active {
+      background: rgba(0, 168, 132, 0.22);
+      border-left: 4px solid var(--accent);
+    }
+
+    .chat-main {
+      display: flex;
+      flex-direction: column;
+      background: #0b141a;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .chat-stream {
+      flex: 1;
+      min-height: 0;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.7) 0%, rgba(11, 20, 26, 0.95) 100%);
+    }
+
+    .chat-bubble-patient {
+      align-self: flex-start;
+      background: #202c33;
+      color: #e9edef;
+      padding: 12px 16px;
+      border-radius: 12px 12px 12px 0;
+      max-width: 78%;
       font-size: 0.92rem;
-      color: #e2e8f0;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      word-break: break-word;
+      line-height: 1.45;
     }
 
-    .list-modal-row-desc {
-      font-size: 0.78rem;
-      color: #94a3b8;
-      margin-top: 2px;
+    .chat-bubble-sec {
+      align-self: flex-end;
+      background: #005c4b;
+      color: #e9edef;
+      padding: 12px 16px;
+      border-radius: 12px 12px 0 12px;
+      max-width: 78%;
+      font-size: 0.92rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      word-break: break-word;
+      line-height: 1.45;
     }
 
-    .list-modal-cancel {
-      color: #94a3b8;
-      font-size: 0.85rem;
-      text-align: center;
+    .lightbox-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .lightbox-img {
+      width: 85vw;
+      max-width: 1200px;
+      max-height: 88vh;
+      min-height: 400px;
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+      border: 2px solid rgba(255,255,255,0.2);
+      object-fit: contain;
+      background: #0b141a;
+      image-rendering: -webkit-optimize-contrast;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
       cursor: pointer;
-      padding: 8px;
     }
 
-    .list-modal-cancel:hover {
-      color: #ef4444;
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-excel {
+      background: #10b981;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .reply-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.4);
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .reply-box textarea {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      resize: vertical;
+      min-height: 70px;
+      outline: none;
+    }
+
+    .quick-reply-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .settings-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .settings-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-group label {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #38bdf8;
+    }
+
+    .settings-group textarea, .settings-group input, .settings-group select {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .tree-builder-card {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .whatsapp-preview-phone {
+      background: #0b141a;
+      border: 12px solid #1f2c34;
+      border-radius: 36px;
+      width: 100%;
+      max-width: 360px;
+      min-height: 480px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      position: sticky;
+      top: 20px;
+    }
+
+    .whatsapp-chat-bubble {
+      background: #202c33;
+      color: #e9edef;
+      padding: 12px;
+      border-radius: 8px 8px 8px 0;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
   </style>
 </head>
@@ -598,539 +610,2485 @@
     <div class="brand">
       <div class="brand-icon">🏥</div>
       <div>
-        <div class="brand-title">Bot de Clínica Médica</div>
-        <div class="brand-subtitle">Cloudflare Worker + Firestore + Google Drive / Supabase</div>
+        <h1 style="font-size: 1.25rem; font-weight: 700;">Recepción & Secretarías</h1>
+        <p style="font-size: 0.78rem; color: var(--muted);">Panel de Gestión de Turnos y Mensajería de WhatsApp</p>
       </div>
     </div>
 
-    <div id="statusBadge" class="badge-status badge-open">
-      <span class="status-dot"></span>
-      <span id="statusText">En Horario (Argentina)</span>
+    <div class="nav-tabs">
+      <button class="nav-tab-btn active" id="tabMainBtn" onclick="switchMainTab('consultas')">📥 Solicitudes (<span id="countBadge">0</span>)</button>
+      <button class="nav-tab-btn" id="tabSettingsBtn" onclick="switchMainTab('settings')">⚙️ Configuración del Bot & Horarios</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="btn btn-secondary" id="btnNotifyPermission" onclick="requestNotificationPermission()" style="font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.2);">
+        🔔 Activar Notificaciones de Escritorio
+      </button>
+
+      <div id="connectorStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 5px 12px; border-radius: 20px;">
+        🟢 Conector WhatsApp En Línea
+      </div>
+
+      <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 4px 12px; border-radius: 20px; display: flex; align-items: center; gap: 6px;">
+        <span>👤 Mi Nombre:</span>
+        <input type="text" id="operatorNameInput" style="background: transparent; border: none; color: #fff; font-weight: 700; font-size: 0.82rem; width: 110px; outline: none;" onchange="updateOperatorName(this.value)" placeholder="Tu nombre...">
+      </div>
+      <button class="btn btn-secondary" onclick="fetchConsultas(true)">🔄 Actualizar</button>
     </div>
   </header>
 
-  <div class="app-container">
+  <div class="container">
 
-    <div class="panel">
-      <div class="panel-title">⚙️ Configuración & Horario</div>
+    <!-- SECCIÓN 1: VISTA DE SOLICITUDES -->
+    <div id="viewConsultas">
 
-      <div class="form-group">
-        <label for="remitenteInput">📱 Teléfono del Paciente (remitente)</label>
-        <div style="display: flex; gap: 6px;">
-          <input type="text" id="remitenteInput" value="+5491112345678" placeholder="+5491112345678" onchange="resetChatForNewUser()" style="flex: 1;">
-          <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.78rem; background: rgba(59,130,246,0.2); color: #60a5fa; border-color: rgba(59,130,246,0.4);" onclick="pickRandomPatient()" title="Cargar paciente aleatorio de las 70 consultas">
-            🎲 Aleatorio
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-title">Pendientes (Bandeja Entrada)</div>
+          <div class="stat-num" id="numPendientes">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Atendidas / Archivadas</div>
+          <div class="stat-num" id="numAtendidas" style="color: #60a5fa;">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Total Registradas</div>
+          <div class="stat-num" id="numTotal" style="color: #a78bfa;">0</div>
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top: 16px;">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Buscar por Nombre, DNI, Teléfono o Mensaje..." oninput="handleSearch()">
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <!-- BOTÓN INICIAR NUEVO CHAT -->
+          <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); font-weight: 700; box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);" onclick="openIniciarChatModal()">
+            💬 Iniciar Nuevo Chat / Escribir a Número
+          </button>
+
+          <!-- SELECTOR DE MODO DE VISTA (TARJETAS vs CHAT ESTILO WHATSAPP) -->
+          <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+            <button class="nav-tab-btn active" id="viewModeGridBtn" onclick="setViewMode('grid')">🎴 Vista Tarjetas</button>
+            <button class="nav-tab-btn" id="viewModeChatBtn" onclick="setViewMode('chat')">💬 Vista Chat (WhatsApp)</button>
+          </div>
+
+          <button class="btn btn-excel" onclick="exportToCsv()">
+            📊 Exportar a Excel (CSV)
+          </button>
+          <button class="btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba variadas">
+            ⚡ Cargar 50 Chats de Prueba
+          </button>
+          <button class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
+            🗑️ Limpiar Todo (Pruebas)
           </button>
         </div>
       </div>
 
-      <div class="form-group">
-        <label for="patientDropdown">👤 Seleccionar Paciente de Pruebas (70 chats)</label>
-        <div style="display: flex; gap: 6px;">
-          <select id="patientDropdown" onchange="onSelectPatientDropdown(this.value)" style="flex: 1;">
-            <option value="">-- Buscar o Seleccionar Paciente --</option>
-          </select>
-          <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.78rem; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none;" onclick="generar70PruebasDesdeSimulador(event)" title="Generar 70 consultas de prueba automáticamente">
-            ⚡ Cargar 70
+      <div class="filters-bar" style="margin-top: 12px;">
+        <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700;">Estado:</span>
+        <button class="tab-btn active" id="filterPendiente" onclick="setFilter('pendiente', this)">⏳ Pendientes</button>
+        <button class="tab-btn" id="filterPrioritarios" onclick="setFilter('prioritarios', this)" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; font-weight: 700;">⭐ Prioritarios (<span id="numPrioritariosBadge">0</span>)</button>
+        <button class="tab-btn" id="filterAtendido" onclick="setFilter('atendido', this)">📁 Atendidas</button>
+        <button class="tab-btn" id="filterTodos" onclick="setFilter('todos', this)">📋 Ver Todas</button>
+
+        <span style="font-size: 0.82rem; color: var(--muted); font-weight: 700; margin-left: 12px;">Etiquetas:</span>
+        <div id="topTagFiltersContainer" style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="tag-filter-chip active" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>
+        </div>
+      </div>
+
+      <!-- VISTA 1: GRID DE TARJETAS (ORIGINAL) -->
+      <div class="consultas-grid" id="consultasGrid" style="margin-top: 16px;">
+        <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando solicitudes...</div>
+      </div>
+
+      <!-- VISTA 2: LAYOUT DE CHAT ESTILO WHATSAPP (ULTRA LIVIANO) -->
+      <div class="chat-layout" id="consultasChatLayout" style="display: none;">
+        <!-- BARRA LATERAL IZQUIERDA: LISTA DE CHATS -->
+        <div class="chat-sidebar" id="chatSidebarList">
+          <!-- Items generados en JS -->
+        </div>
+
+        <!-- PANEL DERECHO PRINCIPAL: CONVERSACIÓN & RESPUESTA -->
+        <div class="chat-main" id="chatMainView">
+          <div style="color: var(--muted); margin: auto; text-align: center;">Seleccioná una conversación del panel izquierdo para comenzar a chatear.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN CON SUB-MENÚS MODULARES -->
+    <div id="viewSettings" class="settings-panel" style="display: none;">
+
+      <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text);">⚙️ Centro de Configuración</h2>
+
+      <!-- NAVEGACIÓN POR SUB-PESTAÑAS DE CONFIGURACIÓN -->
+      <div class="sub-nav-tabs">
+        <button class="sub-nav-btn active" id="subTabSchedBtn" onclick="switchSettingsSubTab('schedule')">⏰ 1. Horario de Atención & Mensajes Automáticos</button>
+        <button class="sub-nav-btn" id="subTabTreeBtn" onclick="switchSettingsSubTab('tree')">📱 2. Constructor No-Code de Menú & Opciones</button>
+        <button class="sub-nav-btn" id="subTabTagsBtn" onclick="switchSettingsSubTab('tags')">🏷️ 3. Gestión de Etiquetas & Colores</button>
+        <button class="sub-nav-btn" id="subTabQuickBtn" onclick="switchSettingsSubTab('quick')">⚡ 4. Respuestas Rápidas</button>
+        <button class="sub-nav-btn" id="subTabPdfBtn" onclick="switchSettingsSubTab('pdf')">📄 5. PDFs Predeterminados</button>
+        <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
+        <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
+      </div>
+
+      <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
+      <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
+        <h3 style="font-size: 1.1rem; color: #38bdf8;">⏰ Control de Horario de Atención</h3>
+        <p style="font-size: 0.86rem; color: var(--muted);">Define si el bot responde automáticamente según el horario oficial de la clínica (Lun-Vie 8-20h) o si forzamos la atención abierta o cerrada.</p>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
+          <button class="btn btn-secondary" id="schedAuto" onclick="setScheduleMode('auto')">⏰ Automático (8-20h)</button>
+          <button class="btn btn-secondary" id="schedOpen" onclick="setScheduleMode('always_open')">🟢 Forzar Abierto (24/7)</button>
+          <button class="btn btn-secondary" id="schedClosed" onclick="setScheduleMode('always_closed')">🌙 Forzar Cerrado</button>
+        </div>
+
+        <div id="settingsScheduleBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
+          🟢 Estado Actual: Cargando...
+        </div>
+
+        <!-- EDITOR MENSAJE FUERA DE HORARIO -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 1rem; color: #38bdf8;">🌙 Mensaje Automático de Fuera de Horario</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Este texto se le envía automáticamente al paciente cuando escribe fuera del horario de atención.</p>
+
+          <textarea id="cfgFueraDeHorario" style="min-height: 100px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de fuera de horario..."></textarea>
+        </div>
+
+        <!-- EDITOR MENSAJE DE FINALIZACIÓN / CIERRE -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px; display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 1rem; color: #34d399;">✅ Mensaje Automático de Finalización / Cierre de Atención</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Este mensaje le llega al paciente por WhatsApp cuando la secretaria hace clic en "Marcar Atendido / Finalizar Chat".</p>
+
+          <textarea id="cfgConfirmacionCierre" style="min-height: 110px; font-size: 0.9rem; width: 100%;" placeholder="Cargando mensaje de cierre de atención..."></textarea>
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 8px;" onclick="saveScheduleMessagesConfig()">
+          💾 Guardar Mensajes de Horario y Cierre
+        </button>
+      </div>
+
+      <!-- SUB-SECCIÓN 2: NO-CODE MENU BUILDER & LIVE SIMULATOR -->
+      <div id="subSettingsTree" style="display: none; grid-template-columns: 1fr 380px; gap: 24px; align-items: start;">
+
+        <!-- CONSTRUCTOR DE OPCIONES -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #00a884; font-weight: 700;">📱 Constructor No-Code de Menú & Opciones</h3>
+            <p style="font-size: 0.84rem; color: var(--muted);">Crea, edita o elimina cualquier letra (A, B, C, D, F...) o sub-opción del bot en tiempo real.</p>
+          </div>
+
+          <div class="settings-group">
+            <label>👋 Encabezado / Saludo de Bienvenida:</label>
+            <textarea id="menuWelcomeMsg" oninput="updateLivePreview()" placeholder="Ej: 🏥 ¡Hola! Bienvenido/a a la Clínica Médica..."></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px;">
+            <h4 style="font-size: 0.95rem; color: #f8fafc;">📋 Lista de Opciones del Menú Principal:</h4>
+            <button class="btn" style="padding: 6px 12px; font-size: 0.82rem;" onclick="addNewMenuOption()">➕ Agregar Nueva Opción</button>
+          </div>
+
+          <div id="menuItemsContainer" style="display: flex; flex-direction: column; gap: 14px;">
+            <!-- Opciones dinámicas generadas en JS -->
+          </div>
+
+          <button class="btn" style="align-self: flex-start; padding: 14px 28px; font-size: 1rem; margin-top: 10px;" onclick="saveMenuTree()">
+            💾 Guardar y Publicar Menú Completo
           </button>
         </div>
-      </div>
 
-      <div class="form-group">
-        <label for="simulatedTimeSelect">🕒 Simulación de Horario (GMT-3)</label>
-        <select id="simulatedTimeSelect" onchange="onTimeModeChange()">
-          <option value="REAL">✅ Horario Real (Seguimiento Sistema)</option>
-          <option value="IN_HOURS">☀️ En Horario (Martes 14:30 hs)</option>
-          <option value="OUT_HOURS">🌙 Fuera de Horario (Domingo 22:00 hs)</option>
-          <option value="CUSTOM">📅 Fecha/Hora Personalizada</option>
-        </select>
-      </div>
+        <!-- SIMULADOR VIVO DE WHATSAPP -->
+        <div class="whatsapp-preview-phone">
+          <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 14px;">
+            <div style="width: 36px; height: 36px; background: #00a884; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🏥</div>
+            <div>
+              <div style="font-size: 0.9rem; font-weight: 700; color: #e9edef;">Clínica Médica Bot</div>
+              <div style="font-size: 0.7rem; color: #00a884;">en línea</div>
+            </div>
+          </div>
 
-      <div class="form-group" id="customTimeGroup" style="display: none;">
-        <label for="customDateTime">Fecha y Hora Personalizada</label>
-        <input type="datetime-local" id="customDateTime" value="2026-07-27T15:00">
-      </div>
-
-      <div class="panel-title" style="margin-top: 10px;">⚡ Botones de Prueba Rápida</div>
-      
-      <div class="quick-actions">
-        <button class="btn btn-primary" onclick="sendQuickMsg('Hola')">👋 1. Enviar Hola / Menú</button>
-        <button class="btn" onclick="sendQuickMsg('A')">Opción A (Turnos)</button>
-        <button class="btn" onclick="sendQuickMsg('1')">A -> 1 (ORL)</button>
-        <button class="btn" onclick="sendQuickMsg('2')">A -> 2 (Estudios + Foto)</button>
-        <button class="btn" onclick="sendQuickMsg('3')">A -> 3 (Cirugías + Foto)</button>
-        <button class="btn" onclick="sendQuickMsg('B')">Opción B (Autoriz. + Foto)</button>
-        <button class="btn" onclick="sendQuickMsg('C')">Opción C (Ayuda)</button>
-        <button class="btn" onclick="sendQuickMsg('D')">Opción D (PAMI)</button>
-        <button class="btn" onclick="sendQuickMsg('E')">Opción E (Reprog.)</button>
-        <button class="btn btn-secondary" onclick="sendSampleDataA2WithImage()">📷 Probar Opción A2 con Imagen de Ejemplo</button>
-      </div>
-    </div>
-
-    <div class="chat-panel">
-      <div class="chat-header">
-        <div class="avatar">🤖</div>
-        <div>
-          <div class="chat-title">Atención WhatsApp Clínica</div>
-          <div class="chat-subtitle" id="chatSub">Lunes a Viernes de 08:00 a 20:00 hs</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;">
+            <div style="align-self: flex-end; background: #005c4b; color: #e9edef; padding: 8px 12px; border-radius: 8px 8px 0 8px; font-size: 0.82rem;">
+              Hola
+            </div>
+            <div class="whatsapp-chat-bubble" id="whatsappLiveBubble">
+              Cargando simulación...
+            </div>
+          </div>
         </div>
+
       </div>
 
-      <div class="chat-messages" id="chatMessages">
-        <!-- Mensajes renderizados -->
-      </div>
+      <!-- SUB-SECCIÓN 3: GESTIÓN DE ETIQUETAS Y COLORES -->
+      <div id="subSettingsTags" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #c084fc; font-weight: 700;">🏷️ Gestión de Etiquetas & Colores</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Crea, edita o elimina las etiquetas que las secretarias asignan a las solicitudes.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewTag()">➕ Crear Nueva Etiqueta</button>
+        </div>
 
-      <div class="image-preview-bar" id="imagePreviewBar" style="display: none;">
-        <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Vista previa">
-        <div style="flex: 1; font-size: 0.8rem;" id="imagePreviewName">pedido_medico.jpg</div>
-        <button type="button" onclick="cancelAttachedImage()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size: 1.1rem;">✕</button>
-      </div>
+        <div id="tagEditorList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;">
+          <!-- Lista de etiquetas dinámicas -->
+        </div>
 
-      <form class="chat-input-area" id="chatInputForm" onsubmit="handleSendSubmit(event)">
-        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelected(event)">
-        
-        <button type="button" class="btn-attach" title="Adjuntar Imagen" onclick="document.getElementById('fileInput').click()">
-          📷
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveTagsConfig()">
+          💾 Guardar Configuración de Etiquetas
         </button>
+      </div>
 
-        <textarea id="userInput" rows="1" placeholder="Escribe un mensaje... (Shift + Enter para nueva línea)" autocomplete="off"></textarea>
-        <button type="submit" class="btn-send" title="Enviar mensaje">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
+      <!-- SUB-SECCIÓN 4: RESPUESTAS RÁPIDAS -->
+      <div id="subSettingsQuick" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⚡ Gestión de Respuestas Rápidas</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura los botones de respuesta rápida que las secretarias pueden insertar en 1 clic.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewQuickReply()">➕ Crear Respuesta Rápida</button>
+        </div>
+
+        <div id="quickReplyEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de respuestas rápidas dinámicas -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveQuickRepliesConfig()">
+          💾 Guardar Respuestas Rápidas
         </button>
-      </form>
-    </div>
-
-    <div class="panel panel-firestore">
-      <div class="panel-title">🔥 Estado Firestore</div>
-
-      <div class="state-card">
-        <div>Sesión Paciente:</div>
-        <div class="state-tag" id="currentStateDisplay">inicio</div>
-        <div style="margin-top: 8px; font-size: 0.72rem; color: #94a3b8;" id="updatedAtDisplay">Actualizado: -</div>
       </div>
 
-      <div class="panel-title" style="margin-top: 10px;">📂 Almacenamiento Fotos</div>
-      <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(15,23,42,0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-        Las fotos adjuntadas se suben a <strong>Google Drive / Supabase</strong> y el enlace se guarda en la consulta de Firestore.
+      <!-- SUB-SECCIÓN 5: PDFS PREDETERMINADOS -->
+      <div id="subSettingsPdf" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">📄 Gestión de PDFs Predeterminados</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Agrega o modifica los documentos PDF que las secretarias adjuntan en los envíos.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewPdfItem()">➕ Agregar Documento PDF</button>
+        </div>
+
+        <div id="pdfEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de PDFs dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="savePdfItemsConfig()">
+          💾 Guardar Lista de PDFs
+        </button>
       </div>
 
-      <div class="panel-title" style="margin-top: 10px;">📦 Consultas Registradas</div>
-      <div class="consultas-list" id="consultasList">
-        <div class="consulta-item" style="color: var(--text-muted);">Sin consultas registradas aún.</div>
+      <!-- SUB-SECCIÓN 6: CONTACTOS PRIORITARIOS -->
+      <div id="subSettingsVip" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #facc15; font-weight: 700;">⭐ Gestión de Contactos Prioritarios</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura números o IDs de contactos prioritarios (socios, directivos, urgencias). <strong>El bot NO les mostrará menú</strong>: escribirán libremente y sus mensajes, fotos o PDFs llegarán directo con alerta sonora y notificación de escritorio.</p>
+            <p style="font-size: 0.78rem; color: #38bdf8; margin-top: 4px;">💡 <em>Nota: Podés ingresar el número de teléfono (ej: 3516123456) O el ID de WhatsApp (ej: 205948144619633@lid).</em></p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewVipContact()">➕ Agregar Contacto Prioritario</button>
+        </div>
+
+        <div id="vipEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de VIPs dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveVipContactsConfig()">
+          💾 Guardar Contactos Prioritarios
+        </button>
       </div>
+
+      <!-- SUB-SECCIÓN 7: DIRECTORIO DE MÉDICOS / TELEMEDICINA -->
+      <div id="subSettingsDoctor" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; padding: 22px; flex-direction: column; gap: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 700;">🩺 Directorio de Médicos & Telemedicina</h3>
+            <p style="font-size: 0.85rem; color: var(--muted);">Configura el staff de profesionales médicos a los cuales las secretarias derivarán las solicitudes y estudios de telemedicina por WhatsApp.</p>
+          </div>
+          <button class="btn" style="padding: 8px 14px; font-size: 0.85rem;" onclick="addNewDoctor()">➕ Agregar Médico</button>
+        </div>
+
+        <div id="doctorEditorList" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Lista de médicos dinámicos -->
+        </div>
+
+        <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveDoctorsConfig()">
+          💾 Guardar Directorio de Médicos
+        </button>
+      </div>
+
     </div>
 
   </div>
 
+  <!-- LIGHTBOX MODAL PARA FOTOS EN ALTA DEFINICIÓN HD -->
+  <div id="lightboxModal" class="lightbox-modal" style="display: none;" onclick="closeLightbox()">
+    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightboxImg" class="lightbox-img" src="" alt="Foto ampliada" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- VISOR DE PDF EN MODAL SIN NECESIDAD DE DESCARGAR -->
+  <div id="pdfViewerModal" class="lightbox-modal" style="display: none;" onclick="closePdfViewer()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 95vw; max-width: 1200px; height: 90vh; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.9);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;" id="pdfViewerTitle">📄 Visor de Documento PDF</h3>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <a id="pdfViewerDownloadBtn" href="" download="" class="btn btn-secondary" style="font-size: 0.8rem; text-decoration: none;">⬇️ Descargar PDF</a>
+          <button style="background: transparent; border: none; color: white; font-size: 24px; cursor: pointer;" onclick="closePdfViewer()">✕</button>
+        </div>
+      </div>
+      <iframe id="pdfViewerFrame" style="width: 100%; flex: 1; border: none; border-radius: 8px; background: #ffffff;" src="about:blank"></iframe>
+    </div>
+  </div>
+
+  <!-- MODAL DE INICIAR NUEVO CHAT -->
+  <div id="iniciarChatModal" class="lightbox-modal" style="display: none;" onclick="closeIniciarChatModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #00a884; font-weight: 700;">💬 Iniciar Nuevo Chat por WhatsApp</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeIniciarChatModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>📱 Número de Teléfono del Paciente:</label>
+        <input type="text" id="newChatPhone" placeholder="Ej: 3516123456 o 5493516123456..." style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">
+      </div>
+
+      <div class="settings-group">
+        <label>👤 Nombre del Paciente (Opcional):</label>
+        <input type="text" id="newChatName" placeholder="Ej: Juan Pérez...">
+      </div>
+
+      <div class="settings-group">
+        <label>💬 Mensaje Inicial a Enviar:</label>
+        <textarea id="newChatMessage" style="min-height: 90px; font-size: 0.9rem;" placeholder="Escribe el mensaje inicial o plantilla para el paciente..."></textarea>
+      </div>
+
+      <div class="quick-reply-chips" id="newChatQuickReplies">
+        <!-- Respuestas rápidas dinámicas -->
+      </div>
+
+      <div class="settings-group">
+        <label>📄 Adjuntar Indicación o Instructivo (PDF Opcional):</label>
+        <select id="newChatPdfSelect" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 8px;">
+          <option value="">-- Sin Archivo Adjunto --</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeIniciarChatModal()">Cancelar</button>
+        <button class="btn" style="background: #00a884; color: #ffffff; font-weight: 700; padding: 12px 22px;" onclick="submitIniciarChat()">
+          📤 Iniciar Chat y Enviar por WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE DERIVACIÓN DE TELEMEDICINA -->
+  <div id="telemedicinaModal" class="lightbox-modal" style="display: none;" onclick="closeTelemedicinaModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;">🩺 Derivar Telemedicina a Médico Profesional</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeTelemedicinaModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>Seleccionar Médico Destinatario:</label>
+        <select id="telemedDoctorSelect">
+          <!-- Opciones dinámicas -->
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Nota de Secretaría para el Médico (Opcional):</label>
+        <textarea id="telemedNotaSecretaria" style="min-height: 70px; font-size: 0.88rem;" placeholder="Ej: Se adjunta informe de audiometría y tomografía enviados por el paciente..."></textarea>
+      </div>
+
+      <div id="telemedFilesPreview" style="background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+        <!-- Resumen de archivos a reenviar -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeTelemedicinaModal()">Cancelar</button>
+        <button class="btn" style="background: #38bdf8; color: #0f172a; font-weight: 700;" onclick="submitTelemedicinaDerivacion()">
+          📤 Reenviar Estudios a Médico por WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA EDITAR PLANTILLA DE SUB-OPCIÓN (ELEGANTE POPUP DENTRO DE LA PÁGINA) -->
+  <div id="subOptionModal" class="lightbox-modal" style="display: none;" onclick="closeSubOptionModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;" id="subModalTitle">✏️ Configurar Plantilla de Sub-Opción</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeSubOptionModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>Comportamiento de esta Sub-Opción:</label>
+        <select id="subModalType" onchange="handleSubModalTypeChange(this.value)">
+          <option value="form">📋 Formulario de Datos (Paciente debe enviar información/foto)</option>
+          <option value="info">💬 Respuesta Informativa Directa (Mensaje automático inmediato)</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Texto / Plantilla enviada al paciente:</label>
+        <textarea id="subModalTemplate" style="min-height: 130px; font-size: 0.9rem;" placeholder="Escribe aquí las instrucciones o plantilla que recibirá el paciente al elegir esta sub-opción..."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeSubOptionModal()">Cancelar</button>
+        <button class="btn" onclick="saveSubOptionModal()">✅ Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    let attachedImageBase64 = null;
-    let attachedImageName = null;
-    let renderedMsgIds = new Set(); // Evitar duplicar mensajes renderizados
+    let allConsultas = [];
+    let currentFilter = 'pendiente';
+    let currentTagFilter = 'all';
+    let currentViewMode = localStorage.getItem('adminViewMode') || 'grid';
+    let selectedChatId = null;
+    let activeTelemedicinaConsultaId = null;
 
-    window.addEventListener('DOMContentLoaded', () => {
-      onTimeModeChange();
-      pollSessionAndMessages();
-      setInterval(pollSessionAndMessages, 2500);
+    let searchQuery = '';
+    let draftResponses = {};
+    let selectedPdfs = {};
+    let customPdfBase64 = {};
+    let customPdfNames = {};
+    let currentScheduleMode = 'auto';
 
-      // Manejador Shift + Enter en la caja de texto multilínea
-      const inputEl = document.getElementById('userInput');
-      if (inputEl) {
-        inputEl.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendSubmit(e);
-          }
-        });
+    let activeSubEdit = { parentIndex: -1, subIndex: -1 };
+    let previousConsultaIds = new Set();
 
-        inputEl.addEventListener('input', function() {
-          this.style.height = 'auto';
-          this.style.height = Math.min(this.scrollHeight, 140) + 'px';
-        });
+    let doctorList = [
+      { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
+      { id: 'doc_2', name: 'Dr. López', specialty: 'Cirugía General / Telemedicina', phone: '3510000001' }
+    ];
+
+    let tagDefinitions = {
+      'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
+      'falta_foto': { key: 'falta_foto', label: '🟡 Falta Foto', color: '#d97706' },
+      'urgente': { key: 'urgente', label: '🔴 Urgente', color: '#dc2626' },
+      'pami': { key: 'pami', label: '🟣 PAMI', color: '#7c3aed' },
+      'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
+    };
+
+    let vipContactsList = [
+      { id: 'v1', phone: '3516123456', name: 'Dr. López (Director)', role: 'Socio Directivo', priority: 'vip' }
+    ];
+
+    let quickRepliesList = [
+      { id: 'qr_1', title: '✅ Confirmar Turno', text: '✅ ¡Hola! Tu turno fue agendado con éxito.' },
+      { id: 'qr_2', title: '📷 Pedir Foto Legible', text: '📸 La foto enviada no es legible. Por favor enviá una foto bien nítida.' },
+      { id: 'qr_3', title: '🩺 Estado PAMI', text: '⚕️ Tu solicitud de PAMI fue recibida y enviada a auditoría médica.' }
+    ];
+
+    let predefinedPdfsList = [
+      { id: 'sangre', title: '📄 Preparación Análisis de Sangre (Laboratorio)', name: 'Indicaciones_Analisis_Sangre_Laboratorio.pdf' },
+      { id: 'ecografia', title: '📄 Preparación Ecografía / Tomografía (Ayuno 8hs)', name: 'Indicaciones_Ecografia_Tomografia_Ayuno.pdf' },
+      { id: 'cirugia', title: '📄 Cuidados Post-Cirugía y Reposo', name: 'Indicaciones_Post_Cirugia_Cuidados.pdf' },
+      { id: 'orl', title: '📄 Instructivo Estudios ORL', name: 'Instructivo_Estudios_ORL.pdf' }
+    ];
+
+    let currentMenuTree = {
+      welcomeMessage: `🏥 *¡Hola! Bienvenido/a a la Clínica Médica.*\nPor favor, responde con la letra de la opción que necesitas:`,
+      items: []
+    };
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      localStorage.setItem('adminViewMode', mode);
+      const gridBtn = document.getElementById('viewModeGridBtn');
+      const chatBtn = document.getElementById('viewModeChatBtn');
+      const gridEl = document.getElementById('consultasGrid');
+      const chatEl = document.getElementById('consultasChatLayout');
+
+      if (mode === 'chat') {
+        gridBtn.classList.remove('active');
+        chatBtn.classList.add('active');
+        gridEl.style.display = 'none';
+        chatEl.style.display = 'grid';
+      } else {
+        gridBtn.classList.add('active');
+        chatBtn.classList.remove('active');
+        gridEl.style.display = 'grid';
+        chatEl.style.display = 'none';
       }
-    });
-
-    function resetChatForNewUser() {
-      renderedMsgIds.clear();
-      document.getElementById('chatMessages').innerHTML = '';
-      updateSessionState();
+      renderConsultas(true);
     }
 
-    function getSimulatedTime() {
-      const mode = document.getElementById('simulatedTimeSelect').value;
-      if (mode === 'IN_HOURS') return '2026-07-28T14:30:00-03:00';
-      if (mode === 'OUT_HOURS') return '2026-07-26T22:00:00-03:00';
-      if (mode === 'CUSTOM') {
-        const customVal = document.getElementById('customDateTime').value;
-        return customVal ? new Date(customVal).toISOString() : undefined;
+    function requestNotificationPermission(silent = false) {
+      if (!('Notification' in window)) {
+        if (!silent) alert('Tu navegador no soporta notificaciones de escritorio.');
+        return;
       }
-      return undefined;
-    }
-
-    function onTimeModeChange() {
-      const mode = document.getElementById('simulatedTimeSelect').value;
-      document.getElementById('customTimeGroup').style.display = (mode === 'CUSTOM') ? 'flex' : 'none';
-      checkStatus();
-    }
-
-    async function checkStatus() {
-      try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        
-        const mode = document.getElementById('simulatedTimeSelect').value;
-        let inHours = data.scheduleInfo.isWithinHours;
-
-        if (mode === 'IN_HOURS') inHours = true;
-        if (mode === 'OUT_HOURS') inHours = false;
-
-        const badge = document.getElementById('statusBadge');
-        const text = document.getElementById('statusText');
-
-        if (inHours) {
-          badge.className = 'badge-status badge-open';
-          text.innerText = 'En Horario (08:00 - 20:00)';
-        } else {
-          badge.className = 'badge-status badge-closed';
-          text.innerText = 'Fuera de Horario (Cerrado)';
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          if (!silent) alert('🔔 ¡Notificaciones de Escritorio activadas exitosamente!');
+          updateNotificationBtn();
+        } else if (permission === 'denied' && !silent) {
+          alert('Las notificaciones de escritorio están bloqueadas en la configuración del navegador.');
         }
-      } catch (err) {}
-    }
-
-    function handleFileSelected(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      attachedImageName = file.name;
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        attachedImageBase64 = evt.target.result;
-        document.getElementById('imagePreviewThumb').src = attachedImageBase64;
-        document.getElementById('imagePreviewName').innerText = file.name;
-        document.getElementById('imagePreviewBar').style.display = 'flex';
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function cancelAttachedImage() {
-      attachedImageBase64 = null;
-      attachedImageName = null;
-      document.getElementById('fileInput').value = '';
-      document.getElementById('imagePreviewBar').style.display = 'none';
-    }
-
-    function formatTextToHtml(text) {
-      if (!text) return '';
-      let html = text
-        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-        .replace(/_(.*?)_/g, '<em>$1</em>')
-        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color: #60a5fa; text-decoration: underline;">$1</a>');
-      return html;
-    }
-
-    function renderMessage(msgId, sender, text, timestampStr, imgBase64, interactive) {
-      if (renderedMsgIds.has(msgId)) return;
-      renderedMsgIds.add(msgId);
-
-      const container = document.getElementById('chatMessages');
-      const msgDiv = document.createElement('div');
-
-      const isOut = sender === 'paciente';
-      msgDiv.className = `message ${isOut ? 'message-out' : 'message-in'}`;
-
-      let contentHtml = '';
-      if (imgBase64) {
-        contentHtml += `<img src="${imgBase64}" class="message-img" alt="Imagen adjunta">`;
-      }
-      contentHtml += formatTextToHtml(text);
-
-      const timeStr = timestampStr
-        ? new Date(timestampStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      msgDiv.innerHTML = `${contentHtml}<div class="message-time">${timeStr}</div>`;
-
-      // ── Renderizar controles interactivos ──
-      if (!isOut && interactive) {
-        const wrap = document.createElement('div');
-        wrap.className = 'interactive-wrap';
-
-        if (interactive.type === 'button') {
-          interactive.buttons.forEach(btn => {
-            const b = document.createElement('button');
-            b.className = 'interactive-btn';
-            b.textContent = `${btn.emoji || ''} ${btn.title}`.trim();
-            b.onclick = () => sendMessage(btn.id);
-            wrap.appendChild(b);
-          });
-        } else if (interactive.type === 'list') {
-          const openBtn = document.createElement('button');
-          openBtn.className = 'list-open-btn';
-          openBtn.innerHTML = `<span>📋</span> ${interactive.buttonLabel}`;
-          openBtn.onclick = () => showListModal(interactive);
-          wrap.appendChild(openBtn);
-        }
-
-        msgDiv.appendChild(wrap);
-      }
-
-      container.appendChild(msgDiv);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    function showListModal(interactive) {
-      const existing = document.getElementById('listModalOverlay');
-      if (existing) existing.remove();
-
-      const overlay = document.createElement('div');
-      overlay.className = 'list-modal-overlay';
-      overlay.id = 'listModalOverlay';
-
-      const modal = document.createElement('div');
-      modal.className = 'list-modal';
-
-      const title = document.createElement('div');
-      title.className = 'list-modal-title';
-      title.textContent = interactive.buttonLabel || 'Seleccioná una opción';
-      modal.appendChild(title);
-
-      interactive.sections.forEach(section => {
-        section.rows.forEach(row => {
-          const rowEl = document.createElement('div');
-          rowEl.className = 'list-modal-row';
-          rowEl.innerHTML = `<div class="list-modal-row-title">${row.title}</div>${row.description ? `<div class="list-modal-row-desc">${row.description}</div>` : ''}`;
-          rowEl.onclick = () => {
-            overlay.remove();
-            sendMessage(row.id);
-          };
-          modal.appendChild(rowEl);
-        });
       });
-
-      const cancel = document.createElement('div');
-      cancel.className = 'list-modal-cancel';
-      cancel.textContent = '✕ Cancelar';
-      cancel.onclick = () => overlay.remove();
-      modal.appendChild(cancel);
-
-      overlay.appendChild(modal);
-      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-      document.body.appendChild(overlay);
     }
 
-    async function pollSessionAndMessages() {
-      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
-      try {
-        const res = await fetch(`/api/session/${encodeURIComponent(remitente)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        document.getElementById('currentStateDisplay').innerText = data.estado || 'inicio';
+    function autoPromptNotifications() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const handler = () => {
+          requestNotificationPermission(true);
+          window.removeEventListener('click', handler);
+        };
+        window.addEventListener('click', handler);
+      }
+    }
 
-        const historial = data.historialMensajes || [];
-        if (historial.length === 0 && renderedMsgIds.size === 0) {
-          renderMessage('init_welcome', 'bot',
-            "🏥 *¡Hola! Bienvenido/a al Simulador de WhatsApp de la Clínica.* \n\nTocá el botón 👋 *Enviar Hola* o escribí algo para comenzar.");
+    function updateNotificationBtn() {
+      const btn = document.getElementById('btnNotifyPermission');
+      if (btn) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          btn.innerText = '🔔 Notificaciones Activas';
+          btn.style.background = 'rgba(52, 211, 153, 0.2)';
+          btn.style.color = '#34d399';
+          btn.style.borderColor = '#34d399';
         } else {
-          for (const m of historial) {
-            renderMessage(m.id, m.sender, m.text, m.timestamp, m.imageUrl, m.interactive);
-          }
+          btn.innerText = '🔔 Activar Notificaciones de Escritorio';
         }
+      }
+    }
 
-        fetchConsultas();
+    function normalizePhone(str) {
+      if (!str) return '';
+      let digits = str.replace(/[^0-9]/g, '');
+      if (digits.startsWith('0')) digits = digits.substring(1);
+      if (digits.startsWith('549')) digits = digits.substring(3);
+      else if (digits.startsWith('54')) digits = digits.substring(2);
+      if (digits.startsWith('15')) digits = digits.substring(2);
+      return digits;
+    }
+
+    function isVipMatch(consultaOrRemitente, vipContact) {
+      if (!consultaOrRemitente || !vipContact) return false;
+
+      let remitente = '';
+      let altRemitente = '';
+      let pushName = '';
+
+      if (typeof consultaOrRemitente === 'object') {
+        remitente = consultaOrRemitente.remitente || '';
+        const datos = consultaOrRemitente.datos || {};
+        altRemitente = datos.altRemitente || '';
+        pushName = datos.pushName || '';
+      } else {
+        remitente = String(consultaOrRemitente);
+      }
+
+      const vPhone = (vipContact.phone || '').trim().toLowerCase();
+      if (!vPhone) return false;
+
+      const rLower = remitente.toLowerCase();
+      const altLower = altRemitente.toLowerCase();
+
+      // 1. Coincidencia por JID directo o LID (ej: "205948144619633@lid" o "205948...")
+      const vDigitsOnly = vPhone.replace(/[^0-9]/g, '');
+      if (vPhone.includes('@lid') || (vDigitsOnly.length > 10 && !vPhone.startsWith('54'))) {
+        if (rLower.includes(vDigitsOnly) || altLower.includes(vDigitsOnly)) return true;
+      }
+
+      // 2. Coincidencia por Teléfono (normalizado)
+      const vClean = normalizePhone(vPhone);
+      const rClean = normalizePhone(remitente);
+      const altClean = normalizePhone(altRemitente);
+
+      if (vClean.length >= 6) {
+        if (rClean && (rClean === vClean || rClean.includes(vClean) || vClean.includes(rClean))) return true;
+        if (altClean && (altClean === vClean || altClean.includes(vClean) || vClean.includes(altClean))) return true;
+
+        const vTail = vClean.slice(-8);
+        if (vTail.length >= 7) {
+          if (rClean && rClean.slice(-8) === vTail) return true;
+          if (altClean && altClean.slice(-8) === vTail) return true;
+        }
+      }
+
+      // 3. Coincidencia por Nombre de WhatsApp (pushName)
+      if (vipContact.name && pushName && pushName.toLowerCase().includes(vipContact.name.toLowerCase())) {
+        return true;
+      }
+
+      return false;
+    }
+
+    function playVipChimeSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
       } catch (e) {}
     }
 
-    async function sendMessage(mensajeText) {
-      const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
-      
-      const currentImageBase64 = attachedImageBase64;
-      const currentImageName = attachedImageName;
-      cancelAttachedImage();
+    async function checkHeartbeatStatus() {
+      try {
+        const res = await fetch('/api/heartbeat-status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('connectorStatusBadge');
+        if (!badge) return;
 
-      const simulatedTime = getSimulatedTime();
+        if (data.online) {
+          badge.innerHTML = '🟢 Conector WhatsApp En Línea';
+          badge.style.background = 'rgba(52, 211, 153, 0.15)';
+          badge.style.color = '#34d399';
+          badge.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+        } else {
+          badge.innerHTML = `🚨 DESCONECTADO (${data.elapsedSeconds}s sin señal) - Revisar PC`;
+          badge.style.background = 'rgba(239, 68, 68, 0.3)';
+          badge.style.color = '#ef4444';
+          badge.style.borderColor = '#ef4444';
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initOperatorNameUI();
+      autoPromptNotifications();
+      updateNotificationBtn();
+      setViewMode(currentViewMode);
+      fetchScheduleConfig();
+      fetchBotConfig();
+      fetchTagConfig();
+      fetchVipContactsConfig();
+      fetchDoctorsConfig();
+      fetchQuickRepliesConfig();
+      fetchPdfItemsConfig();
+      fetchMenuTree();
+      fetchConsultas();
+      checkHeartbeatStatus();
+      setInterval(fetchConsultas, 4000);
+      setInterval(fetchScheduleConfig, 10000);
+      setInterval(checkHeartbeatStatus, 10000);
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeLightbox();
+          closePdfViewer();
+          closeSubOptionModal();
+          closeTelemedicinaModal();
+          closeIniciarChatModal();
+        }
+      });
+    });
+
+    function openPdfViewer(base64Data, pdfName) {
+      const modal = document.getElementById('pdfViewerModal');
+      const frame = document.getElementById('pdfViewerFrame');
+      const title = document.getElementById('pdfViewerTitle');
+      const downloadLink = document.getElementById('pdfViewerDownloadBtn');
+
+      if (!modal || !frame) return;
+
+      title.innerText = `📄 Visor: ${pdfName || 'Documento.pdf'}`;
+      downloadLink.href = base64Data;
+      downloadLink.download = pdfName || 'documento.pdf';
 
       try {
-        const response = await fetch('/webhook', {
+        let base64Clean = base64Data.replace(/^data:application\/pdf;base64,/, '');
+        const byteCharacters = atob(base64Clean);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        frame.src = blobUrl;
+      } catch (e) {
+        frame.src = base64Data;
+      }
+
+      modal.style.display = 'flex';
+    }
+
+    function closePdfViewer() {
+      const modal = document.getElementById('pdfViewerModal');
+      const frame = document.getElementById('pdfViewerFrame');
+      if (frame) frame.src = 'about:blank';
+      if (modal) modal.style.display = 'none';
+    }
+
+    function openIniciarChatModal() {
+      document.getElementById('newChatPhone').value = '';
+      document.getElementById('newChatName').value = '';
+      document.getElementById('newChatMessage').value = '';
+
+      const qrContainer = document.getElementById('newChatQuickReplies');
+      let qrHtml = '';
+      quickRepliesList.forEach(qr => {
+        qrHtml += `<button class="chip-btn" onclick="insertNewChatTemplate(\`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>`;
+      });
+      qrContainer.innerHTML = qrHtml;
+
+      const pdfSelect = document.getElementById('newChatPdfSelect');
+      let pdfHtml = '<option value="">-- Sin Archivo Adjunto --</option>';
+      predefinedPdfsList.forEach(pdf => {
+        pdfHtml += `<option value="${pdf.id}">${pdf.title}</option>`;
+      });
+      pdfSelect.innerHTML = pdfHtml;
+
+      document.getElementById('iniciarChatModal').style.display = 'flex';
+    }
+
+    function closeIniciarChatModal() {
+      document.getElementById('iniciarChatModal').style.display = 'none';
+    }
+
+    function insertNewChatTemplate(text) {
+      document.getElementById('newChatMessage').value = text;
+    }
+
+    async function submitIniciarChat() {
+      const phone = document.getElementById('newChatPhone').value.trim();
+      const nombre = document.getElementById('newChatName').value.trim();
+      const mensaje = document.getElementById('newChatMessage').value.trim();
+      const pdfKey = document.getElementById('newChatPdfSelect').value;
+
+      let pdfNombre = null;
+      if (pdfKey) {
+        const found = predefinedPdfsList.find(p => p.id === pdfKey);
+        if (found) pdfNombre = found.name;
+      }
+
+      if (!phone) {
+        alert('Por favor ingresa el número de teléfono del paciente.');
+        return;
+      }
+
+      if (!mensaje && !pdfKey) {
+        alert('Por favor escribe un mensaje o selecciona un PDF para enviar al paciente.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/iniciar-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            remitente,
-            mensaje: mensajeText,
-            simulatedTime,
-            imagenBase64: currentImageBase64,
-            imagenNombre: currentImageName
+            phone,
+            nombre,
+            mensaje,
+            pdfKey,
+            pdfNombre
           })
         });
 
-        const data = await response.json();
-        pollSessionAndMessages();
-      } catch (err) {
-        console.error(err);
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ ¡Mensaje enviado y chat iniciado exitosamente con ${nombre || phone}!`);
+          closeIniciarChatModal();
+          selectedChatId = data.idConsulta;
+          fetchConsultas(true);
+        } else {
+          alert('Error al iniciar chat: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('Error de conexión al iniciar chat.');
       }
     }
 
-    function sendQuickMsg(text) {
-      sendMessage(text);
+    async function fetchDoctorsConfig() {
+      try {
+        const res = await fetch('/api/doctors');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items && Array.isArray(data.items)) {
+          doctorList = data.items;
+        }
+      } catch (e) {}
     }
 
-    function handleSendSubmit(e) {
-      e.preventDefault();
-      const userInput = document.getElementById('userInput');
-      const text = userInput.value;
-      if (!text.trim() && !attachedImageBase64) return;
-
-      const userMsgId = `msg_${Date.now()}_user`;
-      renderMessage(userMsgId, 'paciente', text || '(Imagen adjunta)', new Date().toISOString(), attachedImageBase64);
-
-      userInput.value = '';
-      userInput.style.height = 'auto';
-      sendMessage(text || '(Imagen adjunta)');
+    function renderDoctorEditor() {
+      const container = document.getElementById('doctorEditorList');
+      let html = '';
+      doctorList.forEach((doc, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <input type="text" value="${doc.name}" onchange="updateDocName(${idx}, this.value)" placeholder="Nombre del Médico (ej: Dra. Venier)..." style="font-weight: 700; flex: 1; min-width: 200px;">
+              <input type="text" value="${doc.specialty}" onchange="updateDocSpecialty(${idx}, this.value)" placeholder="Especialidad (ej: ORL / Telemedicina)..." style="flex: 1; min-width: 200px;">
+              <input type="text" value="${doc.phone}" onchange="updateDocPhone(${idx}, this.value)" placeholder="WhatsApp (ej: 5493516123456)..." style="width: 220px; color: #38bdf8; font-weight: 700;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeDoctor(${idx})">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
     }
 
-    function sendSampleDataA2WithImage() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 300;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, 400, 300);
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText('📋 PEDIDO MÉDICO - CLINICA', 20, 40);
-      ctx.font = '14px sans-serif';
-      ctx.fillText('Paciente: María González (DNI 32.456.789)', 20, 80);
-      ctx.fillText('Estudio: Ecografía Abdominal', 20, 110);
-      ctx.fillText('Obra Social: OSDE 210', 20, 140);
-      ctx.fillText('Firma y Sello Dr. Ramírez M.P. 45123', 20, 240);
+    function updateDocName(idx, val) { doctorList[idx].name = val.trim(); }
+    function updateDocSpecialty(idx, val) { doctorList[idx].specialty = val.trim(); }
+    function updateDocPhone(idx, val) { doctorList[idx].phone = val.trim(); }
 
-      attachedImageBase64 = canvas.toDataURL('image/jpeg');
-      attachedImageName = 'pedido_medico_muestra.jpg';
-
-      const sampleMsg = `1. María González
-2. 32456789
-3. 22/08/1992
-4. OSDE 210
-5. 1155443322
-6. Ecografía Abdominal
-7. Mañana (09 a 12 hs)`;
-
-      sendMessage(sampleMsg);
+    function addNewDoctor() {
+      doctorList.push({
+        id: `doc_${Date.now()}`,
+        name: 'Nuevo Médico',
+        specialty: 'Especialidad',
+        phone: '549351'
+      });
+      renderDoctorEditor();
     }
 
-    async function updateSessionState() {
-      pollSessionAndMessages();
+    function removeDoctor(idx) {
+      doctorList.splice(idx, 1);
+      renderDoctorEditor();
     }
 
-    let allPatientsList = [];
+    async function saveDoctorsConfig() {
+      try {
+        const res = await fetch('/api/doctors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: doctorList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Directorio de médicos guardado exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar médicos.');
+      }
+    }
 
-    async function fetchConsultas() {
+    function openTelemedicinaModal(idConsulta) {
+      const consulta = allConsultas.find(c => c.id === idConsulta);
+      if (!consulta) return;
+      activeTelemedicinaConsultaId = idConsulta;
+
+      const select = document.getElementById('telemedDoctorSelect');
+      let html = '<option value="">-- Seleccionar Médico de la Clínica --</option>';
+      doctorList.forEach(d => {
+        html += `<option value="${d.phone}" data-name="${d.name}">${d.name} (${d.specialty}) - 📱 ${d.phone}</option>`;
+      });
+      html += '<option value="custom">✏️ Ingresar Otro Número de Teléfono...</option>';
+      select.innerHTML = html;
+
+      const datos = consulta.datos || {};
+      const respuestasPaciente = datos.respuestasPaciente || [];
+      const displayImg = datos.imagenBase64 || datos.imagenUrl;
+      const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0 ? datos.imagenesAdjuntas : (displayImg ? [displayImg] : []);
+      const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+      const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
+      const prevContainer = document.getElementById('telemedFilesPreview');
+      prevContainer.innerHTML = `
+        <div style="font-size: 0.82rem; color: #38bdf8; font-weight: 700;">
+          📄 Documentos PDF a Reenviar (${listPdfs.length}) | 📷 Fotos a Reenviar (${listImagenes.length})
+        </div>
+      `;
+
+      document.getElementById('telemedNotaSecretaria').value = '';
+      document.getElementById('telemedicinaModal').style.display = 'flex';
+    }
+
+    function closeTelemedicinaModal() {
+      document.getElementById('telemedicinaModal').style.display = 'none';
+    }
+
+    async function submitTelemedicinaDerivacion() {
+      const idConsulta = activeTelemedicinaConsultaId;
+      const select = document.getElementById('telemedDoctorSelect');
+      let doctorPhone = select.value;
+      let doctorName = select.options[select.selectedIndex]?.getAttribute('data-name') || 'Médico';
+
+      if (doctorPhone === 'custom') {
+        doctorPhone = prompt('Ingresa el número de WhatsApp del médico con código de país (ej: 5493516123456):');
+        doctorName = 'Médico Externo';
+      }
+
+      if (!doctorPhone) {
+        alert('Por favor selecciona un médico o ingresa su número de WhatsApp.');
+        return;
+      }
+
+      const notaSecretaria = document.getElementById('telemedNotaSecretaria').value.trim();
+
+      try {
+        const res = await fetch('/api/forward-telemedicina', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idConsulta,
+            doctorPhone,
+            doctorName,
+            notaSecretaria
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ ¡Estudios y ficha derivados exitosamente al WhatsApp del ${doctorName}! (${data.totalArchivos} archivos reenviados).`);
+          closeTelemedicinaModal();
+          fetchConsultas(true);
+        } else {
+          alert('Error al derivar: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('Error de conexión al derivar telemedicina.');
+      }
+    }
+
+    async function fetchVipContactsConfig() {
+      try {
+        const res = await fetch('/api/vip-contacts');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items && Array.isArray(data.items)) {
+          vipContactsList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderVipEditor() {
+      const container = document.getElementById('vipEditorList');
+      let html = '';
+      vipContactsList.forEach((vip, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <input type="text" value="${vip.name}" onchange="updateVipName(${idx}, this.value)" placeholder="Nombre del Contacto (ej: Dr. López)..." style="font-weight: 700; flex: 1; min-width: 200px;">
+              <input type="text" value="${vip.phone}" onchange="updateVipPhone(${idx}, this.value)" placeholder="Número de Teléfono o ID @lid..." style="width: 230px; color: #facc15; font-weight: 700;">
+              <select onchange="updateVipPriority(${idx}, this.value)" style="width: 170px;">
+                <option value="vip" ${vip.priority === 'vip' ? 'selected' : ''}>⭐ Contacto Prioritario</option>
+                <option value="urgente" ${vip.priority === 'urgente' ? 'selected' : ''}>🚨 Urgencia Médica</option>
+              </select>
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeVipContact(${idx})">🗑️</button>
+            </div>
+            <input type="text" value="${vip.role || ''}" onchange="updateVipRole(${idx}, this.value)" placeholder="Cargo / Nota (ej: Socio Directivo, Auditor PAMI)..." style="font-size: 0.82rem; color: var(--muted);">
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateVipName(idx, val) { vipContactsList[idx].name = val.trim(); }
+    function updateVipPhone(idx, val) { vipContactsList[idx].phone = val.trim(); }
+    function updateVipPriority(idx, val) { vipContactsList[idx].priority = val; }
+    function updateVipRole(idx, val) { vipContactsList[idx].role = val.trim(); }
+
+    function addNewVipContact() {
+      vipContactsList.push({
+        id: `vip_${Date.now()}`,
+        phone: '351',
+        name: 'Nuevo Contacto Prioritario',
+        role: 'Socio / Directivo',
+        priority: 'vip'
+      });
+      renderVipEditor();
+    }
+
+    function removeVipContact(idx) {
+      vipContactsList.splice(idx, 1);
+      renderVipEditor();
+    }
+
+    async function saveVipContactsConfig() {
+      try {
+        const res = await fetch('/api/vip-contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: vipContactsList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Lista de contactos prioritarios guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar contactos prioritarios.');
+      }
+    }
+
+    async function limpiarTodasConsultas() {
+      if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
+        try {
+          const res = await fetch('/api/clear-consultas', { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            alert('🧹 Se han borrado todas las solicitudes de prueba.');
+            fetchConsultas(true);
+          }
+        } catch (e) {
+          alert('Error al limpiar solicitudes.');
+        }
+      }
+    }
+
+    async function cargar50ChatsPrueba() {
+      if (!confirm('⚡ ¿Deseas generar 50 solicitudes de prueba variadas (ORL, Estudios, Cirugías, PAMI, etc.) con estado PENDIENTE?')) return;
+      try {
+        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Se cargaron ${data.count || 50} chats de prueba exitosamente.`);
+          fetchConsultas(true);
+        } else {
+          alert('❌ Error al cargar solicitudes de prueba: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('❌ Error de red al conectar con el servidor.');
+      }
+    }
+
+    async function fetchBotConfig() {
+      try {
+        const res = await fetch('/api/bot-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cfg = data.config || {};
+        if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
+        if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
+      } catch (e) {}
+    }
+
+    async function saveScheduleMessagesConfig() {
+      try {
+        const fuera = document.getElementById('cfgFueraDeHorario').value;
+        const cierre = document.getElementById('cfgConfirmacionCierre').value;
+
+        const res = await fetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fueraDeHorario: fuera,
+            confirmacionCierre: cierre
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Mensajes de horario y finalización guardados exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar mensajes.');
+      }
+    }
+
+    async function fetchQuickRepliesConfig() {
+      try {
+        const res = await fetch('/api/quick-replies');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items) {
+          quickRepliesList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderQuickRepliesEditor() {
+      const container = document.getElementById('quickReplyEditorList');
+      let html = '';
+      quickRepliesList.forEach((qr, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${qr.title}" onchange="updateQuickTitle(${idx}, this.value)" placeholder="Título del Botón (ej: ✅ Confirmar Turno)..." style="font-weight: 700; flex: 1;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeQuickReply(${idx})">🗑️</button>
+            </div>
+            <textarea onchange="updateQuickText(${idx}, this.value)" style="width: 100%; min-height: 60px; font-size: 0.85rem;" placeholder="Texto que se insertará al hacer clic...">${qr.text}</textarea>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateQuickTitle(idx, val) { quickRepliesList[idx].title = val.trim(); }
+    function updateQuickText(idx, val) { quickRepliesList[idx].text = val.trim(); }
+    function addNewQuickReply() {
+      quickRepliesList.push({ id: `qr_${Date.now()}`, title: '⚡ Nueva Respuesta', text: 'Texto de la respuesta rápida...' });
+      renderQuickRepliesEditor();
+    }
+    function removeQuickReply(idx) { quickRepliesList.splice(idx, 1); renderQuickRepliesEditor(); }
+
+    async function saveQuickRepliesConfig() {
+      try {
+        const res = await fetch('/api/quick-replies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: quickRepliesList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Respuestas rápidas guardadas exitosamente.');
+        }
+      } catch (e) { alert('Error al guardar respuestas rápidas.'); }
+    }
+
+    async function fetchPdfItemsConfig() {
+      try {
+        const res = await fetch('/api/pdf-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.items) {
+          predefinedPdfsList = data.items;
+        }
+      } catch (e) {}
+    }
+
+    function renderPdfEditor() {
+      const container = document.getElementById('pdfEditorList');
+      let html = '';
+      predefinedPdfsList.forEach((pdf, idx) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${pdf.title}" onchange="updatePdfTitle(${idx}, this.value)" placeholder="Título del PDF en desplegable..." style="font-weight: 700; flex: 1;">
+              <input type="text" value="${pdf.name}" onchange="updatePdfName(${idx}, this.value)" placeholder="Nombre del archivo.pdf..." style="width: 250px;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removePdfItem(${idx})">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function updatePdfTitle(idx, val) { predefinedPdfsList[idx].title = val.trim(); }
+    function updatePdfName(idx, val) { predefinedPdfsList[idx].name = val.trim(); }
+    function addNewPdfItem() {
+      const id = `pdf_${Date.now()}`;
+      predefinedPdfsList.push({ id, title: '📄 Nuevo Instructivo PDF', name: 'Documento_Instrucciones.pdf' });
+      renderPdfEditor();
+    }
+    function removePdfItem(idx) { predefinedPdfsList.splice(idx, 1); renderPdfEditor(); }
+
+    async function savePdfItemsConfig() {
+      try {
+        const res = await fetch('/api/pdf-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: predefinedPdfsList })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderConsultas(true);
+          alert('✅ Lista de PDFs predeterminados guardada exitosamente.');
+        }
+      } catch (e) { alert('Error al guardar PDFs.'); }
+    }
+
+    function switchMainTab(tab) {
+      const viewC = document.getElementById('viewConsultas');
+      const viewS = document.getElementById('viewSettings');
+      const btnC = document.getElementById('tabMainBtn');
+      const btnS = document.getElementById('tabSettingsBtn');
+
+      if (tab === 'settings') {
+        viewC.style.display = 'none';
+        viewS.style.display = 'flex';
+        btnC.classList.remove('active');
+        btnS.classList.add('active');
+      } else {
+        viewC.style.display = 'block';
+        viewS.style.display = 'none';
+        btnC.classList.add('active');
+        btnS.classList.remove('active');
+      }
+    }
+
+    function switchSettingsSubTab(subTab) {
+      const secSched = document.getElementById('subSettingsSchedule');
+      const secTree = document.getElementById('subSettingsTree');
+      const secTags = document.getElementById('subSettingsTags');
+      const secQuick = document.getElementById('subSettingsQuick');
+      const secPdf = document.getElementById('subSettingsPdf');
+      const secVip = document.getElementById('subSettingsVip');
+      const secDoc = document.getElementById('subSettingsDoctor');
+
+      const btnSched = document.getElementById('subTabSchedBtn');
+      const btnTree = document.getElementById('subTabTreeBtn');
+      const btnTags = document.getElementById('subTabTagsBtn');
+      const btnQuick = document.getElementById('subTabQuickBtn');
+      const btnPdf = document.getElementById('subTabPdfBtn');
+      const btnVip = document.getElementById('subTabVipBtn');
+      const btnDoc = document.getElementById('subTabDocBtn');
+
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc].forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc].forEach(s => s.style.display = 'none');
+
+      if (subTab === 'tree') {
+        secTree.style.display = 'grid';
+        btnTree.classList.add('active');
+      } else if (subTab === 'tags') {
+        secTags.style.display = 'flex';
+        btnTags.classList.add('active');
+        renderTagEditor();
+      } else if (subTab === 'quick') {
+        secQuick.style.display = 'flex';
+        btnQuick.classList.add('active');
+        renderQuickRepliesEditor();
+      } else if (subTab === 'pdf') {
+        secPdf.style.display = 'flex';
+        btnPdf.classList.add('active');
+        renderPdfEditor();
+      } else if (subTab === 'vip') {
+        secVip.style.display = 'flex';
+        btnVip.classList.add('active');
+        renderVipEditor();
+      } else if (subTab === 'doctor') {
+        secDoc.style.display = 'flex';
+        btnDoc.classList.add('active');
+        renderDoctorEditor();
+      } else {
+        secSched.style.display = 'flex';
+        btnSched.classList.add('active');
+      }
+    }
+
+    async function fetchTagConfig() {
+      try {
+        const res = await fetch('/api/tag-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.tags) {
+          tagDefinitions = data.tags;
+          renderTopTagFilters();
+        }
+      } catch (e) {}
+    }
+
+    function renderTopTagFilters() {
+      const container = document.getElementById('topTagFiltersContainer');
+      let html = `<button class="tag-filter-chip ${currentTagFilter === 'all' ? 'active' : ''}" id="tagAll" onclick="setTagFilter('all', this)">Todas</button>`;
+
+      Object.entries(tagDefinitions).forEach(([key, tag]) => {
+        html += `<button class="tag-filter-chip ${currentTagFilter === key ? 'active' : ''}" style="color: ${tag.color};" onclick="setTagFilter('${key}', this)">${tag.label}</button>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderTagEditor() {
+      const container = document.getElementById('tagEditorList');
+      let html = '';
+
+      Object.entries(tagDefinitions).forEach(([key, tag]) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="color" value="${tag.color}" onchange="updateTagColor('${key}', this.value)" style="width: 38px; height: 38px; border: none; border-radius: 6px; cursor: pointer; background: transparent;">
+              <input type="text" value="${tag.label}" onchange="updateTagLabel('${key}', this.value)" style="flex: 1; font-weight: 600; font-size: 0.9rem;">
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.78rem;" onclick="removeTag('${key}')">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function updateTagLabel(key, val) {
+      if (tagDefinitions[key]) {
+        tagDefinitions[key].label = val.trim();
+      }
+    }
+
+    function updateTagColor(key, val) {
+      if (tagDefinitions[key]) {
+        tagDefinitions[key].color = val;
+      }
+    }
+
+    function addNewTag() {
+      const newKey = `tag_${Date.now()}`;
+      tagDefinitions[newKey] = {
+        key: newKey,
+        label: '🏷️ Nueva Etiqueta',
+        color: '#34d399'
+      };
+      renderTagEditor();
+    }
+
+    function removeTag(key) {
+      delete tagDefinitions[key];
+      renderTagEditor();
+    }
+
+    async function saveTagsConfig() {
+      try {
+        const res = await fetch('/api/tag-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tags: tagDefinitions })
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderTopTagFilters();
+          renderConsultas(true);
+          alert('✅ Configuración de etiquetas y colores guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar etiquetas.');
+      }
+    }
+
+    async function fetchScheduleConfig() {
+      try {
+        const res = await fetch('/api/schedule-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        currentScheduleMode = data.mode || 'auto';
+        updateScheduleUI(data);
+      } catch (e) {}
+    }
+
+    async function setScheduleMode(mode) {
+      try {
+        const res = await fetch('/api/schedule-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        });
+        const data = await res.json();
+        currentScheduleMode = data.mode || 'auto';
+        updateScheduleUI(data);
+      } catch (e) {
+        alert('Error al cambiar el modo de horario.');
+      }
+    }
+
+    function updateScheduleUI(data) {
+      const mode = data.mode || 'auto';
+      const autoBtn = document.getElementById('schedAuto');
+      const openBtn = document.getElementById('schedOpen');
+      const closedBtn = document.getElementById('schedClosed');
+      const badgeSettings = document.getElementById('settingsScheduleBadge');
+
+      if (autoBtn) autoBtn.style.background = mode === 'auto' ? 'rgba(59, 130, 246, 0.4)' : 'transparent';
+      if (openBtn) openBtn.style.background = mode === 'always_open' ? 'rgba(52, 211, 153, 0.4)' : 'transparent';
+      if (closedBtn) closedBtn.style.background = mode === 'always_closed' ? 'rgba(239, 68, 68, 0.4)' : 'transparent';
+
+      if (badgeSettings) {
+        if (mode === 'always_open') {
+          badgeSettings.innerText = '🟢 Estado Actual: FORZADO ABIERTO 24/7 (Atendiendo)';
+          badgeSettings.style.color = '#34d399';
+        } else if (mode === 'always_closed') {
+          badgeSettings.innerText = '🌙 Estado Actual: FORZADO CERRADO';
+          badgeSettings.style.color = '#ef4444';
+        } else {
+          badgeSettings.innerText = '⏰ Estado Actual: AUTOMÁTICO (Lun-Vie 8-20h)';
+          badgeSettings.style.color = '#60a5fa';
+        }
+      }
+    }
+
+    async function fetchMenuTree() {
+      try {
+        const res = await fetch('/api/menu-tree');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.tree && data.tree.items) {
+          currentMenuTree = data.tree;
+          renderMenuTreeEditor();
+        }
+      } catch (e) {}
+    }
+
+    function renderMenuTreeEditor() {
+      document.getElementById('menuWelcomeMsg').value = currentMenuTree.welcomeMessage || '';
+      const container = document.getElementById('menuItemsContainer');
+
+      if (!currentMenuTree.items || currentMenuTree.items.length === 0) {
+        container.innerHTML = '<div style="color: var(--muted); padding: 10px;">No hay opciones configuradas. Haz clic en "Agregar Nueva Opción".</div>';
+        updateLivePreview();
+        return;
+      }
+
+      let html = '';
+      currentMenuTree.items.forEach((item, index) => {
+        html += `
+          <div class="tree-builder-card">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" value="${item.key.toUpperCase()}" onchange="updateItemKey(${index}, this.value)" style="width: 50px; text-align: center; font-weight: 700; color: #00a884; font-size: 1rem;">
+              <input type="text" value="${item.label}" onchange="updateItemLabel(${index}, this.value)" placeholder="Título de la opción..." style="flex: 1; font-weight: 600;">
+              <select onchange="updateItemType(${index}, this.value)" style="width: 140px;">
+                <option value="form" ${item.type === 'form' ? 'selected' : ''}>Formulario</option>
+                <option value="submenu" ${item.type === 'submenu' ? 'selected' : ''}>Sub-Menú</option>
+                <option value="info" ${item.type === 'info' ? 'selected' : ''}>Info Directa</option>
+              </select>
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeMenuOption(${index})">🗑️</button>
+            </div>
+
+            ${item.type !== 'submenu' ? `
+              <div style="margin-top: 4px;">
+                <label style="font-size: 0.78rem; color: var(--muted); font-weight: 600;">Respuesta / Plantilla para el paciente:</label>
+                <textarea onchange="updateItemTemplate(${index}, this.value)" style="width: 100%; min-height: 60px; margin-top: 4px; font-size: 0.82rem;">${item.responseTemplate || ''}</textarea>
+              </div>
+            ` : `
+              <div style="background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--border); padding: 10px; border-radius: 8px; margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">Sub-Opciones de (${item.key.toUpperCase()}):</span>
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="addSubOption(${index})">➕ Agregar Sub-Opción</button>
+                </div>
+                ${(item.subItems || []).map((sub, sIdx) => `
+                  <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center;">
+                    <input type="text" value="${sub.key}" onchange="updateSubKey(${index}, ${sIdx}, this.value)" style="width: 40px; text-align: center; font-size: 0.8rem;">
+                    <input type="text" value="${sub.label}" onchange="updateSubLabel(${index}, ${sIdx}, this.value)" placeholder="Título sub-opción..." style="flex: 1; font-size: 0.8rem;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.76rem;" onclick="openSubOptionModal(${index}, ${sIdx})" title="Editar la respuesta de esta sub-opción">✏️ Configurar Texto</button>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem;" onclick="removeSubOption(${index}, ${sIdx})">✕</button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      updateLivePreview();
+    }
+
+    function openSubOptionModal(parentIndex, subIndex) {
+      activeSubEdit = { parentIndex, subIndex };
+      const sub = currentMenuTree.items[parentIndex].subItems[subIndex];
+
+      document.getElementById('subModalTitle').innerText = `✏️ Configurar Sub-Opción (${sub.key}) - ${sub.label}`;
+      document.getElementById('subModalType').value = sub.type || 'form';
+      document.getElementById('subModalTemplate').value = sub.responseTemplate || '';
+
+      document.getElementById('subOptionModal').style.display = 'flex';
+    }
+
+    function closeSubOptionModal() {
+      document.getElementById('subOptionModal').style.display = 'none';
+    }
+
+    function saveSubOptionModal() {
+      const { parentIndex, subIndex } = activeSubEdit;
+      if (parentIndex >= 0 && subIndex >= 0) {
+        const sub = currentMenuTree.items[parentIndex].subItems[subIndex];
+        sub.type = document.getElementById('subModalType').value;
+        sub.responseTemplate = document.getElementById('subModalTemplate').value;
+      }
+      closeSubOptionModal();
+      alert('✅ Plantilla de la sub-opción actualizada temporalmente. Haz clic en "Guardar y Publicar Menú Completo" para aplicar.');
+    }
+
+    function handleSubModalTypeChange(val) {}
+
+    function updateLivePreview() {
+      const welcome = document.getElementById('menuWelcomeMsg').value || '';
+      let text = welcome + '\n\n';
+      (currentMenuTree.items || []).forEach(item => {
+        text += `*${item.key.toUpperCase()})* ${item.label}\n`;
+      });
+      document.getElementById('whatsappLiveBubble').innerText = text.trim();
+    }
+
+    function addNewMenuOption() {
+      const nextChar = String.fromCharCode(65 + (currentMenuTree.items ? currentMenuTree.items.length : 0));
+      currentMenuTree.items.push({
+        key: nextChar.toLowerCase(),
+        label: `Nueva Opción ${nextChar}`,
+        type: 'form',
+        responseTemplate: 'Por favor responde con tus datos.'
+      });
+      renderMenuTreeEditor();
+    }
+
+    function removeMenuOption(index) {
+      currentMenuTree.items.splice(index, 1);
+      renderMenuTreeEditor();
+    }
+
+    function updateItemKey(index, val) {
+      currentMenuTree.items[index].key = val.toLowerCase().trim();
+      renderMenuTreeEditor();
+    }
+
+    function updateItemLabel(index, val) {
+      currentMenuTree.items[index].label = val.trim();
+      updateLivePreview();
+    }
+
+    function updateItemType(index, val) {
+      currentMenuTree.items[index].type = val;
+      if (val === 'submenu' && !currentMenuTree.items[index].subItems) {
+        currentMenuTree.items[index].subItems = [
+          { key: '1', label: 'Opción 1', type: 'form', responseTemplate: 'Ingresa los datos para la opción 1.' }
+        ];
+      }
+      renderMenuTreeEditor();
+    }
+
+    function updateItemTemplate(index, val) {
+      currentMenuTree.items[index].responseTemplate = val;
+    }
+
+    function addSubOption(parentIndex) {
+      if (!currentMenuTree.items[parentIndex].subItems) {
+        currentMenuTree.items[parentIndex].subItems = [];
+      }
+      const nextNum = (currentMenuTree.items[parentIndex].subItems.length + 1).toString();
+      currentMenuTree.items[parentIndex].subItems.push({
+        key: nextNum,
+        label: `Sub-Opción ${nextNum}`,
+        type: 'form',
+        responseTemplate: 'Por favor ingresa los datos solicitados.'
+      });
+      renderMenuTreeEditor();
+    }
+
+    function removeSubOption(parentIndex, subIndex) {
+      currentMenuTree.items[parentIndex].subItems.splice(subIndex, 1);
+      renderMenuTreeEditor();
+    }
+
+    function updateSubKey(parentIndex, subIndex, val) {
+      currentMenuTree.items[parentIndex].subItems[subIndex].key = val.trim();
+    }
+
+    function updateSubLabel(parentIndex, subIndex, val) {
+      currentMenuTree.items[parentIndex].subItems[subIndex].label = val.trim();
+    }
+
+    async function saveMenuTree() {
+      try {
+        currentMenuTree.welcomeMessage = document.getElementById('menuWelcomeMsg').value;
+        const res = await fetch('/api/menu-tree', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tree: currentMenuTree })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ ¡Árbol de Menú y Opciones guardado y publicado exitosamente en WhatsApp!');
+        }
+      } catch (e) {
+        alert('Error al guardar el menú del bot.');
+      }
+    }
+
+    async function fetchConsultas(forceRedraw = false) {
       try {
         const res = await fetch('/api/consultas');
         if (!res.ok) return;
         const data = await res.json();
-        const list = document.getElementById('consultasList');
-        const consultas = data.consultas || [];
+        allConsultas = data.consultas || [];
 
-        // Poblar lista de pacientes para el selector desplegable
-        populatePatientDropdown(consultas);
+        // Detectar si ingresó una consulta Prioritaria nueva para reproducir alarma y notificación de escritorio
+        let hasNewVipOrUrgent = false;
+        allConsultas.forEach(c => {
+          if (!previousConsultaIds.has(c.id)) {
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+            if (vipMatch) {
+              hasNewVipOrUrgent = true;
 
-        if (consultas.length === 0) {
-          list.innerHTML = `<div class="consulta-item" style="color: var(--text-muted);">Sin consultas registradas aún.</div>`;
-          return;
+              // Disparar Notificación de Escritorio OS
+              if ('Notification' in window && Notification.permission === 'granted') {
+                const contactName = vipMatch.name || c.datos?.pushName || c.remitente;
+                const roleText = vipMatch.role ? ` (${vipMatch.role})` : '';
+                const msgBody = c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido';
+
+                try {
+                  new Notification(`⭐ Mensaje Prioritario: ${contactName}${roleText}`, {
+                    body: msgBody,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
+                    requireInteraction: true
+                  });
+                } catch (nErr) {}
+              }
+            }
+          }
+        });
+
+        previousConsultaIds = new Set(allConsultas.map(c => c.id));
+        if (hasNewVipOrUrgent) {
+          playVipChimeSound();
         }
 
-        list.innerHTML = consultas.map(c => `
-          <div class="consulta-item">
-            <div class="consulta-header">
-              <span>${c.opcion || 'Consulta'}</span>
-              <span>${c.estado || 'pendiente'}</span>
-            </div>
-            <div><strong>Remitente:</strong> <span style="color:#60a5fa; cursor:pointer;" onclick="loadPatientDirect('${c.remitente}')">${c.remitente}</span></div>
-            ${c.datos && c.datos.imagenUrl ? `<div class="badge-drive">📷 <a href="${c.datos.imagenUrl}" target="_blank" style="color:inherit;">Ver Imagen (${c.datos.proveedorAlmacenamiento || 'Drive'})</a></div>` : ''}
-            <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">${new Date(c.timestamp).toLocaleString()}</div>
-          </div>
-        `).reverse().join('');
+        updateStats(allConsultas);
+        renderConsultas(forceRedraw);
+      } catch (err) {
+        console.error('Error al cargar consultas:', err);
+      }
+    }
+
+    function updateStats(totalArray) {
+      const pendientes = totalArray.filter(c => (c.estado || 'pendiente') === 'pendiente').length;
+      const atendidas = totalArray.filter(c => c.estado === 'atendido').length;
+      const prioritarios = totalArray.filter(c => vipContactsList.some(v => isVipMatch(c, v)) && (c.estado || 'pendiente') === 'pendiente').length;
+
+      document.getElementById('numPendientes').innerText = pendientes;
+      document.getElementById('numAtendidas').innerText = atendidas;
+      document.getElementById('numTotal').innerText = totalArray.length;
+      document.getElementById('countBadge').innerText = pendientes;
+
+      const prioBadge = document.getElementById('numPrioritariosBadge');
+      if (prioBadge) prioBadge.innerText = prioritarios;
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filters-bar .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderConsultas(true);
+    }
+
+    function setTagFilter(tag, btn) {
+      currentTagFilter = tag;
+      document.querySelectorAll('.tag-filter-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderConsultas(true);
+    }
+
+    function handleSearch() {
+      searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+      renderConsultas(true);
+    }
+
+    async function toggleTag(cardId, tagKey) {
+      const target = allConsultas.find(c => c.id === cardId);
+      if (!target) return;
+
+      const datos = target.datos || {};
+      let tags = datos.etiquetas || [];
+
+      if (tags.includes(tagKey)) {
+        tags = tags.filter(t => t !== tagKey);
+      } else {
+        tags.push(tagKey);
+      }
+
+      datos.etiquetas = tags;
+      target.datos = datos;
+      renderConsultas(true);
+
+      try {
+        await fetch(`/api/consultas/${cardId}/etiquetas`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ etiquetas: tags })
+        });
       } catch (e) {}
     }
 
-    function populatePatientDropdown(consultas) {
-      const dropdown = document.getElementById('patientDropdown');
-      if (!dropdown) return;
+    function insertTemplate(cardId, templateText) {
+      const textarea = document.getElementById(`replyText_${cardId}`);
+      if (textarea) {
+        textarea.value = templateText;
+        draftResponses[cardId] = templateText;
+      }
+    }
 
-      const currentVal = dropdown.value;
-      
-      // Obtener lista única de pacientes con nombre parseado si existe
-      const patientsMap = new Map();
-      consultas.forEach(c => {
-        if (c.remitente && !patientsMap.has(c.remitente)) {
-          let nombre = c.remitente;
-          if (c.datos && c.datos.contenidoMensaje) {
-            const matchNombre = c.datos.contenidoMensaje.match(/(?:Nombre|1\.):\s*([^\n]+)/i);
-            if (matchNombre) nombre = `${matchNombre[1].trim()} (${c.remitente})`;
-          }
-          patientsMap.set(c.remitente, { phone: c.remitente, label: nombre, opcion: c.opcion });
+    function handlePdfSelect(cardId, val) {
+      selectedPdfs[cardId] = val;
+    }
+
+    function handleCustomPdfUpload(cardId, fileInput) {
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          customPdfBase64[cardId] = e.target.result;
+          customPdfNames[cardId] = file.name;
+          selectedPdfs[cardId] = 'custom';
+          alert(`📎 Documento "${file.name}" cargado para enviar.`);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function formatTextForWhatsApp(text, datos) {
+      if (!text) text = '';
+      const cleanText = text.trim();
+      if (!cleanText) return '';
+
+      const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      const LABELS_PLANTILLA = [
+        '🪪 *DNI*',
+        '👤 *Nombre completo*',
+        '📅 *Fecha de nacimiento*',
+        '🏥 *Obra social*',
+        '🩺 *Motivo de consulta*',
+        '📱 *Celular*',
+        '📧 *E-mail*',
+        '👨‍⚕️ *Médico (Preferencia)*',
+        '⏰ *Preferencia horaria*'
+      ];
+
+      // Si el mensaje consiste en respuestas en varias líneas sin los dos puntos ':', aparear CADA línea con su etiqueta
+      if (lines.length >= 2 && lines.length <= 12 && !cleanText.includes(':')) {
+        const formattedLines = lines.map((line, i) => {
+          const label = LABELS_PLANTILLA[i] || `📌 *Dato ${i+1}*`;
+          return `${label}: ${line}`;
+        });
+
+        if (datos && (datos.tipoSolicitud || datos.opcion)) {
+          formattedLines.unshift(`📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}`);
+        }
+        return formattedLines.join('\n');
+      }
+
+      // Si ya tiene etiquetas o es texto libre, conservar el 100% del texto intacto
+      if (datos && (datos.tipoSolicitud || datos.opcion) && !cleanText.toLowerCase().includes('solicitud')) {
+        return `📋 *Solicitud:* ${datos.tipoSolicitud || datos.opcion}\n${cleanText}`;
+      }
+
+      return cleanText;
+    }
+
+    function renderWhatsAppFormattedText(text) {
+      if (!text) return '';
+      let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>');
+      return html;
+    }
+
+    let currentOperatorName = localStorage.getItem('wabot_operator_name') || 'Secretaría';
+
+    function initOperatorNameUI() {
+      const input = document.getElementById('operatorNameInput');
+      if (input) {
+        input.value = currentOperatorName;
+      }
+    }
+
+    function updateOperatorName(newName) {
+      if (newName && newName.trim().length > 0) {
+        currentOperatorName = newName.trim();
+        localStorage.setItem('wabot_operator_name', currentOperatorName);
+        if (selectedChatId) {
+          fetch(`/api/consultas/${selectedChatId}/gestion`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ operador: currentOperatorName })
+          }).catch(() => {});
+        }
+      }
+    }
+
+    function selectChat(id) {
+      if (selectedChatId && selectedChatId !== id) {
+        const prevId = selectedChatId;
+        fetch(`/api/consultas/${prevId}/gestion`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ release: true })
+        }).catch(() => {});
+      }
+
+      selectedChatId = id;
+
+      fetch(`/api/consultas/${id}/gestion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operador: currentOperatorName })
+      }).catch(() => {});
+
+      renderConsultas(true);
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (selectedChatId) {
+        navigator.sendBeacon(`/api/consultas/${selectedChatId}/gestion`, JSON.stringify({ release: true }));
+      }
+    });
+
+    function renderConsultas(forceRedraw = false) {
+      const containerGrid = document.getElementById('consultasGrid');
+      const containerChatSidebar = document.getElementById('chatSidebarList');
+      const containerChatMain = document.getElementById('chatMainView');
+
+      // PROTECCIÓN CONTRA PÉRDIDA DE FOCO AL ESCRIBIR
+      if (!forceRedraw && document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) {
+        return;
+      }
+
+      document.querySelectorAll('textarea[id^="replyText_"]').forEach(ta => {
+        const cardId = ta.id.replace('replyText_', '');
+        if (ta.value.trim().length > 0) {
+          draftResponses[cardId] = ta.value;
         }
       });
 
-      allPatientsList = Array.from(patientsMap.values());
+      let filtered = [...allConsultas];
 
-      let html = `<option value="">-- Seleccionar Paciente (${allPatientsList.length} disponibles) --</option>`;
-      allPatientsList.forEach(p => {
-        html += `<option value="${p.phone}">${p.label} - [${p.opcion || 'Consulta'}]</option>`;
+      if (currentFilter === 'prioritarios') {
+        filtered = filtered.filter(c => vipContactsList.some(v => isVipMatch(c, v)));
+      } else if (currentFilter !== 'todos') {
+        filtered = filtered.filter(c => (c.estado || 'pendiente') === currentFilter);
+      }
+
+      if (currentTagFilter !== 'all') {
+        filtered = filtered.filter(c => c.datos && c.datos.etiquetas && c.datos.etiquetas.includes(currentTagFilter));
+      }
+
+      if (searchQuery) {
+        filtered = filtered.filter(c => {
+          const rem = (c.remitente || '').toLowerCase();
+          const msg = (c.datos && c.datos.contenidoMensaje ? c.datos.contenidoMensaje : '').toLowerCase();
+          const pName = (c.datos && c.datos.pushName ? c.datos.pushName : '').toLowerCase();
+          return rem.includes(searchQuery) || msg.includes(searchQuery) || pName.includes(searchQuery);
+        });
+      }
+
+      // SISTEMA DE ORDENAMIENTO DE COLA INTELIGENTE (FIFO + PRIORIDAD VIP + CONVERSACIÓN ACTIVA):
+      filtered.sort((a, b) => {
+        const vipA = vipContactsList.find(v => isVipMatch(a, v));
+        const vipB = vipContactsList.find(v => isVipMatch(b, v));
+
+        // 1. Prioritarios y Urgencias siempre flotan primero (#1)
+        if (vipA && !vipB) return -1;
+        if (!vipA && vipB) return 1;
+        if (vipA && vipB) {
+          if (vipA.priority === 'urgente' && vipB.priority !== 'urgente') return -1;
+          if (vipA.priority !== 'urgente' && vipB.priority === 'urgente') return 1;
+          const timeA = new Date(a.timestamp || a.createdAt).getTime();
+          const timeB = new Date(b.timestamp || b.createdAt).getTime();
+          return timeB - timeA;
+        }
+
+        // 2. Conversación activa (el paciente respondió tras un mensaje de la secretaria) sube arriba
+        const activeA = a.datos && a.datos.respuestasPaciente && a.datos.respuestasPaciente.length > 0;
+        const activeB = b.datos && b.datos.respuestasPaciente && b.datos.respuestasPaciente.length > 0;
+        if (activeA && !activeB) return -1;
+        if (!activeA && activeB) return 1;
+
+        // 3. FIFO: Los mensajes más antiguos primero (para atender a quien lleva más tiempo esperando)
+        const timeA = new Date(a.timestamp || a.createdAt).getTime();
+        const timeB = new Date(b.timestamp || b.createdAt).getTime();
+        return timeA - timeB;
       });
 
-      dropdown.innerHTML = html;
-      if (currentVal) dropdown.value = currentVal;
-    }
+      // RENDER VISTA 1: GRID DE TARJETAS
+      if (currentViewMode === 'grid') {
+        if (filtered.length === 0) {
+          containerGrid.innerHTML = `<div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">No hay solicitudes en esta sección. (¡Bandeja al día!)</div>`;
+        } else {
+          let html = '';
+          filtered.forEach(c => {
+            const datos = c.datos || {};
+            const respuestasSecretaria = datos.respuestasSecretaria || [];
+            const respuestasPaciente = datos.respuestasPaciente || [];
+            const etiquetas = datos.etiquetas || [];
+            const fecha = new Date(c.timestamp || c.createdAt).toLocaleString();
+            const displayImg = datos.imagenBase64 || datos.imagenUrl;
+            const imgUrl = datos.imagenUrl;
 
-    function onSelectPatientDropdown(phone) {
-      if (!phone) return;
-      loadPatientDirect(phone);
-    }
+            const draftValue = draftResponses[c.id] || '';
+            const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0
+              ? datos.imagenesAdjuntas
+              : (displayImg ? [displayImg] : []);
 
-    function pickRandomPatient() {
-      if (allPatientsList.length > 0) {
-        const randomPatient = allPatientsList[Math.floor(Math.random() * allPatientsList.length)];
-        loadPatientDirect(randomPatient.phone);
-      } else {
-        // Generar un número aleatorio de celular argentino (+54911 + 8 dígitos)
-        const area = ['11', '351', '261', '341', '381'][Math.floor(Math.random() * 5)];
-        const num = Math.floor(10000000 + Math.random() * 89999999);
-        const randomPhone = `+549${area}${num}`;
-        loadPatientDirect(randomPhone);
+            const pdfsFromResp = respuestasPaciente.filter(r => r.pdfBase64).map(r => ({ base64: r.pdfBase64, nombre: r.pdfNombre || 'pedido_medico.pdf' }));
+            const listPdfs = (datos.pdfsAdjuntos && datos.pdfsAdjuntos.length > 0) ? datos.pdfsAdjuntos : pdfsFromResp;
+
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+
+            const contenidoMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje de texto)';
+
+            const enGestionCard = datos.enGestionPor;
+            const enGestionAtCard = datos.enGestionAt || 0;
+            const isManagedCard = enGestionCard && (Date.now() - enGestionAtCard < 120000);
+            let managedBadgeCard = '';
+            if (isManagedCard) {
+              if (enGestionCard === currentOperatorName) {
+                managedBadgeCard = `<span class="tag-badge" style="background: rgba(56, 189, 248, 0.25); color: #38bdf8; border: 1px solid #38bdf8; font-weight: 700;">👁️ En gestión por Vos</span>`;
+              } else {
+                managedBadgeCard = `<span class="tag-badge" style="background: rgba(234, 179, 8, 0.25); color: #facc15; border: 1px solid #facc15; font-weight: 700;">👁️ En gestión por ${enGestionCard}</span>`;
+              }
+            }
+
+            let cardClass = 'card';
+            if (vipMatch) {
+              cardClass += vipMatch.priority === 'urgente' ? ' urgent-card' : ' vip-card';
+            }
+
+            html += `
+              <div class="${cardClass}" id="card_${c.id}">
+                <div class="card-header">
+                  <span class="tab-btn" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: none; font-size: 0.75rem;">
+                    ${c.opcion || 'Consulta'}
+                  </span>
+                  <button class="btn btn-secondary" style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8;" onclick="openTelemedicinaModal('${c.id}')">
+                    🩺 Derivar Telemedicina
+                  </button>
+                  <span class="tab-btn" style="background: ${c.estado === 'atendido' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(251, 191, 36, 0.2)'}; color: ${c.estado === 'atendido' ? '#34d399' : '#fbbf24'}; border: none; font-size: 0.75rem;">
+                    ${c.estado === 'atendido' ? '✅ Atendido' : '⏳ Pendiente'}
+                  </span>
+                </div>
+
+                ${vipMatch ? `
+                  <div style="background: ${vipMatch.priority === 'urgente' ? '#dc2626' : '#d97706'}; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                    <span>${vipMatch.priority === 'urgente' ? '🚨 CONTACTO DE URGENCIA' : '⭐ CONTACTO PRIORITARIO'}</span>
+                    <span><strong>${vipMatch.name || 'Prioritario'}</strong> ${vipMatch.role ? `(${vipMatch.role})` : ''}</span>
+                  </div>
+                ` : ''}
+
+                <div class="patient-info">
+                  <div><strong>Paciente:</strong> <span style="color: var(--accent); font-weight: 700;">📱 ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}</span></div>
+                  <div style="font-size: 0.78rem; color: var(--muted);">📅 Recibido: ${fecha}</div>
+
+                  <!-- ETIQUETAS Y ETIQUETADOR -->
+                  <div style="margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+                    ${managedBadgeCard}
+                    ${etiquetas.map(t => {
+                      const def = tagDefinitions[t];
+                      if (!def) return '';
+                      return `<span class="tag-badge" style="background: ${def.color}33; color:${def.color}; border: 1px solid ${def.color};">${def.label}</span>`;
+                    }).join('')}
+                  </div>
+
+                  <div class="tag-selector">
+                    <span style="font-size: 0.7rem; color: var(--muted); font-weight: 600; align-self: center;">Etiquetar:</span>
+                    ${Object.entries(tagDefinitions).map(([key, def]) => {
+                      const isSel = etiquetas.includes(key);
+                      return `<button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color};` : ''}" onclick="toggleTag('${c.id}', '${key}')">${def.label}</button>`;
+                    }).join('')}
+                  </div>
+                </div>
+
+                <!-- 📥 Solicitud Inicial del Paciente -->
+                <div style="background: #0f172a; padding: 10px; border-radius: 8px; font-size: 0.85rem; color: #cbd5e1; white-space: pre-wrap; border: 1px solid var(--border);">
+                  ${contenidoMsg}
+                </div>
+
+                <!-- 👩‍⚕️ Historial de Respuestas de Secretaría -->
+                ${respuestasSecretaria.length > 0 ? `
+                  <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; font-size: 0.84rem;">
+                    <strong style="color: #60a5fa;">👩‍⚕️ Enviado por Secretaría:</strong>
+                    ${respuestasSecretaria.map(r => `
+                      <div style="margin-top: 4px; color: #e2e8f0;">
+                        💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                <!-- 🟢 RESPUESTA EN VIVO DEL PACIENTE -->
+                ${respuestasPaciente.length > 0 ? `
+                  <div style="background: linear-gradient(135deg, rgba(0, 230, 153, 0.18), rgba(5, 150, 105, 0.25)); border: 2px solid #00e699; border-radius: 10px; padding: 12px; font-size: 0.92rem;">
+                    <strong style="color: #00e699; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;">💬 Respuesta del Paciente en Vivo:</strong>
+                    ${respuestasPaciente.map(r => `
+                      <div style="margin-top: 6px; color: #ffffff; font-weight: 700; font-size: 1.05rem;">
+                        🟢 <em>"${r.texto}"</em> <span style="font-size: 0.72rem; color: #a7f3d0; font-weight: 400;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                        ${r.pdfBase64 ? `
+                          <div style="margin-top: 6px;">
+                            <button onclick="openPdfViewer('${r.pdfBase64}', '${r.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                              👁️ Ver PDF: ${r.pdfNombre || 'pedido_medico.pdf'}
+                            </button>
+                            <a href="${r.pdfBase64}" download="${r.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline; margin-left: 8px;">
+                              ⬇️ Descargar
+                            </a>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                <!-- 📄 DOCUMENTOS PDF ENVIADOS POR EL PACIENTE -->
+                ${listPdfs.length > 0 ? `
+                  <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(56, 189, 248, 0.06); padding: 10px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">📄 Documentos PDF Adjuntos del Paciente (${listPdfs.length}):</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                      ${listPdfs.map((pdfItem, pIdx) => `
+                        <div style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                          <span>📄 ${pdfItem.nombre || `Documento_PDF_${pIdx + 1}.pdf`}</span>
+                          <div style="display: flex; gap: 8px; align-items: center;">
+                            <button onclick="openPdfViewer('${pdfItem.base64}', '${pdfItem.nombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">👁️ Ver PDF</button>
+                            <a href="${pdfItem.base64}" download="${pdfItem.nombre || 'pedido_medico.pdf'}" target="_blank" style="font-size: 0.75rem; color: var(--muted); text-decoration: underline;">⬇️ Descargar</a>
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- 📷 GALERÍA MULTI-FOTO CON LAZY LOADING -->
+                ${(() => {
+                  if (listImagenes.length === 0 && !imgUrl) return '';
+                  return `
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                      <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">📷 Pedidos Médicos / Fotos Adjuntas (${listImagenes.length}):</span>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                        ${listImagenes.map((imgSrc, idx) => `
+                          <div class="card-img-container" onclick="openLightbox('${imgSrc}')" title="Clic para ampliar Foto ${idx + 1}">
+                            <img src="${imgSrc}" class="card-img-preview" loading="lazy" alt="Foto ${idx + 1}">
+                            <div class="card-img-overlay">
+                              <span>🔍 Foto ${idx + 1}</span>
+                            </div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `;
+                })()}
+
+                <div class="reply-box">
+                  <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
+
+                  <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS -->
+                  <div class="quick-reply-chips">
+                    ${quickRepliesList.map(qr => `
+                      <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
+                    `).join('')}
+                  </div>
+
+                  <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta aquí y presioná Enter para enviar..." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); responderViaApi('${c.id}', '${c.remitente}'); }">${draftValue}</textarea>
+
+                  <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                    <label style="font-size: 0.78rem; color: #38bdf8; font-weight: 600;">📄 Adjuntar Indicaciones de Estudio (PDF):</label>
+                    <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.8rem;">
+                      <option value="">-- Sin Archivo Adjunto --</option>
+                      ${predefinedPdfsList.map(pdf => `
+                        <option value="${pdf.id}">${pdf.title}</option>
+                      `).join('')}
+                    </select>
+
+                    <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                      O subir PDF personalizado:
+                      <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">
+                    </div>
+                  </div>
+
+                  <button class="btn" style="margin-top: 8px; width: 100%; font-size: 0.95rem;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
+                    📤 Enviar Respuesta por WhatsApp
+                  </button>
+                </div>
+
+                <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
+                  <button class="btn btn-secondary" style="font-size: 0.78rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
+                    ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+          containerGrid.innerHTML = html;
+        }
       }
+
+      // RENDER VISTA 2: LAYOUT DE CHAT ESTILO WHATSAPP (ULTRA LIVIANO)
+      if (currentViewMode === 'chat') {
+        // 1. Sidebar items
+        if (filtered.length === 0) {
+          containerChatSidebar.innerHTML = `<div style="color: var(--muted); padding: 20px; text-align: center; font-size: 0.84rem;">Sin chats en esta sección.</div>`;
+        } else {
+          let sideHtml = '';
+          filtered.forEach(c => {
+            const datos = c.datos || {};
+            const etiquetas = datos.etiquetas || [];
+            const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+            const isSel = selectedChatId === c.id;
+            const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName || c.remitente);
+            const lastMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje)';
+            const fechaStr = new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+            const enGestion = datos.enGestionPor;
+            const enGestionAt = datos.enGestionAt || 0;
+            const isManaged = enGestion && (Date.now() - enGestionAt < 120000);
+            let managedBadge = '';
+            if (isManaged) {
+              if (enGestion === currentOperatorName) {
+                managedBadge = `<span style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.25); color: #38bdf8; padding: 2px 6px; border-radius: 4px; border: 1px solid #38bdf8; font-weight: 700;">👁️ En gestión por Vos</span>`;
+              } else {
+                managedBadge = `<span style="font-size: 0.68rem; background: rgba(234, 179, 8, 0.25); color: #facc15; padding: 2px 6px; border-radius: 4px; border: 1px solid #facc15; font-weight: 700;">👁️ En gestión por ${enGestion}</span>`;
+              }
+            }
+
+            sideHtml += `
+              <div class="chat-item ${isSel ? 'active' : ''}" onclick="selectChat('${c.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="font-size: 0.9rem; color: ${vipMatch ? '#facc15' : 'var(--text)'}; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;">
+                    ${patientName}
+                  </strong>
+                  <span style="font-size: 0.72rem; color: var(--muted);">${fechaStr}</span>
+                </div>
+                <div style="font-size: 0.78rem; color: var(--muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                  ${lastMsg}
+                </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; align-items: center;">
+                  ${managedBadge}
+                  <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">
+                    ${c.opcion || 'Consulta'}
+                  </span>
+                  ${etiquetas.map(t => {
+                    const def = tagDefinitions[t];
+                    if (!def) return '';
+                    return `<span style="font-size: 0.68rem; background:${def.color}33; color:${def.color}; padding: 2px 6px; border-radius: 4px; border: 1px solid ${def.color};">${def.label}</span>`;
+                  }).join('')}
+                  ${c.estado === 'atendido' ? `<span style="font-size: 0.68rem; background: rgba(52, 211, 153, 0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">Atendido</span>` : ''}
+                </div>
+              </div>
+            `;
+          });
+          containerChatSidebar.innerHTML = sideHtml;
+        }
+
+        // Si no hay chat seleccionado o el seleccionado fue filtrado, seleccionar el primero automáticamente
+        if (filtered.length > 0 && (!selectedChatId || !filtered.some(c => c.id === selectedChatId))) {
+          selectedChatId = filtered[0].id;
+        }
+
+        const currentSelected = filtered.find(c => c.id === selectedChatId);
+
+        if (!currentSelected) {
+          containerChatMain.innerHTML = `<div style="color: var(--muted); margin: auto; text-align: center;">No hay chat seleccionado.</div>`;
+        } else {
+          const c = currentSelected;
+          const datos = c.datos || {};
+          const respuestasSecretaria = datos.respuestasSecretaria || [];
+          const respuestasPaciente = datos.respuestasPaciente || [];
+          const etiquetas = datos.etiquetas || [];
+
+          const draftValue = draftResponses[c.id] || '';
+          const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+
+          // CONSTRUIR STREAM UNIFICADO 100% CRONOLÓGICO POR TIMESTAMP E INTEGRADO (FOTOS + PDFS + TEXTO)
+          const allStreamMsgs = [];
+          const baseTime = new Date(c.timestamp || c.createdAt).getTime();
+
+          const initMsgFormatted = formatTextForWhatsApp(datos.contenidoMensaje || datos.mensajeRaw, datos);
+          if (initMsgFormatted) {
+            allStreamMsgs.push({
+              type: 'init',
+              senderName: '📥 Mensaje Inicial del Paciente',
+              text: initMsgFormatted,
+              timestamp: baseTime,
+              cssClass: 'chat-bubble-patient',
+              headerColor: '#38bdf8'
+            });
+          }
+
+          respuestasSecretaria.forEach((r, idx) => {
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 1) * 1000);
+            allStreamMsgs.push({
+              type: 'sec',
+              senderName: '👩‍⚕️ Secretaría',
+              text: r.texto,
+              timestamp: ts,
+              cssClass: 'chat-bubble-sec',
+              headerColor: '#a7f3d0'
+            });
+          });
+
+          respuestasPaciente.forEach((r, idx) => {
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 2) * 1000);
+            allStreamMsgs.push({
+              type: 'pac',
+              senderName: '🟢 Paciente',
+              text: formatTextForWhatsApp(r.texto, null),
+              timestamp: ts,
+              pdfBase64: r.pdfBase64,
+              pdfNombre: r.pdfNombre,
+              imagenBase64: r.imagenBase64,
+              cssClass: 'chat-bubble-patient',
+              headerColor: '#00e699'
+            });
+          });
+
+          // Incluir imágenes adjuntas iniciales si no están ya en respuestasPaciente
+          const displayImg = datos.imagenBase64 || datos.imagenUrl;
+          const listImagenes = datos.imagenesAdjuntas && datos.imagenesAdjuntas.length > 0 ? datos.imagenesAdjuntas : (displayImg ? [displayImg] : []);
+
+          listImagenes.forEach((imgSrc, idx) => {
+            const alreadyInResp = respuestasPaciente.some(r => r.imagenBase64 === imgSrc);
+            if (!alreadyInResp && imgSrc) {
+              allStreamMsgs.push({
+                type: 'pac_img',
+                senderName: '🟢 Paciente',
+                text: '',
+                timestamp: baseTime + 10 + idx,
+                imagenBase64: imgSrc,
+                cssClass: 'chat-bubble-patient',
+                headerColor: '#00e699'
+              });
+            }
+          });
+
+          const listPdfs = datos.pdfsAdjuntos || [];
+          listPdfs.forEach((pdfItem, idx) => {
+            const alreadyInResp = respuestasPaciente.some(r => r.pdfBase64 === pdfItem.base64);
+            if (!alreadyInResp && pdfItem.base64) {
+              allStreamMsgs.push({
+                type: 'pac_pdf',
+                senderName: '🟢 Paciente',
+                text: '',
+                timestamp: baseTime + 20 + idx,
+                pdfBase64: pdfItem.base64,
+                pdfNombre: pdfItem.nombre,
+                cssClass: 'chat-bubble-patient',
+                headerColor: '#38bdf8'
+              });
+            }
+          });
+
+          allStreamMsgs.sort((a, b) => a.timestamp - b.timestamp);
+
+          let mainHtml = `
+            <!-- ENCABEZADO CHAT CON ETIQUETADOR Y DERIVACIÓN A TELEMEDICINA -->
+            <div style="background: #111b21; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; background: ${vipMatch ? '#facc15' : '#00a884'}; color: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">
+                  ${vipMatch ? '⭐' : '📱'}
+                </div>
+                <div>
+                  <h3 style="font-size: 1rem; font-weight: 700; color: #e9edef;">
+                    ${datos.pushName ? `${datos.pushName} (${c.remitente})` : c.remitente}
+                  </h3>
+                  <div style="font-size: 0.75rem; color: #00a884; font-weight: 600;">
+                    ${vipMatch ? `${vipMatch.name} (${vipMatch.role || 'Prioritario'})` : `Opción: ${c.opcion || 'Consulta'}`}
+                  </div>
+                </div>
+              </div>
+
+              <!-- SELECTOR DE ETIQUETAS INTEGRADO EN EL ENCABEZADO -->
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="font-size: 0.75rem; color: var(--muted); font-weight: 700;">Etiquetas:</span>
+                ${Object.entries(tagDefinitions).map(([key, def]) => {
+                  const isSel = etiquetas.includes(key);
+                  return `
+                    <button class="tag-chip-btn ${isSel ? 'selected' : ''}" style="${isSel ? `background:${def.color}; color:#fff; font-weight:700; border-color:transparent;` : ''}" onclick="toggleTag('${c.id}', '${key}')">
+                      ${def.label}
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-secondary" style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;" onclick="openTelemedicinaModal('${c.id}')">
+                  🩺 Derivar Telemedicina
+                </button>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="marcarEstado('${c.id}', '${c.estado === 'atendido' ? 'pendiente' : 'atendido'}')">
+                  ${c.estado === 'atendido' ? '↩️ Reabrir Consulta' : '☑️ Marcar Atendido / Finalizar Chat'}
+                </button>
+              </div>
+            </div>
+
+            <!-- CHAT STREAM SCROLLABLE CRONOLÓGICO -->
+            <div class="chat-stream" id="chatStreamBox_${c.id}">
+              ${allStreamMsgs.map(m => `
+                <div class="${m.cssClass}">
+                  <div style="font-size: 0.72rem; color: ${m.headerColor}; font-weight: 700; margin-bottom: 4px;">
+                    ${m.senderName}
+                  </div>
+
+                  ${m.text ? `<div style="white-space: pre-wrap; word-break: break-word; line-height: 1.45; font-size: 0.88rem;">${renderWhatsAppFormattedText(m.text)}</div>` : ''}
+
+                  ${m.imagenBase64 ? `
+                    <div style="margin-top: 6px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                      <div class="card-img-container" onclick="openLightbox('${m.imagenBase64}')" title="Haz clic para ver foto en HD">
+                        <img src="${m.imagenBase64}" style="max-height: 250px; border-radius: 6px; object-fit: cover;" loading="lazy" alt="Foto adjunta">
+                        <div class="card-img-overlay">
+                          <span>🔍 Clic para ampliar HD</span>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
+
+                  ${m.pdfBase64 ? `
+                    <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                      <button onclick="openPdfViewer('${m.pdfBase64}', '${m.pdfNombre || 'pedido_medico.pdf'}')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        👁️ Ver PDF: ${m.pdfNombre || 'pedido_medico.pdf'}
+                      </button>
+                      <a href="${m.pdfBase64}" download="${m.pdfNombre || 'pedido_medico.pdf'}" target="_blank" style="color: var(--muted); font-size: 0.75rem; text-decoration: underline;">
+                        ⬇️ Descargar
+                      </a>
+                    </div>
+                  ` : ''}
+
+                  <div style="font-size: 0.68rem; color: #8696a0; text-align: right; margin-top: 4px;">
+                    ${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    ${m.type === 'sec' ? '<span style="color: #53bdeb; font-weight: bold; margin-left: 3px;">✓✓</span>' : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- PANEL INFERIOR DE RESPUESTA ESPACIOSO -->
+            <div style="background: #111b21; padding: 14px 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
+              <div class="quick-reply-chips">
+                ${quickRepliesList.map(qr => `
+                  <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
+                `).join('')}
+              </div>
+
+              <div style="display: flex; gap: 12px; align-items: flex-end;">
+                <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta a ${datos.pushName || c.remitente} y presiona Enter..." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); responderViaApi('${c.id}', '${c.remitente}'); }" style="flex: 1; background: #2a3942; border: 1px solid rgba(255,255,255,0.1); color: #e9edef; padding: 12px; border-radius: 10px; min-height: 70px; font-size: 0.92rem; outline: none;">${draftValue}</textarea>
+                <button class="btn" style="padding: 14px 24px; font-size: 1rem; height: 70px;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
+                  📤 Enviar WhatsApp
+                </button>
+              </div>
+
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <select id="pdfSelect_${c.id}" onchange="handlePdfSelect('${c.id}', this.value)" style="background: #2a3942; border: 1px solid var(--border); color: #e9edef; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; flex: 1;">
+                  <option value="">-- Sin Archivo PDF Adjunto --</option>
+                  ${predefinedPdfsList.map(pdf => `
+                    <option value="${pdf.id}">${pdf.title}</option>
+                  `).join('')}
+                </select>
+
+                <div style="font-size: 0.75rem; color: var(--muted);">
+                  O subir PDF:
+                  <input type="file" accept="application/pdf" onchange="handleCustomPdfUpload('${c.id}', this)" style="font-size: 0.75rem; color: var(--muted);">
+                </div>
+              </div>
+            </div>
+          `;
+
+          containerChatMain.innerHTML = mainHtml;
+
+          const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
+          if (streamBox) {
+            if (allStreamMsgs.length <= 2) {
+              streamBox.scrollTop = 0;
+            } else {
+              streamBox.scrollTop = streamBox.scrollHeight;
+            }
+          }
+        }
+      }
+
     }
 
-    async function generar70PruebasDesdeSimulador(evt) {
-      const btn = evt ? evt.target : null;
-      if (btn) {
-        btn.innerText = '⏳ Cargando...';
-        btn.disabled = true;
+    const isSendingResponse = {};
+
+    async function responderViaApi(idConsulta, remitente) {
+      if (isSendingResponse[idConsulta]) return;
+
+      const textarea = document.getElementById(`replyText_${idConsulta}`);
+      const respuestaText = textarea ? textarea.value.trim() : '';
+
+      const pdfKey = selectedPdfs[idConsulta] || '';
+      let pdfBase64ToSend = customPdfBase64[idConsulta] || null;
+      let pdfNombreToSend = customPdfNames[idConsulta] || null;
+
+      if (!pdfBase64ToSend && pdfKey) {
+        const found = predefinedPdfsList.find(p => p.id === pdfKey);
+        if (found) {
+          pdfNombreToSend = found.name;
+        }
       }
+
+      if (!respuestaText && !pdfKey && !pdfBase64ToSend) {
+        alert('Por favor escribe un mensaje o selecciona un documento PDF para enviar.');
+        return;
+      }
+
+      isSendingResponse[idConsulta] = true;
 
       try {
-        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const res = await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente,
+            respuesta: respuestaText,
+            idConsulta,
+            pdfKey: pdfKey !== 'custom' ? pdfKey : undefined,
+            pdfNombre: pdfNombreToSend,
+            pdfBase64: pdfBase64ToSend
+          })
+        });
+
         const data = await res.json();
-        fetchConsultas();
-        setTimeout(pickRandomPatient, 500);
-      } catch (e) {
-        alert('Error al generar consultas de prueba.');
-      } finally {
-        if (btn) {
-          btn.innerText = '⚡ Cargar 70';
-          btn.disabled = false;
+        if (data.success) {
+          if (textarea) textarea.value = '';
+          delete draftResponses[idConsulta];
+          delete selectedPdfs[idConsulta];
+          delete customPdfBase64[idConsulta];
+          delete customPdfNames[idConsulta];
+
+          fetchConsultas(true);
+        } else {
+          alert('⚠️ Error enviando respuesta: ' + (data.error || 'Desconocido'));
         }
+      } catch (err) {
+        alert('⚠️ Error de conexión al enviar respuesta.');
+      } finally {
+        isSendingResponse[idConsulta] = false;
       }
     }
 
-    function loadPatientDirect(phone) {
-      const input = document.getElementById('remitenteInput');
-      input.value = phone;
-      const dropdown = document.getElementById('patientDropdown');
-      if (dropdown) dropdown.value = phone;
-      resetChatForNewUser();
+    async function marcarEstado(id, nuevoEstado) {
+      try {
+        const res = await fetch(`/api/consultas/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estado: nuevoEstado })
+        });
+        if (res.ok) {
+          fetchConsultas(true);
+        }
+      } catch (e) {}
+    }
+
+    function exportToCsv() {
+      if (allConsultas.length === 0) {
+        alert('No hay solicitudes para exportar.');
+        return;
+      }
+
+      const rows = [
+        ['ID Consulta', 'Paciente / Teléfono', 'Tipo Solicitud', 'Estado', 'Fecha', 'Etiquetas', 'Contenido Mensaje']
+      ];
+
+      allConsultas.forEach(c => {
+        const datos = c.datos || {};
+        const tags = (datos.etiquetas || []).map(t => tagDefinitions[t] ? tagDefinitions[t].label : t).join('; ');
+        const msg = (datos.contenidoMensaje || datos.mensajeRaw || '').replace(/"/g, '""');
+        rows.push([
+          c.id,
+          c.remitente,
+          c.opcion || 'Consulta',
+          c.estado || 'pendiente',
+          new Date(c.timestamp || c.createdAt).toLocaleString(),
+          tags,
+          `"${msg}"`
+        ]);
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Solicitudes_Clinica_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function openLightbox(src) {
+      const modal = document.getElementById('lightboxModal');
+      const img = document.getElementById('lightboxImg');
+      if (modal && img) {
+        img.src = src;
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightboxModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
     }
   </script>
 </body>
