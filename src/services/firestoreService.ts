@@ -989,6 +989,37 @@ export class FirestoreService {
     }
   }
 
+  public async actualizarGestionConsulta(id: string, operador: string | null): Promise<boolean> {
+    const itemMem = FirestoreService.inMemoryConsultas.find(c => c.id === id);
+    if (itemMem) {
+      const datos = itemMem.datos || {};
+      if (operador) {
+        datos.enGestionPor = operador;
+        datos.enGestionAt = Date.now();
+      } else {
+        delete datos.enGestionPor;
+        delete datos.enGestionAt;
+      }
+      itemMem.datos = datos;
+    }
+
+    if (!this.projectId) return true;
+
+    try {
+      const target = FirestoreService.inMemoryConsultas.find(c => c.id === id);
+      const datosUpdate = target?.datos || {};
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas/${id}?updateMask.fieldPaths=datos${this.apiKey ? `&key=${this.apiKey}` : ''}`;
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { datos: { mapValue: { fields: this.toFirestoreFields(datosUpdate) } } } })
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   public async clearAllConsultas(): Promise<void> {
     FirestoreService.inMemoryConsultas = [];
     FirestoreService.inMemorySessions.clear();

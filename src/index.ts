@@ -293,6 +293,16 @@ app.patch('/api/consultas/:id/etiquetas', async (c) => {
   }
 });
 
+app.patch('/api/consultas/:id/gestion', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const { operador, release } = body;
+
+  const firestore = new FirestoreService(c.env);
+  const ok = await firestore.actualizarGestionConsulta(id, release ? null : operador);
+  return c.json({ success: ok, id, operador: release ? null : operador });
+});
+
 app.patch('/api/consultas/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
