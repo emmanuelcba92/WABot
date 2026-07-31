@@ -1038,8 +1038,8 @@ export class FirestoreService {
     FirestoreService.lastHeartbeatTimestamp = now;
     if (!this.projectId) return true;
 
-    // Throttle writes a Firestore a 1 vez cada 3 minutos para ahorrar cuotas gratis
-    if (now - FirestoreService.lastHeartbeatFirestoreWrite < 180000) {
+    // Actualiza Firestore cada 30 segundos (2.880 escrituras/día, muy por debajo del límite de 20.000)
+    if (now - FirestoreService.lastHeartbeatFirestoreWrite < 30000) {
       return true;
     }
 

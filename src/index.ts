@@ -410,7 +410,10 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
   }
 }
 
+let lastGlobalHeartbeatPing = 0;
+
 app.post('/api/heartbeat', async (c) => {
+  lastGlobalHeartbeatPing = Date.now();
   const db = DBFactory.createService(c.env);
   await db.saveHeartbeatPing();
   return c.json({ ok: true, timestamp: Date.now() });
@@ -418,7 +421,8 @@ app.post('/api/heartbeat', async (c) => {
 
 app.get('/api/heartbeat-status', async (c) => {
   const db = DBFactory.createService(c.env);
-  const lastPing = await db.getHeartbeatPing();
+  const dbPing = await db.getHeartbeatPing();
+  const lastPing = Math.max(dbPing || 0, lastGlobalHeartbeatPing || 0);
   const elapsed = lastPing > 0 ? Date.now() - lastPing : 999999999;
   const elapsedSeconds = Math.max(0, Math.floor(elapsed / 1000));
   const isOnline = lastPing > 0 && elapsed <= 60000;
