@@ -23,21 +23,30 @@ app.get('/health', (c) => {
 
 // RUTAS PRINCIPALES DE NAVEGACIÓN DE LA WEB APP
 app.get('/', async (c) => {
-  const url = new URL(c.req.url);
-  url.pathname = '/admin.html';
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    url.pathname = '/admin.html';
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  }
+  return c.text('Admin Panel Assets no disponibles');
 });
 
 app.get('/admin', async (c) => {
-  const url = new URL(c.req.url);
-  url.pathname = '/admin.html';
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    url.pathname = '/admin.html';
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  }
+  return c.text('Admin Panel Assets no disponibles');
 });
 
 app.get('/test', async (c) => {
-  const url = new URL(c.req.url);
-  url.pathname = '/index.html';
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    url.pathname = '/index.html';
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  }
+  return c.text('Test Simulator Assets no disponibles');
 });
 
 app.get('/api/doctors', async (c) => {
