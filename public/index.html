@@ -609,34 +609,76 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
   <script>
-    // AUTH GUARD: verificar sesión antes de mostrar la página
+    window._currentUserRole = 'secretaria';
+
     (async function() {
       try {
         const res = await fetch('/api/firebase-config');
         const config = await res.json();
         if (config.apiKey) {
           if (!firebase.apps.length) firebase.initializeApp(config);
-          firebase.auth().onAuthStateChanged((user) => {
+          firebase.auth().onAuthStateChanged(async (user) => {
             if (!user) {
               window.location.replace('/login.html');
             } else {
-              // Guardar info del usuario globalmente
               window._currentUser = user;
-              window._currentUserName = user.displayName || user.email.split('@')[0];
+              const username = (user.email || '').split('@')[0].toLowerCase();
+              window._currentUserName = user.displayName || username;
+
+              await loadUserRole(username, user.email);
+
               document.getElementById('authLoadingOverlay').style.display = 'none';
-              // Actualizar badge de usuario
               const nameEl = document.getElementById('currentUserName');
-              if (nameEl) nameEl.textContent = window._currentUserName;
+              if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
+
+              applyRolePermissions();
             }
           });
         } else {
-          // Sin apiKey → modo sin auth, ocultar overlay
           document.getElementById('authLoadingOverlay').style.display = 'none';
         }
       } catch(e) {
         document.getElementById('authLoadingOverlay').style.display = 'none';
       }
     })();
+
+    async function loadUserRole(username, email) {
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          const data = await res.json();
+          const users = data.users || [];
+          const match = users.find(u => u.username.toLowerCase() === username || u.email.toLowerCase() === email.toLowerCase());
+          if (match) {
+            if (match.displayName) window._currentUserName = match.displayName;
+            if (match.role) window._currentUserRole = match.role;
+          } else if (username === 'egomez' || users.length === 0) {
+            window._currentUserRole = 'admin';
+          } else {
+            window._currentUserRole = 'secretaria';
+          }
+        } else {
+          window._currentUserRole = username === 'egomez' ? 'admin' : 'secretaria';
+        }
+      } catch(e) {
+        window._currentUserRole = username === 'egomez' ? 'admin' : 'secretaria';
+      }
+    }
+
+    function applyRolePermissions() {
+      const isRoleAdmin = window._currentUserRole === 'admin';
+      const btnDb = document.getElementById('subTabDbBtn');
+      const btnUsers = document.getElementById('subTabUsersBtn');
+      const dbBadge = document.getElementById('dbProviderBadge');
+
+      if (btnDb) btnDb.style.display = isRoleAdmin ? 'block' : 'none';
+      if (btnUsers) btnUsers.style.display = isRoleAdmin ? 'block' : 'none';
+      if (dbBadge) dbBadge.style.display = isRoleAdmin ? 'block' : 'none';
+
+      if (!isRoleAdmin && (window._currentSubTab === 'db' || window._currentSubTab === 'users')) {
+        switchSettingsSubTab('schedule');
+      }
+    }
 
     function logout() {
       if (confirm('¿Cerrar sesión?')) {
@@ -1012,15 +1054,19 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
           <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">➕ Crear Nuevo Usuario</h4>
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
-            <div style="flex: 1; min-width: 160px;">
+            <div style="flex: 1; min-width: 140px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Usuario (sin @)</label>
-              <input type="text" id="newUsernameInput" placeholder="ej: mgarcia" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+              <input type="text" id="newUsernameInput" placeholder="ej: egomez" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
             </div>
-            <div style="flex: 1; min-width: 160px;">
+            <div style="flex: 1; min-width: 140px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Nombre para Mostrar</label>
+              <input type="text" id="newDisplayNameInput" placeholder="ej: Emmanuel" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+            </div>
+            <div style="flex: 1; min-width: 140px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Contraseña</label>
               <input type="password" id="newUserPasswordInput" placeholder="••••••••" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
             </div>
-            <div style="width: 160px;">
+            <div style="width: 140px;">
               <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Rol de Acceso</label>
               <select id="newUserRoleSelect" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
                 <option value="secretaria">Secretaría</option>
@@ -1040,13 +1086,14 @@
               <thead>
                 <tr style="border-bottom: 1px solid var(--border); color: var(--muted);">
                   <th style="padding: 10px;">Usuario</th>
+                  <th style="padding: 10px;">Nombre Visible</th>
                   <th style="padding: 10px;">Email</th>
                   <th style="padding: 10px;">Rol</th>
                   <th style="padding: 10px; text-align: right;">Acciones</th>
                 </tr>
               </thead>
               <tbody id="usersTableBody">
-                <tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--muted);">Cargando usuarios...</td></tr>
+                <tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--muted);">Cargando usuarios...</td></tr>
               </tbody>
             </table>
           </div>
@@ -2394,7 +2441,7 @@
         const users = data.users || [];
 
         if (users.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--muted);">No hay usuarios registrados aún.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--muted);">No hay usuarios registrados aún.</td></tr>`;
           return;
         }
 
@@ -2407,6 +2454,7 @@
           return `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
               <td style="padding: 12px; font-weight: 700; color: #fff;">👤 ${u.username}</td>
+              <td style="padding: 12px; color: #38bdf8; font-weight: 600;">${u.displayName || u.username}</td>
               <td style="padding: 12px; color: var(--muted);">${u.email}</td>
               <td style="padding: 12px;">${roleBadge}</td>
               <td style="padding: 12px; text-align: right;">
@@ -2418,16 +2466,18 @@
           `;
         }).join('');
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--error);">Error al cargar usuarios.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--error);">Error al cargar usuarios.</td></tr>`;
       }
     }
 
     async function createNewUserSubmit() {
       const usernameInput = document.getElementById('newUsernameInput');
+      const displayNameInput = document.getElementById('newDisplayNameInput');
       const passwordInput = document.getElementById('newUserPasswordInput');
       const roleSelect = document.getElementById('newUserRoleSelect');
 
       const username = usernameInput.value.trim().toLowerCase();
+      const displayName = displayNameInput ? displayNameInput.value.trim() : '';
       const password = passwordInput.value;
       const role = roleSelect.value;
 
@@ -2439,7 +2489,7 @@
       const email = `${username}@coat.com.ar`;
 
       try {
-        // 1. Crear el usuario en Firebase Auth usando una instancia secundaria para no interrumpir la sesión del admin actual
+        // 1. Crear el usuario en Firebase Auth usando una instancia secundaria
         const resConfig = await fetch('/api/firebase-config');
         const config = await resConfig.json();
 
@@ -2447,33 +2497,37 @@
           let secondaryApp;
           const appName = `SecApp_${Date.now()}`;
           secondaryApp = firebase.initializeApp(config, appName);
-          await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+          const userCred = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+          if (displayName && userCred.user) {
+            await userCred.user.updateProfile({ displayName });
+          }
           await secondaryApp.delete();
         }
 
-        // 2. Guardar el rol del usuario en la base de datos de la clínica
+        // 2. Guardar el usuario y su rol en la base de datos de la clínica
         const resSave = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, role })
+          body: JSON.stringify({ username, displayName: displayName || username, email, role })
         });
 
         if (resSave.ok) {
-          alert(`✅ Usuario "${username}" creado exitosamente con rol ${role.toUpperCase()}.`);
+          alert(`✅ Usuario "${displayName || username}" (@${username}) creado exitosamente con rol ${role.toUpperCase()}.`);
           usernameInput.value = '';
+          if (displayNameInput) displayNameInput.value = '';
           passwordInput.value = '';
           renderUsersEditor();
         } else {
-          alert('⚠️ El usuario se creó en Firebase pero ocurrió un error guardando el rol.');
+          alert('⚠️ El usuario se creó en Firebase pero ocurrió un error guardando el perfil.');
         }
       } catch(err) {
         const code = err.code || '';
         if (code === 'auth/email-already-in-use') {
-          alert(`ℹ️ El usuario "${username}" ya existe en Firebase. Actualizando rol a ${role.toUpperCase()}...`);
+          alert(`ℹ️ El usuario "${username}" ya existe en Firebase. Actualizando perfil a ${role.toUpperCase()}...`);
           await fetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, role })
+            body: JSON.stringify({ username, displayName: displayName || username, email, role })
           });
           renderUsersEditor();
         } else {

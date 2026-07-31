@@ -368,11 +368,11 @@ export class FirestoreService {
     }
   }
 
-  public static globalUsersList: Array<{ username: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }> = [
-    { username: 'egomez', email: 'egomez@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
+  public static globalUsersList: Array<{ username: string; displayName?: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }> = [
+    { username: 'egomez', displayName: 'Emmanuel', email: 'egomez@coat.com.ar', role: 'admin', createdAt: new Date().toISOString() }
   ];
 
-  public async getUsers(): Promise<Array<{ username: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }>> {
+  public async getUsers(): Promise<Array<{ username: string; displayName?: string; email: string; role: 'admin' | 'secretaria'; createdAt: string }>> {
     if (!this.projectId) return FirestoreService.globalUsersList;
 
     try {
@@ -391,18 +391,23 @@ export class FirestoreService {
     return FirestoreService.globalUsersList;
   }
 
-  public async saveUser(user: { username: string; email: string; role: 'admin' | 'secretaria' }): Promise<void> {
+  public async saveUser(user: { username: string; displayName?: string; email: string; role: 'admin' | 'secretaria' }): Promise<void> {
     const users = await this.getUsers();
     const existingIdx = users.findIndex(u => u.username.toLowerCase() === user.username.toLowerCase() || u.email.toLowerCase() === user.email.toLowerCase());
     const newUserItem = {
       username: user.username.toLowerCase().trim(),
+      displayName: user.displayName || user.username,
       email: user.email.toLowerCase().trim(),
       role: user.role,
       createdAt: new Date().toISOString()
     };
 
     if (existingIdx >= 0) {
-      users[existingIdx] = { ...users[existingIdx], role: user.role };
+      users[existingIdx] = {
+        ...users[existingIdx],
+        displayName: user.displayName || users[existingIdx].displayName || user.username,
+        role: user.role
+      };
     } else {
       users.push(newUserItem);
     }

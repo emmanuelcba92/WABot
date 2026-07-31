@@ -110,13 +110,14 @@ app.get('/api/users', async (c) => {
 app.post('/api/users', async (c) => {
   try {
     const body = await c.req.json();
-    const { username, email, role } = body;
+    const { username, displayName, email, role } = body;
     if (!username || !role) {
       return c.json({ error: 'Username y rol son requeridos' }, 400);
     }
     const firestore = new FirestoreService(c.env);
     await firestore.saveUser({
       username: username.toLowerCase().trim(),
+      displayName: (displayName || username).trim(),
       email: (email || `${username}@coat.com.ar`).toLowerCase().trim(),
       role: role === 'admin' ? 'admin' : 'secretaria'
     });
