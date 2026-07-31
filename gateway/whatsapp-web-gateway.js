@@ -23,8 +23,8 @@ if (!fs.existsSync(mediaDir)) {
 const processedMsgIds = new Set();
 const sentMsgHistory = new Map(); // id -> timestamp
 
-// 1. LATIDO (HEARTBEAT) CADA 30 SEGUNDOS AL SERVIDOR
-setInterval(async () => {
+// 1. LATIDO (HEARTBEAT) CADA 15 SEGUNDOS AL SERVIDOR
+async function sendHeartbeatPing() {
   try {
     await fetch(WORKER_HEARTBEAT_URL, {
       method: 'POST',
@@ -34,13 +34,13 @@ setInterval(async () => {
   } catch (err) {
     // Silencioso si hay corte temporal de red
   }
-}, 30000);
+}
+setInterval(sendHeartbeatPing, 15000);
 
 // 2. MANTENIMIENTO NOCTURNO A LAS 3:30 AM (ELIMINA ARCHIVOS > 60 DÍAS)
 setInterval(() => {
   try {
     const now = new Date();
-    // 3:30 AM hora Argentina
     if (now.getHours() === 3 && now.getMinutes() >= 30 && now.getMinutes() <= 35) {
       if (fs.existsSync(mediaDir)) {
         const files = fs.readdirSync(mediaDir);
@@ -48,23 +48,46 @@ setInterval(() => {
         const nowMs = Date.now();
         let deletedCount = 0;
 
-        for (const file of files) {
+        files.forEach(file => {
           const filePath = path.join(mediaDir, file);
-          const stats = fs.statSync(filePath);
-          if (nowMs - stats.mtimeMs > limitMs) {
+          const stat = fs.statSync(filePath);
+          if (nowMs - stat.mtimeMs > limitMs) {
             fs.unlinkSync(filePath);
             deletedCount++;
           }
-        }
+        });
         if (deletedCount > 0) {
-          console.log(`🧹 [MANTENIMIENTO NOCTURNO 3:30 AM] Se eliminaron ${deletedCount} archivos antiguos (> 60 días) del disco de la PC.`);
+          console.log(`🧹 [Limpieza Nocturna 3:30 AM] Se eliminaron ${deletedCount} archivos multimedia antiguos de más de 60 días.`);
         }
       }
     }
   } catch (cleanErr) {
-    console.error('⚠️ Error en mantenimiento nocturno de disco:', cleanErr);
+    console.error('⚠️ Error en mantenimiento nocturno:', cleanErr);
   }
-}, 300000); // Chequeo cada 5 min
+}, 300000); // Revisar cada 5 minutos
+
+function resolveRealPhone(jidStr) {
+  if (!jidStr) return null;
+  const cleanId = jidStr.replace('@lid', '').replace('@s.whatsapp.net', '').trim();
+
+  // 1. Buscar en archivo reverse de Baileys
+  const revPath = path.join(__dirname, 'auth_info_baileys', `lid-mapping-${cleanId}_reverse.json`);
+  if (fs.existsSync(revPath)) {
+    try {
+      const content = fs.readFileSync(revPath, 'utf8').trim().replace(/"/g, '');
+      if (content && /^\d+$/.test(content)) {
+        return content;
+      }
+    } catch (e) {}
+  }
+
+  // 2. Si no es @lid y tiene solo digitos (10 a 15 digitos)
+  if (!jidStr.includes('@lid') && /^\d{10,15}$/.test(cleanId)) {
+    return cleanId;
+  }
+
+  return null;
+}
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
@@ -83,51 +106,43 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 async function startWhatsAppGateway() {
   console.log('🚀 Iniciando Conector Oficial de WhatsApp Baileys para la Clínica...');
 
-  const authFolder = path.join(__dirname, 'auth_info_baileys');
-  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-  const { version } = await fetchLatestBaileysVersion();
+  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
   const sock = makeWASocket({
-    version,
     auth: state,
-    printQRInTerminal: false,
+    printQRInTerminal: true,
     logger: pino({ level: 'silent' }),
-    browser: ['Clínica Médica Bot', 'Chrome', '1.0.0']
+    browser: ['WA Bot Clínica', 'Chrome', '1.0.0']
   });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
-
     if (qr) {
-      console.log('\n📲 ESCANEE ESTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA PARA VINCULAR:');
-      qrcode.generate(qr, { small: true });
+      console.log('⚡ ESCANEA EL SIGUIENTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:');
     }
-
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`⚠️ Conexión cerrada. Razón: ${statusCode}. ¿Reconectar?: ${shouldReconnect}`);
-
+      const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.log('⚠️ Conexión cerrada. Reintentando reconexión...', shouldReconnect);
       if (shouldReconnect) {
-        setTimeout(() => startWhatsAppGateway(), 3000);
-      } else {
-        console.error('❌ Sesión cerrada por el usuario. Por favor elimine la carpeta auth_info_baileys y escanee el QR nuevamente.');
+        setTimeout(startWhatsAppGateway, 3000);
       }
     } else if (connection === 'open') {
       console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
-      console.log('👂 Escuchando mensajes entrantes en tiempo real...');
+      console.log('📡 Escuchando mensajes entrantes en tiempo real y sintonizando mensajes offline...');
+      sendHeartbeatPing();
     }
   });
 
   sock.ev.on('messages.upsert', async (m) => {
-    if (m.type !== 'notify') return;
+    // Procesar mensajes en tiempo real ('notify') y mensajes offline sincronizados al reconectar ('append')
+    if (m.type !== 'notify' && m.type !== 'append') return;
 
     for (const msg of m.messages) {
-      try {
-        if (!msg.message || msg.key.fromMe) continue;
+      if (!msg.message || msg.key.fromMe) continue; // Ignorar respuestas salientes o vacías
 
+      try {
         const remitente = msg.key.remoteJid;
         if (!remitente || remitente.includes('@g.us')) continue; // Ignorar grupos
 
