@@ -669,11 +669,7 @@
             💬 Iniciar Nuevo Chat / Escribir a Número
           </button>
 
-          <!-- SELECTOR DE MODO DE VISTA (TARJETAS vs CHAT ESTILO WHATSAPP) -->
-          <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
-            <button class="nav-tab-btn active" id="viewModeGridBtn" onclick="setViewMode('grid')">🎴 Vista Tarjetas</button>
-            <button class="nav-tab-btn" id="viewModeChatBtn" onclick="setViewMode('chat')">💬 Vista Chat (WhatsApp)</button>
-          </div>
+
 
           <button class="btn btn-excel" onclick="exportToCsv()">
             📊 Exportar a Excel (CSV)
@@ -1051,7 +1047,7 @@
     let allConsultas = [];
     let currentFilter = 'pendiente';
     let currentTagFilter = 'all';
-    let currentViewMode = localStorage.getItem('adminViewMode') || 'grid';
+    let currentViewMode = 'chat';
     let selectedChatId = null;
     let activeTelemedicinaConsultaId = null;
 
@@ -1100,25 +1096,13 @@
       items: []
     };
 
-    function setViewMode(mode) {
-      currentViewMode = mode;
-      localStorage.setItem('adminViewMode', mode);
-      const gridBtn = document.getElementById('viewModeGridBtn');
-      const chatBtn = document.getElementById('viewModeChatBtn');
+    function setViewMode(mode = 'chat') {
+      currentViewMode = 'chat';
       const gridEl = document.getElementById('consultasGrid');
       const chatEl = document.getElementById('consultasChatLayout');
 
-      if (mode === 'chat') {
-        gridBtn.classList.remove('active');
-        chatBtn.classList.add('active');
-        gridEl.style.display = 'none';
-        chatEl.style.display = 'grid';
-      } else {
-        gridBtn.classList.add('active');
-        chatBtn.classList.remove('active');
-        gridEl.style.display = 'grid';
-        chatEl.style.display = 'none';
-      }
+      if (gridEl) gridEl.style.display = 'none';
+      if (chatEl) chatEl.style.display = 'grid';
       renderConsultas(true);
     }
 
