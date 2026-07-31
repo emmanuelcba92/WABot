@@ -1060,7 +1060,7 @@
 
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
     let previousConsultaIds = new Set();
-    let previousMsgCounts = new Map();
+    let processedVipMsgIds = new Set();
 
     let doctorList = [
       { id: 'doc_1', name: 'Dra. Venier', specialty: 'Otorrinolaringología (ORL)', phone: '3510000000' },
@@ -1070,7 +1070,6 @@
     let tagDefinitions = {
       'turno_confirmado': { key: 'turno_confirmado', label: '🟢 Turno Dado', color: '#059669' },
       'falta_foto': { key: 'falta_foto', label: '🟡 Falta Foto', color: '#d97706' },
-      'urgente': { key: 'urgente', label: '🔴 Urgente', color: '#dc2626' },
       'pami': { key: 'pami', label: '🟣 PAMI', color: '#7c3aed' },
       'en_revision': { key: 'en_revision', label: '🔵 En Revisión', color: '#2563eb' }
     };
@@ -2171,44 +2170,43 @@
         const data = await res.json();
         allConsultas = data.consultas || [];
 
-        // Detectar si ingresó una consulta u otro mensaje Prioritario nuevo para reproducir alarma y notificación de escritorio
-        let hasNewVipOrUrgent = false;
+        // Detectar si ingresó un mensaje de un número Prioritario/VIP configurado (NO por etiqueta urgente)
+        let hasNewVip = false;
         allConsultas.forEach(c => {
           const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
-          const isUrgentTag = (c.datos?.etiquetas || []).includes('urgente');
-
-          if (vipMatch || isUrgentTag) {
+          if (vipMatch) {
             const respuestasPaciente = c.datos?.respuestasPaciente || [];
-            const currentCount = 1 + respuestasPaciente.length;
-            const prevCount = previousMsgCounts.get(c.id) || 0;
+            const msgCount = 1 + respuestasPaciente.length;
+            const msgKey = `${c.id}_${msgCount}`;
 
-            if (!previousConsultaIds.has(c.id) || currentCount > prevCount) {
-              hasNewVipOrUrgent = true;
+            if (!processedVipMsgIds.has(msgKey)) {
+              processedVipMsgIds.add(msgKey);
 
-              if ('Notification' in window && Notification.permission === 'granted') {
-                const contactName = vipMatch ? (vipMatch.name || c.datos?.pushName || c.remitente) : (c.datos?.pushName || c.remitente);
-                const roleText = vipMatch?.role ? ` (${vipMatch.role})` : '';
-                const lastMsg = respuestasPaciente.length > 0
-                  ? respuestasPaciente[respuestasPaciente.length - 1].texto
-                  : (c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido');
+              if (previousConsultaIds.size > 0) {
+                hasNewVip = true;
 
-                try {
-                  new Notification(`⭐ Mensaje Prioritario: ${contactName}${roleText}`, {
-                    body: lastMsg,
-                    icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
-                    requireInteraction: true
-                  });
-                } catch (nErr) {}
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  const contactName = vipMatch.name || c.datos?.pushName || c.remitente;
+                  const roleText = vipMatch.role ? ` (${vipMatch.role})` : '';
+                  const lastMsg = respuestasPaciente.length > 0
+                    ? respuestasPaciente[respuestasPaciente.length - 1].texto
+                    : (c.datos?.contenidoMensaje || 'Nuevo mensaje prioritario recibido');
+
+                  try {
+                    new Notification(`⭐ Mensaje Prioritario: ${contactName}${roleText}`, {
+                      body: lastMsg,
+                      icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png',
+                      requireInteraction: true
+                    });
+                  } catch (nErr) {}
+                }
               }
             }
           }
-
-          const respPac = c.datos?.respuestasPaciente || [];
-          previousMsgCounts.set(c.id, 1 + respPac.length);
         });
 
         previousConsultaIds = new Set(allConsultas.map(c => c.id));
-        if (hasNewVipOrUrgent) {
+        if (hasNewVip) {
           playVipChimeSound();
         }
 
@@ -2451,32 +2449,31 @@
         });
       }
 
-      // SISTEMA DE ORDENAMIENTO DE COLA INTELIGENTE (FIFO + PRIORIDAD VIP + CONVERSACIÓN ACTIVA):
+      // SISTEMA DE ORDENAMIENTO DE COLA (1. VIP CONFIGURADO, 2. ETIQUETA URGENTE, 3. FECHA RECIENTE):
       filtered.sort((a, b) => {
-        const vipA = vipContactsList.find(v => isVipMatch(a, v));
-        const vipB = vipContactsList.find(v => isVipMatch(b, v));
+        const vipA = vipContactsList.some(v => isVipMatch(a, v));
+        const vipB = vipContactsList.some(v => isVipMatch(b, v));
 
-        // 1. Prioritarios y Urgencias siempre flotan primero (#1)
+        // 1. Números Prioritarios/VIP siempre primero (#1)
         if (vipA && !vipB) return -1;
         if (!vipA && vipB) return 1;
-        if (vipA && vipB) {
-          if (vipA.priority === 'urgente' && vipB.priority !== 'urgente') return -1;
-          if (vipA.priority !== 'urgente' && vipB.priority === 'urgente') return 1;
-          const timeA = new Date(a.timestamp || a.createdAt).getTime();
-          const timeB = new Date(b.timestamp || b.createdAt).getTime();
-          return timeB - timeA;
-        }
 
-        // 2. Conversación activa (el paciente respondió tras un mensaje de la secretaria) sube arriba
+        // 2. Etiqueta Urgente flotando inmediatamente debajo de los Prioritarios (#2)
+        const urgA = (a.datos?.etiquetas || []).includes('urgente');
+        const urgB = (b.datos?.etiquetas || []).includes('urgente');
+        if (urgA && !urgB) return -1;
+        if (!urgA && urgB) return 1;
+
+        // 3. Conversación activa del paciente
         const activeA = a.datos && a.datos.respuestasPaciente && a.datos.respuestasPaciente.length > 0;
         const activeB = b.datos && b.datos.respuestasPaciente && b.datos.respuestasPaciente.length > 0;
         if (activeA && !activeB) return -1;
         if (!activeA && activeB) return 1;
 
-        // 3. FIFO: Los mensajes más antiguos primero (para atender a quien lleva más tiempo esperando)
+        // 4. Cronológico más reciente primero
         const timeA = new Date(a.timestamp || a.createdAt).getTime();
         const timeB = new Date(b.timestamp || b.createdAt).getTime();
-        return timeA - timeB;
+        return timeB - timeA;
       });
 
       // RENDER VISTA 1: GRID DE TARJETAS
