@@ -1122,19 +1122,29 @@
       renderConsultas(true);
     }
 
-    function requestNotificationPermission() {
+    function requestNotificationPermission(silent = false) {
       if (!('Notification' in window)) {
-        alert('Tu navegador no soporta notificaciones de escritorio.');
+        if (!silent) alert('Tu navegador no soporta notificaciones de escritorio.');
         return;
       }
       Notification.requestPermission().then(permission => {
         if (permission === 'granted') {
-          alert('🔔 ¡Notificaciones de Escritorio activadas exitosamente!');
+          if (!silent) alert('🔔 ¡Notificaciones de Escritorio activadas exitosamente!');
           updateNotificationBtn();
-        } else {
-          alert('Las notificaciones de escritorio fueron bloqueadas en el navegador.');
+        } else if (permission === 'denied' && !silent) {
+          alert('Las notificaciones de escritorio están bloqueadas en la configuración del navegador.');
         }
       });
+    }
+
+    function autoPromptNotifications() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const handler = () => {
+          requestNotificationPermission(true);
+          window.removeEventListener('click', handler);
+        };
+        window.addEventListener('click', handler);
+      }
     }
 
     function updateNotificationBtn() {
@@ -1254,6 +1264,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       initOperatorNameUI();
+      autoPromptNotifications();
       updateNotificationBtn();
       setViewMode(currentViewMode);
       fetchScheduleConfig();
