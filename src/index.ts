@@ -303,6 +303,23 @@ app.patch('/api/consultas/:id/gestion', async (c) => {
   return c.json({ success: ok, id, operador: release ? null : operador });
 });
 
+let lastGatewayPingTimestamp = Date.now();
+
+app.post('/api/heartbeat', async (c) => {
+  lastGatewayPingTimestamp = Date.now();
+  return c.json({ ok: true, timestamp: lastGatewayPingTimestamp });
+});
+
+app.get('/api/heartbeat-status', async (c) => {
+  const elapsed = Date.now() - lastGatewayPingTimestamp;
+  const isOnline = elapsed <= 60000; // 60 segundos (1 minuto exacto)
+  return c.json({
+    online: isOnline,
+    elapsedSeconds: Math.floor(elapsed / 1000),
+    lastPing: new Date(lastGatewayPingTimestamp).toISOString()
+  });
+});
+
 app.patch('/api/consultas/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));

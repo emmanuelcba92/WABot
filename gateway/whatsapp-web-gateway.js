@@ -13,9 +13,58 @@ const sharp = require('sharp');
 
 const WORKER_WEBHOOK_URL = 'https://coatwa.emmanuel-ag92.workers.dev/webhook';
 const WORKER_PENDING_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/pending-outgoing';
+const WORKER_HEARTBEAT_URL = 'https://coatwa.emmanuel-ag92.workers.dev/api/heartbeat';
+
+const mediaDir = path.join(__dirname, 'media');
+if (!fs.existsSync(mediaDir)) {
+  fs.mkdirSync(mediaDir, { recursive: true });
+}
 
 const processedMsgIds = new Set();
 const sentMsgHistory = new Map(); // id -> timestamp
+
+// 1. LATIDO (HEARTBEAT) CADA 30 SEGUNDOS AL SERVIDOR
+setInterval(async () => {
+  try {
+    await fetch(WORKER_HEARTBEAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'online', timestamp: Date.now() })
+    });
+  } catch (err) {
+    // Silencioso si hay corte temporal de red
+  }
+}, 30000);
+
+// 2. MANTENIMIENTO NOCTURNO A LAS 3:30 AM (ELIMINA ARCHIVOS > 60 DÍAS)
+setInterval(() => {
+  try {
+    const now = new Date();
+    // 3:30 AM hora Argentina
+    if (now.getHours() === 3 && now.getMinutes() >= 30 && now.getMinutes() <= 35) {
+      if (fs.existsSync(mediaDir)) {
+        const files = fs.readdirSync(mediaDir);
+        const limitMs = 60 * 24 * 60 * 60 * 1000; // 60 días exactos
+        const nowMs = Date.now();
+        let deletedCount = 0;
+
+        for (const file of files) {
+          const filePath = path.join(mediaDir, file);
+          const stats = fs.statSync(filePath);
+          if (nowMs - stats.mtimeMs > limitMs) {
+            fs.unlinkSync(filePath);
+            deletedCount++;
+          }
+        }
+        if (deletedCount > 0) {
+          console.log(`🧹 [MANTENIMIENTO NOCTURNO 3:30 AM] Se eliminaron ${deletedCount} archivos antiguos (> 60 días) del disco de la PC.`);
+        }
+      }
+    }
+  } catch (cleanErr) {
+    console.error('⚠️ Error en mantenimiento nocturno de disco:', cleanErr);
+  }
+}, 300000); // Chequeo cada 5 min
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
