@@ -2982,10 +2982,25 @@
             </div>
           `;
 
-          const chatJson = JSON.stringify(c);
-          const shouldUpdateMain = forceRedraw || (lastRenderedChatId !== c.id) || (lastRenderedChatJson !== chatJson);
+          const isUserInteracting = document.activeElement &&
+                                    containerChatMain &&
+                                    containerChatMain.contains(document.activeElement) &&
+                                    ['SELECT', 'TEXTAREA', 'INPUT'].includes(document.activeElement.tagName);
 
-          if (shouldUpdateMain) {
+          const chatJson = JSON.stringify({
+            id: c.id,
+            opcion: c.opcion,
+            estado: c.estado,
+            remitente: c.remitente,
+            respuestasSecretaria: c.datos?.respuestasSecretaria,
+            respuestasPaciente: c.datos?.respuestasPaciente,
+            etiquetas: c.datos?.etiquetas,
+            enGestionPor: c.datos?.enGestionPor
+          });
+
+          const chatChanged = (lastRenderedChatId !== c.id) || (lastRenderedChatJson !== chatJson);
+
+          if (forceRedraw || (chatChanged && !isUserInteracting)) {
             lastRenderedChatId = c.id;
             lastRenderedChatJson = chatJson;
             containerChatMain.innerHTML = mainHtml;
