@@ -304,6 +304,62 @@ app.patch('/api/consultas/:id/gestion', async (c) => {
 });
 
 let lastGatewayPingTimestamp = Date.now();
+let lastAlertSentTimestamp = 0;
+
+async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
+  const telegramToken = env.TELEGRAM_BOT_TOKEN;
+  const telegramChatId = env.TELEGRAM_CHAT_ID;
+  const alertEmail = env.ALERT_EMAIL || 'admin@coat.com.ar';
+  const resendApiKey = env.RESEND_API_KEY;
+
+  const alertMessage = `🚨 <b>ALERTA CRÍTICA - CLÍNICA COAT</b>\n\n⚠️ Se ha perdido la conexión con WhatsApp en la PC de recepción.\n⏱️ <b>Tiempo sin señal:</b> ${elapsedSeconds} segundos.\n📌 Por favor verifique que la PC esté encendida y conectada a internet.`;
+
+  // 1. Enviar Alerta por Telegram
+  if (telegramToken && telegramChatId) {
+    try {
+      const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: telegramChatId,
+          text: alertMessage,
+          parse_mode: 'HTML'
+        })
+      });
+      console.log('📱 Alerta de desconexión enviada a Telegram con éxito.');
+    } catch (e) {
+      console.error('⚠️ Error al enviar alerta a Telegram:', e);
+    }
+  }
+
+  // 2. Enviar Alerta por Email (Resend API)
+  if (resendApiKey && alertEmail) {
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Alertas Bot COAT <alertas@resend.dev>',
+          to: [alertEmail],
+          subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
+          html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
+            <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
+            <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
+            <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
+            <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
+          </div>`
+        })
+      });
+      console.log(`📧 Alerta enviada por Email a ${alertEmail} con éxito.`);
+    } catch (e) {
+      console.error('⚠️ Error al enviar email de alerta:', e);
+    }
+  }
+}
 
 app.post('/api/heartbeat', async (c) => {
   lastGatewayPingTimestamp = Date.now();
@@ -312,10 +368,23 @@ app.post('/api/heartbeat', async (c) => {
 
 app.get('/api/heartbeat-status', async (c) => {
   const elapsed = Date.now() - lastGatewayPingTimestamp;
-  const isOnline = elapsed <= 60000; // 60 segundos (1 minuto exacto)
+  const elapsedSeconds = Math.floor(elapsed / 1000);
+  const isOnline = elapsed <= 60000;
+
+  if (!isOnline) {
+    // Si pasaron más de 60s sin señal y no notificamos en los últimos 10 minutos
+    if (Date.now() - lastAlertSentTimestamp > 600000) {
+      lastAlertSentTimestamp = Date.now();
+      c.executionCtx.waitUntil(sendDisconnectionAlerts(c.env, elapsedSeconds));
+    }
+  } else {
+    // Resetear timestamp de alerta al volver a estar online
+    lastAlertSentTimestamp = 0;
+  }
+
   return c.json({
     online: isOnline,
-    elapsedSeconds: Math.floor(elapsed / 1000),
+    elapsedSeconds,
     lastPing: new Date(lastGatewayPingTimestamp).toISOString()
   });
 });
