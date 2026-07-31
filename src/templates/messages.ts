@@ -100,5 +100,12 @@ Si en el futuro necesitás solicitar un nuevo turno o realizar otra gestión, po
 
 ¡Que tengas un excelente día! 👋`,
 
+  PLANTILLA_OPCION_F: `🩺 *ATENCIÓN AFILIADOS PAMI*
+Por favor, reenvía este mensaje completando los *3 datos* requeridos para PAMI:
+
+1. Nombre y Apellido del afiliado:
+2. N° de Afiliado PAMI (14 dígitos):
+3. Especialidad médica o trámite requerido:`,
+
   OPCION_INVALIDA: `⚠️ Opción no válida. Por favor, selecciona una letra del menú principal (*A, B, C, D, E*) o escribe *"Hola"* para reiniciar.`
 };
