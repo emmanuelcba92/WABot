@@ -1017,6 +1017,7 @@ export class FirestoreService {
       return res.ok;
     } catch (e) {
       return false;
+    }
   }
 
   public static lastHeartbeatTimestamp = Date.now();
