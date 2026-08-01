@@ -7,6 +7,7 @@ export class D1Service {
   private env: any;
 
   private static inMemoryConsultas: Array<Record<string, any>> = [];
+  private static inMemoryUsersList: AppUser[] = [];
 
   constructor(env?: Env) {
     this.env = env;
@@ -452,6 +453,8 @@ export class D1Service {
           users = parsed.users || [];
         }
       } catch (e) {}
+    } else {
+      users = D1Service.inMemoryUsersList;
     }
 
     // Garantizar que el usuario 'egomez' existe como admin con hash de contraseña
@@ -483,6 +486,8 @@ export class D1Service {
         needsSave = true;
       }
     }
+
+    D1Service.inMemoryUsersList = users;
 
     if (needsSave && this.db) {
       try {
@@ -532,6 +537,8 @@ export class D1Service {
       users.push(updatedUser);
     }
 
+    D1Service.inMemoryUsersList = users;
+
     if (!this.db) return;
     try {
       await this.initTables();
@@ -551,6 +558,8 @@ export class D1Service {
     existing.passwordHash = hash;
     existing.salt = salt;
 
+    D1Service.inMemoryUsersList = users;
+
     if (!this.db) return true;
     try {
       await this.initTables();
@@ -567,6 +576,9 @@ export class D1Service {
   public async deleteUser(username: string): Promise<void> {
     const users = await this.getUsers();
     const filtered = users.filter((u: any) => (u.username || '').toLowerCase() !== username.toLowerCase().trim());
+
+    D1Service.inMemoryUsersList = filtered;
+
     if (!this.db) return;
     try {
       await this.initTables();

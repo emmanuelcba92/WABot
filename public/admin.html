@@ -2617,6 +2617,11 @@
 
         if (resSave.ok) {
           window._currentUserName = displayName || username;
+          if (!window._currentUser) window._currentUser = {};
+          window._currentUser.displayName = displayName || username;
+          window._currentUser.email = email;
+          localStorage.setItem('coat_user', JSON.stringify(window._currentUser));
+
           const nameEl = document.getElementById('currentUserName');
           if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
 

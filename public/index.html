@@ -2184,7 +2184,12 @@
       closePdfModalGlobal();
     }
 
-    let activeEditTarget = null;
+    function sendLocationGps(idConsulta, remitente) {
+      const text = "📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 468, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333";
+      const textarea = document.getElementById(`replyText_${idConsulta}`);
+      if (textarea) textarea.value = text;
+      responderViaApi(idConsulta, remitente);
+    }
 
     function triggerEditMsgModal(remitente, msgId, idConsulta) {
       const c = allConsultas.find(item => item.id === idConsulta);
@@ -2778,6 +2783,11 @@
 
         if (resSave.ok) {
           window._currentUserName = displayName || username;
+          if (!window._currentUser) window._currentUser = {};
+          window._currentUser.displayName = displayName || username;
+          window._currentUser.email = email;
+          localStorage.setItem('coat_user', JSON.stringify(window._currentUser));
+
           const nameEl = document.getElementById('currentUserName');
           if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
 
@@ -3691,7 +3701,7 @@
                   `).join('')}
                 </select>
 
-                <button class="chip-btn" style="background: rgba(0, 168, 132, 0.2); color: #34d399; border: 1px solid #34d399; font-weight: 700; padding: 8px 12px;" onclick="insertTemplate('${c.id}', '📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 123, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333')">
+                <button class="chip-btn" style="background: rgba(0, 168, 132, 0.2); color: #34d399; border: 1px solid #34d399; font-weight: 700; padding: 8px 12px;" onclick="sendLocationGps('${c.id}', '${c.remitente}')">
                   📍 Enviar Ubicación GPS
                 </button>
               </div>
