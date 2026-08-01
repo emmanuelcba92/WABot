@@ -724,17 +724,27 @@ export class D1Service {
       targetMsgKey
     };
 
-    D1Service.pendingOutgoingQueue.push(item);
-
     if (this.db) {
       try {
         await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('pending_queue').first();
+        let currentQueue: PendingOutgoingMsg[] = [];
+        if (row && row.data) {
+          try {
+            const parsed = JSON.parse(row.data);
+            if (Array.isArray(parsed)) currentQueue = parsed;
+          } catch (e) {}
+        }
+        currentQueue.push(item);
         await this.db
           .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
-          .bind('pending_queue', JSON.stringify(D1Service.pendingOutgoingQueue), new Date().toISOString(), JSON.stringify(D1Service.pendingOutgoingQueue), new Date().toISOString())
+          .bind('pending_queue', JSON.stringify(currentQueue), new Date().toISOString(), JSON.stringify(currentQueue), new Date().toISOString())
           .run();
+        return;
       } catch (e) {}
     }
+
+    D1Service.pendingOutgoingQueue.push(item);
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
