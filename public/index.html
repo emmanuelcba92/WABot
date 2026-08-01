@@ -3531,7 +3531,7 @@
               type: 'init',
               senderName: '📥 Mensaje Inicial del Paciente',
               text: initMsgFormatted,
-              timestamp: 0,
+              timestamp: c.timestamp || c.createdAt || Date.now(),
               cssClass: 'chat-bubble-patient',
               headerColor: '#38bdf8'
             });
