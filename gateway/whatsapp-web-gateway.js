@@ -194,6 +194,9 @@ process.on('unhandledRejection', (reason, promise) => {
       console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
       console.log('📡 Escuchando mensajes entrantes en tiempo real y sintonizando mensajes offline...');
       sendHeartbeatPing();
+    }
+  });
+
   const sentMsgKeys = new Map();
 
   sock.ev.on('message-receipt.update', async (events) => {
