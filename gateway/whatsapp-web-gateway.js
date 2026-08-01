@@ -29,7 +29,24 @@ try {
 }
 
 const processedMsgIds = new Set();
-const sentMsgHistory = new Map(); // id -> timestamp
+const sentHistoryFile = path.join(__dirname, 'sent_history.json');
+let persistentSentIds = new Set();
+try {
+  if (fs.existsSync(sentHistoryFile)) {
+    const raw = fs.readFileSync(sentHistoryFile, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) persistentSentIds = new Set(parsed);
+  }
+} catch (e) {}
+
+function markMsgAsSent(msgId) {
+  if (!msgId) return;
+  persistentSentIds.add(msgId);
+  try {
+    const arr = Array.from(persistentSentIds).slice(-3000);
+    fs.writeFileSync(sentHistoryFile, JSON.stringify(arr), 'utf8');
+  } catch (e) {}
+}
 
 // 1. LATIDO (HEARTBEAT) CADA 15 SEGUNDOS AL SERVIDOR
 async function sendHeartbeatPing() {
@@ -347,17 +364,14 @@ process.on('unhandledRejection', (reason, promise) => {
 
       for (const msg of messages) {
         try {
-          // DEDUPLICADOR ATÓMICO EN GATEWAY
+          // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
           const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
-          if (sentMsgHistory.has(msgDedupeKey)) {
-            const prevTime = sentMsgHistory.get(msgDedupeKey);
-            if (Date.now() - prevTime < 30000) {
-              console.warn(`⚠️ [DEDUPLICADOR GATEWAY] Omitiendo mensaje duplicado en cola: ${msgDedupeKey}`);
-              continue;
-            }
+          if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
+            console.warn(`⚠️ [DEDUPLICADOR GATEWAY] Omitiendo mensaje ya enviado previamente: ${msgDedupeKey}`);
+            continue;
           }
-          sentMsgHistory.set(msgDedupeKey, Date.now());
-          if (sentMsgHistory.size > 1000) sentMsgHistory.clear();
+          markMsgAsSent(msgDedupeKey);
+          if (msg.id) markMsgAsSent(msg.id);
 
           let primaryJid = msg.targetJid || msg.remitente;
           let altJid = msg.altRemitente;
