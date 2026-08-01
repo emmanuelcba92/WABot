@@ -781,4 +781,13 @@ app.post('/api/edit-message', async (c) => {
   }
 });
 
+app.get('/api/pending-outgoing', async (c) => {
+  const db = DBFactory.createService(c.env);
+  const messages = await db.popPendingOutgoing();
+  return c.json({
+    total: messages.length,
+    messages
+  });
+});
+
 export default app;
