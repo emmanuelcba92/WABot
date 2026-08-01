@@ -80,14 +80,33 @@ export class D1Service {
 
   public async appendPacienteMensajeAConsulta(
     remitente: string,
-    altRemitente?: string,
-    pushName?: string,
-    texto?: string,
-    imagenBase64?: string,
-    imagenNombre?: string,
-    pdfBase64?: string,
-    pdfNombre?: string
+    textoOrAlt?: string,
+    imagenBase64OrPush?: string,
+    pdfBase64OrTexto?: string,
+    pdfNombreOrImg?: string,
+    altRemitenteParam?: string,
+    pushNameParam?: string
   ): Promise<boolean> {
+    let texto: string | undefined = undefined;
+    let imagenBase64: string | undefined = undefined;
+    let pdfBase64: string | undefined = undefined;
+    let pdfNombre: string | undefined = undefined;
+    let altRemitente: string | undefined = undefined;
+    let pushName: string | undefined = undefined;
+
+    if (altRemitenteParam !== undefined || pushNameParam !== undefined || pdfNombreOrImg !== undefined) {
+      texto = textoOrAlt;
+      imagenBase64 = imagenBase64OrPush;
+      pdfBase64 = pdfBase64OrTexto;
+      pdfNombre = pdfNombreOrImg;
+      altRemitente = altRemitenteParam;
+      pushName = pushNameParam;
+    } else {
+      altRemitente = textoOrAlt;
+      pushName = imagenBase64OrPush;
+      texto = pdfBase64OrTexto;
+    }
+
     const consultas = await this.getConsultas();
     const cleanRem = remitente.toLowerCase().trim();
     const cleanAlt = (altRemitente || '').toLowerCase().trim();
@@ -106,7 +125,6 @@ export class D1Service {
     respuestasPaciente.push({
       texto: texto || '',
       imagenBase64: imagenBase64 || null,
-      imagenNombre: imagenNombre || null,
       pdfBase64: pdfBase64 || null,
       pdfNombre: pdfNombre || null,
       timestamp: new Date().toISOString()
@@ -122,13 +140,30 @@ export class D1Service {
 
   public async crearConsulta(
     remitente: string,
-    altRemitente: string | undefined,
-    pushName: string | undefined,
-    opcion: string,
-    datos: Record<string, any>,
+    opcionOrAltRemitente: string | undefined,
+    datosOrPushName: any,
+    opcionParam?: string,
+    datosParam?: Record<string, any>,
     simulatedTime?: string,
     esVip: boolean = false
   ): Promise<string> {
+    let opcion = opcionOrAltRemitente || 'Consulta';
+    let datos: Record<string, any> = {};
+    let altRemitente: string | undefined = undefined;
+    let pushName: string | undefined = undefined;
+
+    if (typeof datosOrPushName === 'object' && datosOrPushName !== null) {
+      datos = datosOrPushName;
+      altRemitente = datos.altRemitente;
+      pushName = datos.pushName;
+      esVip = datos.esVip || false;
+    } else {
+      altRemitente = opcionOrAltRemitente;
+      pushName = datosOrPushName;
+      opcion = opcionParam || 'Consulta';
+      datos = datosParam || {};
+    }
+
     const id = `cons_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const tsStr = simulatedTime || new Date().toISOString();
     const tsNum = new Date(tsStr).getTime();
@@ -140,15 +175,15 @@ export class D1Service {
       opcion,
       datos: {
         ...datos,
-        altRemitente,
-        pushName,
+        altRemitente: altRemitente || datos.altRemitente || null,
+        pushName: pushName || datos.pushName || null,
         esVip
       },
       timestamp: tsNum,
       createdAt: tsStr
     };
 
-    D1Service.inMemoryConsultas.push(item);
+    D1Service.inMemoryConsultas.unshift(item);
 
     if (this.db) {
       try {
@@ -159,8 +194,9 @@ export class D1Service {
           )
           .bind(id, remitente, 'pendiente', opcion, JSON.stringify(item.datos), tsNum, tsStr)
           .run();
+        console.log(`✅ [D1] Consulta creada exitosamente en Cloudflare D1: ${id} para ${remitente}`);
       } catch (e) {
-        console.error('Error inserting consulta into D1:', e);
+        console.error('❌ Error inserting consulta into D1:', e);
       }
     }
 
