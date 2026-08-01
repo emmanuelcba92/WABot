@@ -604,66 +604,42 @@
     }
   </style>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-
   <script>
     window._currentUserRole = 'secretaria';
 
     (async function() {
       try {
-        const res = await fetch('/api/firebase-config');
-        const config = await res.json();
-        if (config.apiKey) {
-          if (!firebase.apps.length) firebase.initializeApp(config);
-          firebase.auth().onAuthStateChanged(async (user) => {
-            if (!user) {
-              window.location.replace('/login.html');
-            } else {
-              window._currentUser = user;
-              const username = (user.email || '').split('@')[0].toLowerCase();
-              window._currentUserName = user.displayName || username;
-
-              await loadUserRole(username, user.email);
-
-              document.getElementById('authLoadingOverlay').style.display = 'none';
-              const nameEl = document.getElementById('currentUserName');
-              if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
-
-              applyRolePermissions();
-            }
-          });
-        } else {
-          document.getElementById('authLoadingOverlay').style.display = 'none';
+        const token = localStorage.getItem('coat_token');
+        if (!token) {
+          window.location.replace('/login.html');
+          return;
         }
+
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          localStorage.removeItem('coat_token');
+          window.location.replace('/login.html');
+          return;
+        }
+
+        const data = await res.json();
+        const user = data.user;
+        window._currentUser = user;
+        window._currentUserName = user.displayName || user.username;
+        window._currentUserRole = user.role || 'secretaria';
+
+        document.getElementById('authLoadingOverlay').style.display = 'none';
+        const nameEl = document.getElementById('currentUserName');
+        if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
+
+        applyRolePermissions();
       } catch(e) {
         document.getElementById('authLoadingOverlay').style.display = 'none';
       }
     })();
-
-    async function loadUserRole(username, email) {
-      try {
-        const res = await fetch('/api/users');
-        if (res.ok) {
-          const data = await res.json();
-          const users = data.users || [];
-          const match = users.find(u => u.username.toLowerCase() === username || u.email.toLowerCase() === email.toLowerCase());
-          if (match) {
-            if (match.displayName) window._currentUserName = match.displayName;
-            if (match.role) window._currentUserRole = match.role;
-          } else if (username === 'egomez' || users.length === 0) {
-            window._currentUserRole = 'admin';
-          } else {
-            window._currentUserRole = 'secretaria';
-          }
-        } else {
-          window._currentUserRole = username === 'egomez' ? 'admin' : 'secretaria';
-        }
-      } catch(e) {
-        window._currentUserRole = username === 'egomez' ? 'admin' : 'secretaria';
-      }
-    }
 
     function applyRolePermissions() {
       const isRoleAdmin = window._currentUserRole === 'admin';
@@ -682,9 +658,9 @@
 
     function logout() {
       if (confirm('¿Cerrar sesión?')) {
-        firebase.auth().signOut().then(() => {
-          window.location.replace('/login.html');
-        });
+        localStorage.removeItem('coat_token');
+        localStorage.removeItem('coat_user');
+        window.location.replace('/login.html');
       }
     }
   </script>
@@ -2546,7 +2522,7 @@
               <td style="padding: 12px; color: var(--muted);">${u.email}</td>
               <td style="padding: 12px;">${roleBadge}</td>
               <td style="padding: 12px; text-align: right;">
-                <button class="btn btn-secondary" onclick="sendResetPasswordForUser('${u.email}')" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56,189,248,0.3); font-size: 0.78rem; padding: 4px 10px; margin-right: 6px;" title="Enviar correo de restablecimiento de contraseña">
+                <button class="btn btn-secondary" onclick="sendResetPasswordForUser('${u.username}')" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56,189,248,0.3); font-size: 0.78rem; padding: 4px 10px; margin-right: 6px;" title="Restablecer contraseña de usuario">
                   🔑 Restablecer
                 </button>
                 <button class="btn btn-secondary" onclick="deleteUserSubmit('${u.username}')" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239,68,68,0.3); font-size: 0.78rem; padding: 4px 10px;">
@@ -2561,41 +2537,43 @@
       }
     }
 
-    async function sendResetPasswordForUser(email) {
+    async function sendResetPasswordForUser(username) {
+      const newPassword = prompt(`🔑 RESTABLECER CONTRASEÑA:\n\nIngresá la nueva contraseña para el usuario "${username}":`);
+      if (!newPassword) return;
+      if (newPassword.length < 4) {
+        alert('⚠️ La contraseña debe tener al menos 4 caracteres.');
+        return;
+      }
       try {
-        const targetEmail = (email && email.includes('@') && !email.endsWith('@coat.com.ar')) ? email : 'secretaria@coat.com.ar';
-        if (typeof firebase !== 'undefined' && firebase.auth) {
-          try {
-            await firebase.auth().sendPasswordResetEmail(targetEmail);
-            alert(`📧 Enlace de restablecimiento enviado exitosamente a:\n👉 ${targetEmail}`);
-          } catch(err) {
-            if (err.code === 'auth/user-not-found') {
-              const resConfig = await fetch('/api/firebase-config');
-              const config = await resConfig.json();
-              const secApp = firebase.initializeApp(config, `SecReset_${Date.now()}`);
-              await secApp.auth().createUserWithEmailAndPassword(targetEmail, 'Temp123456!');
-              await secApp.delete();
-              await firebase.auth().sendPasswordResetEmail(targetEmail);
-              alert(`📧 Se vinculó la casilla ${targetEmail} en Firebase Auth y se envió el enlace de restablecimiento.`);
-            } else {
-              alert('⚠️ Error al enviar enlace: ' + (err.message || err.code));
-            }
-          }
+        const token = localStorage.getItem('coat_token');
+        const res = await fetch('/api/auth/admin-reset-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ username, newPassword })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`✅ Contraseña del usuario "${username}" actualizada exitosamente.`);
+        } else {
+          alert('⚠️ Error al restablecer contraseña: ' + (data.error || 'Error del servidor'));
         }
       } catch(e) {
-        alert('⚠️ Error al enviar enlace: ' + (e.message || e));
+        alert('⚠️ Error al conectar con el servidor.');
       }
     }
 
     function openMyProfileModal() {
       const modal = document.getElementById('myProfileModal');
       if (!modal) return;
-      const user = window._currentUser || (typeof firebase !== 'undefined' ? firebase.auth().currentUser : null);
+      const user = window._currentUser || {};
 
-      const username = user ? (user.email || '').split('@')[0] : 'egomez';
+      const username = user.username || 'egomez';
       document.getElementById('profUsername').value = username;
       document.getElementById('profDisplayName').value = window._currentUserName || username;
-      document.getElementById('profEmail').value = (user && user.email) ? user.email : 'secretaria@coat.com.ar';
+      document.getElementById('profEmail').value = user.email || '';
       document.getElementById('profNewPassword').value = '';
       document.getElementById('profConfirmPassword').value = '';
 
@@ -2612,49 +2590,43 @@
       const email = document.getElementById('profEmail').value.trim().toLowerCase();
       const newPass = document.getElementById('profNewPassword').value;
       const confirmPass = document.getElementById('profConfirmPassword').value;
+      const username = document.getElementById('profUsername').value;
 
       if (newPass && newPass !== confirmPass) {
         alert('⚠️ Las nuevas contraseñas no coinciden.');
         return;
       }
 
-      if (newPass && newPass.length < 6) {
-        alert('⚠️ La nueva contraseña debe tener al menos 6 caracteres.');
+      if (newPass && newPass.length < 4) {
+        alert('⚠️ La nueva contraseña debe tener al menos 4 caracteres.');
         return;
       }
 
       try {
-        const user = firebase.auth().currentUser;
-        if (user) {
-          if (displayName && displayName !== user.displayName) {
-            await user.updateProfile({ displayName });
-          }
-          if (newPass) {
-            await user.updatePassword(newPass);
-          }
-        }
-
-        const username = document.getElementById('profUsername').value;
-
-        await fetch('/api/users', {
+        const resSave = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username,
             displayName,
-            email: email || 'secretaria@coat.com.ar',
-            role: window._currentUserRole || 'secretaria'
+            email,
+            role: window._currentUserRole || 'secretaria',
+            password: newPass || undefined
           })
         });
 
-        window._currentUserName = displayName || username;
-        const nameEl = document.getElementById('currentUserName');
-        if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
+        if (resSave.ok) {
+          window._currentUserName = displayName || username;
+          const nameEl = document.getElementById('currentUserName');
+          if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
 
-        alert('✅ ¡Tu perfil y contraseña han sido actualizados con éxito!');
-        closeMyProfileModal();
+          alert('✅ ¡Perfil actualizado con éxito!');
+          closeMyProfileModal();
+        } else {
+          alert('⚠️ Error al actualizar perfil.');
+        }
       } catch (err) {
-        alert('⚠️ Error al actualizar perfil/contraseña: ' + (err.message || err.code || err));
+        alert('⚠️ Error al actualizar perfil: ' + (err.message || err));
       }
     }
 
@@ -2667,7 +2639,7 @@
 
       const username = usernameInput.value.trim().toLowerCase();
       const displayName = displayNameInput ? displayNameInput.value.trim() : '';
-      const email = (userEmailInput ? userEmailInput.value.trim() : '').toLowerCase() || `${username}@coat.com.ar`;
+      const email = userEmailInput ? userEmailInput.value.trim().toLowerCase() : '';
       const password = passwordInput.value;
       const role = roleSelect.value;
 
@@ -2677,24 +2649,10 @@
       }
 
       try {
-        const resConfig = await fetch('/api/firebase-config');
-        const config = await resConfig.json();
-
-        if (config.apiKey && typeof firebase !== 'undefined') {
-          let secondaryApp;
-          const appName = `SecApp_${Date.now()}`;
-          secondaryApp = firebase.initializeApp(config, appName);
-          const userCred = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
-          if (displayName && userCred.user) {
-            await userCred.user.updateProfile({ displayName });
-          }
-          await secondaryApp.delete();
-        }
-
         const resSave = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, displayName: displayName || username, email, role })
+          body: JSON.stringify({ username, displayName: displayName || username, email, role, password })
         });
 
         if (resSave.ok) {
@@ -2702,9 +2660,11 @@
           usernameInput.value = '';
           if (displayNameInput) displayNameInput.value = '';
           passwordInput.value = '';
-          renderUsersEditor();
+          if (userEmailInput) userEmailInput.value = '';
+          loadUsersList();
         } else {
-          alert('⚠️ El usuario se creó en Firebase pero ocurrió un error guardando el perfil.');
+          const errData = await resSave.json();
+          alert('⚠️ Error al crear usuario: ' + (errData.error || 'Error en el servidor'));
         }
       } catch(err) {
         const code = err.code || '';

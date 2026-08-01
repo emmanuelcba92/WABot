@@ -275,8 +275,7 @@
             required
           >
           <div class="domain-hint">
-            📧 Accedés como:
-            <span id="emailPreview"><span id="emailPreviewUser">tu_usuario</span>@coat.com.ar</span>
+            👤 Ingresá con tu usuario (ej: <span>egomez</span> o <span>secretaria</span>)
           </div>
         </div>
 
@@ -302,27 +301,34 @@
         </button>
       </form>
 
+      <div style="margin-top: 20px; text-align: center;">
+        <div style="font-size: 0.78rem; color: var(--muted); margin-bottom: 10px;">o continuar con:</div>
+        <div id="g_id_onload"
+             data-client_id=""
+             data-callback="handleGoogleLogin"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left"
+             style="display: flex; justify-content: center;">
+        </div>
+      </div>
+
       <div class="footer-info">
-        ¿Olvidaste tu contraseña? <a href="#" onclick="handleResetPassword(); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;">Restablecer aquí</a> o escribí a <strong>secretaria@coat.com.ar</strong>
+        ¿Olvidaste tu contraseña? <a href="#" onclick="handleResetPassword(); return false;" style="color: var(--accent); font-weight: 600; text-decoration: underline;">Restablecer aquí</a>
       </div>
     </div>
   </div>
 
-  <!-- Firebase SDK (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <!-- Google Sign-In SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <script>
-    let firebaseReady = false;
-
-    // Actualizar preview en tiempo real
-    const usernameInput = document.getElementById('usernameInput');
-    const emailPreviewUser = document.getElementById('emailPreviewUser');
-    usernameInput.addEventListener('input', () => {
-      const val = usernameInput.value.trim() || 'tu_usuario';
-      emailPreviewUser.textContent = val;
-    });
-
     // Toggle contraseña
     function togglePassword() {
       const inp = document.getElementById('passwordInput');
@@ -357,53 +363,20 @@
       }
     }
 
-    // Inicializar Firebase desde el endpoint del servidor
-    async function initFirebase() {
-      try {
-        const res = await fetch('/api/firebase-config');
-        const config = await res.json();
-        if (!config.apiKey) {
-          showError('⚠️ Configuración de Firebase incompleta. Contactá al administrador.');
-          return false;
-        }
-        if (!firebase.apps.length) {
-          firebase.initializeApp(config);
-        }
-        firebaseReady = true;
-        return true;
-      } catch (e) {
-        showError('⚠️ No se pudo conectar con el servidor. Verificá tu conexión.');
-        return false;
-      }
-    }
-
-    // Verificar si ya está autenticado → redirigir
+    // Verificar si ya está autenticado en Cloudflare D1 Auth → redirigir
     async function checkAlreadyLoggedIn() {
-      const ok = await initFirebase();
-      if (!ok) return;
-      firebase.auth().onAuthStateChanged((user) => {
-        if (user) {
-          window.location.replace('/');
-        }
-      });
-    }
-
-    async function getEmailCandidates(username) {
-      const list = [];
+      const token = localStorage.getItem('coat_token');
+      if (!token) return;
       try {
-        const res = await fetch('/api/users');
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         if (res.ok) {
-          const data = await res.json();
-          const users = data.users || [];
-          const match = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-          if (match && match.email) list.push(match.email);
+          window.location.replace('/');
+        } else {
+          localStorage.removeItem('coat_token');
         }
-      } catch(e) {}
-
-      const userDomainEmail = `${username}@coat.com.ar`;
-      if (!list.includes(userDomainEmail)) list.push(userDomainEmail);
-      if (!list.includes('secretaria@coat.com.ar')) list.push('secretaria@coat.com.ar');
-      return list;
+      } catch (e) {}
     }
 
     async function handleLogin(e) {
@@ -421,90 +394,59 @@
       setLoading(true);
 
       try {
-        if (!firebaseReady) {
-          const ok = await initFirebase();
-          if (!ok) { setLoading(false); return; }
-        }
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
 
-        const emailCandidates = await getEmailCandidates(username);
-        let loggedIn = false;
-        let lastError = null;
+        const data = await res.json();
+        setLoading(false);
 
-        for (const email of emailCandidates) {
-          try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
-            loggedIn = true;
-            break;
-          } catch(err) {
-            lastError = err;
-            if (err.code !== 'auth/user-not-found' && err.code !== 'auth/invalid-credential') {
-              break;
-            }
-          }
-        }
-
-        if (loggedIn) {
+        if (res.ok && data.token) {
+          localStorage.setItem('coat_token', data.token);
+          localStorage.setItem('coat_user', JSON.stringify(data.user));
           window.location.replace('/');
         } else {
-          setLoading(false);
-          const code = lastError?.code || '';
-          if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-            showError('❌ Usuario o contraseña incorrectos. Verificá tus datos.');
-          } else if (code === 'auth/too-many-requests') {
-            showError('⏳ Demasiados intentos. Esperá unos minutos e intentá de nuevo.');
-          } else if (code === 'auth/network-request-failed') {
-            showError('🌐 Sin conexión a internet. Verificá tu red.');
-          } else {
-            showError('⚠️ Error al iniciar sesión: ' + (lastError?.message || code));
-          }
+          showError(data.error || '❌ Usuario o contraseña incorrectos.');
         }
       } catch (err) {
         setLoading(false);
-        showError('⚠️ Error al iniciar sesión.');
+        showError('⚠️ Error de conexión con el servidor.');
       }
     }
 
-    async function handleResetPassword() {
+    async function handleGoogleLogin(response) {
       hideError();
-      const username = document.getElementById('usernameInput').value.trim().toLowerCase();
-      if (!username) {
-        showError('Escribí tu usuario en el campo de arriba y hacé clic de nuevo en "Restablecer aquí".');
-        return;
-      }
+      if (!response || !response.credential) return;
+      setLoading(true);
 
       try {
-        if (!firebaseReady) {
-          const ok = await initFirebase();
-          if (!ok) return;
-        }
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
 
-        const candidates = await getEmailCandidates(username);
-        const targetEmail = candidates.find(e => e.includes('@') && !e.endsWith('@coat.com.ar')) || candidates[0] || 'secretaria@coat.com.ar';
+        const data = await res.json();
+        setLoading(false);
 
-        try {
-          await firebase.auth().sendPasswordResetEmail(targetEmail);
-          alert(`📧 Se envió un correo con el enlace de restablecimiento a:\n👉 ${targetEmail}\n\nRevisá la bandeja de entrada para crear tu nueva contraseña.`);
-        } catch(err) {
-          if (err.code === 'auth/user-not-found') {
-            try {
-              const resConfig = await fetch('/api/firebase-config');
-              const config = await resConfig.json();
-              const appName = `SecReset_${Date.now()}`;
-              const secApp = firebase.initializeApp(config, appName);
-              await secApp.auth().createUserWithEmailAndPassword(targetEmail, 'Temp123456!');
-              await secApp.delete();
-              await firebase.auth().sendPasswordResetEmail(targetEmail);
-              alert(`📧 Se vinculó la casilla ${targetEmail} en Firebase Auth y se envió el enlace de restablecimiento.\n\nRevisá la bandeja de entrada.`);
-            } catch(createErr) {
-              showError(`Error al procesar recuperación para ${targetEmail}: ` + (createErr.message || createErr.code));
-            }
-          } else {
-            showError('Error enviando enlace: ' + (err.message || err.code));
-          }
+        if (res.ok && data.token) {
+          localStorage.setItem('coat_token', data.token);
+          localStorage.setItem('coat_user', JSON.stringify(data.user));
+          window.location.replace('/');
+        } else {
+          showError(data.error || '❌ No se pudo iniciar sesión con la cuenta de Google.');
         }
       } catch (err) {
-        showError('⚠️ Error al iniciar recuperación de contraseña.');
+        setLoading(false);
+        showError('⚠️ Error procesando la cuenta de Google.');
       }
+    }
+
+    function handleResetPassword() {
+      const username = document.getElementById('usernameInput').value.trim().toLowerCase() || 'tu usuario';
+      alert(`🔑 RESTABLECIMIENTO DE CONTRASEÑA:\n\nPor seguridad, el usuario Administrador ("egomez") puede restablecer o asignar una nueva contraseña a "${username}" directamente desde la sección "Gestión de Usuarios" del Panel Admin.`);
     }
 
     // Al cargar la página

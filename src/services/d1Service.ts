@@ -1,5 +1,6 @@
-import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem, PendingOutgoingMsg } from '../types';
+import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem, PendingOutgoingMsg, AppUser } from '../types';
 import { DEFAULT_MENU_TREE } from './firestoreService';
+import { AuthService } from './authService';
 
 export class D1Service {
   private db: any;
@@ -440,27 +441,97 @@ export class D1Service {
     } catch (e) {}
   }
 
-  public async getUsers(): Promise<any[]> {
-    if (!this.db) return [];
-    try {
-      await this.initTables();
-      const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('users_list').first();
-      if (row && row.data) {
-        const parsed = JSON.parse(row.data);
-        return parsed.users || [];
+  public async getUsers(): Promise<AppUser[]> {
+    let users: AppUser[] = [];
+    if (this.db) {
+      try {
+        await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('users_list').first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          users = parsed.users || [];
+        }
+      } catch (e) {}
+    }
+
+    // Garantizar que el usuario 'egomez' existe como admin con hash de contraseña
+    let egomez = users.find(u => (u.username || '').toLowerCase() === 'egomez');
+    let needsSave = false;
+
+    if (!egomez) {
+      const { hash, salt } = await AuthService.hashPassword('coat2026');
+      egomez = {
+        username: 'egomez',
+        displayName: 'Emmanuel',
+        email: 'secretaria@coat.com.ar',
+        role: 'admin',
+        passwordHash: hash,
+        salt: salt,
+        createdAt: new Date().toISOString()
+      };
+      users.unshift(egomez);
+      needsSave = true;
+    } else {
+      if (egomez.role !== 'admin') {
+        egomez.role = 'admin';
+        needsSave = true;
       }
-    } catch (e) {}
-    return [];
+      if (!egomez.passwordHash || !egomez.salt) {
+        const { hash, salt } = await AuthService.hashPassword('coat2026');
+        egomez.passwordHash = hash;
+        egomez.salt = salt;
+        needsSave = true;
+      }
+    }
+
+    if (needsSave && this.db) {
+      try {
+        await this.db
+          .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+          .bind('users_list', JSON.stringify({ users }), new Date().toISOString(), JSON.stringify({ users }), new Date().toISOString())
+          .run();
+      } catch (e) {}
+    }
+
+    return users;
+  }
+
+  public async getUserByUsername(username: string): Promise<AppUser | null> {
+    const users = await this.getUsers();
+    const u = users.find(u => (u.username || '').toLowerCase() === username.toLowerCase().trim());
+    return u || null;
   }
 
   public async saveUser(user: any): Promise<void> {
     const users = await this.getUsers();
-    const existingIdx = users.findIndex((u: any) => u.username === user.username);
+    const username = (user.username || '').toLowerCase().trim();
+    const existingIdx = users.findIndex((u: any) => (u.username || '').toLowerCase() === username);
+
+    let updatedUser: AppUser;
     if (existingIdx >= 0) {
-      users[existingIdx] = { ...users[existingIdx], ...user };
+      updatedUser = { ...users[existingIdx], ...user, username };
     } else {
-      users.push({ ...user, createdAt: new Date().toISOString() });
+      updatedUser = {
+        username,
+        displayName: user.displayName || username,
+        email: user.email || '',
+        role: user.role === 'admin' ? 'admin' : 'secretaria',
+        createdAt: new Date().toISOString()
+      };
     }
+
+    if (user.password) {
+      const { hash, salt } = await AuthService.hashPassword(user.password);
+      updatedUser.passwordHash = hash;
+      updatedUser.salt = salt;
+    }
+
+    if (existingIdx >= 0) {
+      users[existingIdx] = updatedUser;
+    } else {
+      users.push(updatedUser);
+    }
+
     if (!this.db) return;
     try {
       await this.initTables();
@@ -471,9 +542,31 @@ export class D1Service {
     } catch (e) {}
   }
 
+  public async updateUserPassword(username: string, newPassword: string): Promise<boolean> {
+    const users = await this.getUsers();
+    const existing = users.find(u => (u.username || '').toLowerCase() === username.toLowerCase().trim());
+    if (!existing) return false;
+
+    const { hash, salt } = await AuthService.hashPassword(newPassword);
+    existing.passwordHash = hash;
+    existing.salt = salt;
+
+    if (!this.db) return true;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('users_list', JSON.stringify({ users }), new Date().toISOString(), JSON.stringify({ users }), new Date().toISOString())
+        .run();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   public async deleteUser(username: string): Promise<void> {
     const users = await this.getUsers();
-    const filtered = users.filter((u: any) => u.username !== username);
+    const filtered = users.filter((u: any) => (u.username || '').toLowerCase() !== username.toLowerCase().trim());
     if (!this.db) return;
     try {
       await this.initTables();
@@ -656,6 +749,16 @@ export class D1Service {
         await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
       }
     }
+
+    const consulta = D1Service.inMemoryConsultas.find(c => c.remitente === remitente || (c.datos && c.datos.altRemitente === remitente));
+    if (consulta && consulta.datos && consulta.datos.respuestasSecretaria) {
+      const r = consulta.datos.respuestasSecretaria.find((x: any) => x.id === msgId || x.baileysId === msgId);
+      if (r) {
+        r.key = key;
+        if (key && key.id) r.baileysId = key.id;
+        await this.saveConsulta(consulta);
+      }
+    }
   }
 
   public async updateMessageReceipt(remitente: string, msgId: string, status: 'delivered' | 'read'): Promise<void> {
@@ -665,6 +768,15 @@ export class D1Service {
       if (msg) {
         msg.status = status;
         await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+      }
+    }
+
+    const consulta = D1Service.inMemoryConsultas.find(c => c.remitente === remitente || (c.datos && c.datos.altRemitente === remitente));
+    if (consulta && consulta.datos && consulta.datos.respuestasSecretaria) {
+      const r = consulta.datos.respuestasSecretaria.find((x: any) => x.id === msgId || x.baileysId === msgId || (x.key && x.key.id === msgId));
+      if (r) {
+        r.status = status;
+        await this.saveConsulta(consulta);
       }
     }
   }

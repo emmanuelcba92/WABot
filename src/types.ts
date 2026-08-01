@@ -8,7 +8,19 @@ export interface Env {
   SUPABASE_BUCKET?: string;
   GOOGLE_DRIVE_FOLDER_ID?: string;
   GOOGLE_ACCESS_TOKEN?: string;
+  JWT_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
   ASSETS?: Fetcher;
+}
+
+export interface AppUser {
+  username: string;
+  displayName?: string;
+  email?: string;
+  role: 'admin' | 'secretaria';
+  passwordHash?: string;
+  salt?: string;
+  createdAt: string;
 }
 
 export type StateType =

@@ -30,12 +30,26 @@ try {
 
 const processedMsgIds = new Set();
 const sentHistoryFile = path.join(__dirname, 'sent_history.json');
+const sentKeysFile = path.join(__dirname, 'sent_keys.json');
+
 let persistentSentIds = new Set();
+let sentKeysMap = new Map();
+
 try {
   if (fs.existsSync(sentHistoryFile)) {
     const raw = fs.readFileSync(sentHistoryFile, 'utf8');
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) persistentSentIds = new Set(parsed);
+  }
+} catch (e) {}
+
+try {
+  if (fs.existsSync(sentKeysFile)) {
+    const raw = fs.readFileSync(sentKeysFile, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      Object.keys(parsed).forEach(k => sentKeysMap.set(k, parsed[k]));
+    }
   }
 } catch (e) {}
 
@@ -45,6 +59,17 @@ function markMsgAsSent(msgId) {
   try {
     const arr = Array.from(persistentSentIds).slice(-3000);
     fs.writeFileSync(sentHistoryFile, JSON.stringify(arr), 'utf8');
+  } catch (e) {}
+}
+
+function registerSentKey(internalId, key) {
+  if (!key) return;
+  if (internalId) sentKeysMap.set(internalId, key);
+  if (key.id) sentKeysMap.set(key.id, key);
+  try {
+    const obj = {};
+    Array.from(sentKeysMap.entries()).slice(-2000).forEach(([k, v]) => { obj[k] = v; });
+    fs.writeFileSync(sentKeysFile, JSON.stringify(obj), 'utf8');
   } catch (e) {}
 }
 
@@ -413,20 +438,20 @@ process.on('unhandledRejection', (reason, promise) => {
           for (const targetJid of targets) {
             try {
               if (msg.action === 'delete') {
-                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId)) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
-                if (targetKey) {
+                const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
+                if (targetKey && targetKey.id) {
                   const sendJid = targetKey.remoteJid || targetJid;
                   await sock.sendMessage(sendJid, { delete: targetKey });
-                  console.log(`🗑️ Mensaje eliminado en WhatsApp para ${sendJid}.`);
+                  console.log(`🗑️ Mensaje (${targetKey.id}) eliminado en WhatsApp para ${sendJid}.`);
                   sendSuccess = true;
                   break;
                 }
               } else if (msg.action === 'edit') {
-                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId)) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
-                if (targetKey) {
+                const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
+                if (targetKey && targetKey.id) {
                   const sendJid = targetKey.remoteJid || targetJid;
                   await sock.sendMessage(sendJid, { edit: targetKey, text: msg.text });
-                  console.log(`✏️ Mensaje editado en WhatsApp para ${sendJid}.`);
+                  console.log(`✏️ Mensaje (${targetKey.id}) editado en WhatsApp para ${sendJid}.`);
                   sendSuccess = true;
                   break;
                 }
@@ -440,8 +465,8 @@ process.on('unhandledRejection', (reason, promise) => {
                   caption: msg.text || undefined
                 });
                 if (sentRes && sentRes.key) {
-                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
-                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                  registerSentKey(msg.id, sentRes.key);
+                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -459,8 +484,8 @@ process.on('unhandledRejection', (reason, promise) => {
                   caption: msg.text || undefined
                 });
                 if (sentRes && sentRes.key) {
-                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
-                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                  registerSentKey(msg.id, sentRes.key);
+                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -473,8 +498,8 @@ process.on('unhandledRejection', (reason, promise) => {
               } else if (msg.text) {
                 const sentRes = await sock.sendMessage(targetJid, { text: msg.text });
                 if (sentRes && sentRes.key) {
-                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
-                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                  registerSentKey(msg.id, sentRes.key);
+                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

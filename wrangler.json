@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wa-bot-clinica",
+  "name": "app",
+  "account_id": "dd870b4185d1c230d6bbf44fe6ce594f",
   "main": "src/index.ts",
   "compatibility_date": "2025-02-04",
   "assets": {
