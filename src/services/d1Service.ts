@@ -1,4 +1,4 @@
-import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem } from '../types';
+import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem, PendingOutgoingMsg } from '../types';
 import { DEFAULT_MENU_TREE } from './firestoreService';
 
 export class D1Service {
@@ -399,17 +399,181 @@ export class D1Service {
     return D1Service.lastHeartbeatTs;
   }
 
-  public async saveSesion(remitente: string, estado: string, datosTemporales?: Record<string, any>): Promise<void> {}
-  public async getSesion(remitente: string): Promise<UserSession> {
-    return {
-      remitente,
+  private static scheduleMode: string = 'auto';
+  private static sessionsMap = new Map<string, UserSession>();
+  private static pendingOutgoingQueue: PendingOutgoingMsg[] = [];
+
+  public async getScheduleMode(): Promise<string> {
+    if (this.db) {
+      try {
+        await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('schedule_mode').first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          if (parsed.mode) {
+            D1Service.scheduleMode = parsed.mode;
+            return parsed.mode;
+          }
+        }
+      } catch (e) {}
+    }
+    return D1Service.scheduleMode;
+  }
+
+  public async saveScheduleMode(mode: string): Promise<void> {
+    D1Service.scheduleMode = mode;
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('schedule_mode', JSON.stringify({ mode }), new Date().toISOString(), JSON.stringify({ mode }), new Date().toISOString())
+        .run();
+    } catch (e) {
+      console.error('Error saving schedule mode to D1:', e);
+    }
+  }
+
+  public async saveSesion(remitente: string, estado: string, datosTemporales?: Record<string, any>): Promise<void> {
+    const cleanRem = remitente.toLowerCase().trim();
+    let current = D1Service.sessionsMap.get(cleanRem) || {
+      remitente: cleanRem,
       estado: 'inicio',
       datosTemporales: {},
       historialMensajes: [],
       updatedAt: new Date().toISOString()
     };
+    current.estado = estado;
+    if (datosTemporales) {
+      current.datosTemporales = { ...current.datosTemporales, ...datosTemporales };
+    }
+    current.updatedAt = new Date().toISOString();
+    D1Service.sessionsMap.set(cleanRem, current);
+
+    if (this.db) {
+      try {
+        await this.initTables();
+        await this.db
+          .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+          .bind(`session_${cleanRem}`, JSON.stringify(current), current.updatedAt, JSON.stringify(current), current.updatedAt)
+          .run();
+      } catch (e) {}
+    }
   }
-  public async agregarMensajeHistorial(remitente: string, msg: any): Promise<void> {}
-  public async getScheduleMode(): Promise<any> { return 'auto'; }
-  public async saveScheduleMode(mode: string): Promise<void> {}
+
+  public async getSesion(remitente: string, altRemitente?: string): Promise<UserSession> {
+    const cleanRem = remitente.toLowerCase().trim();
+    if (D1Service.sessionsMap.has(cleanRem)) {
+      return D1Service.sessionsMap.get(cleanRem)!;
+    }
+    if (altRemitente) {
+      const cleanAlt = altRemitente.toLowerCase().trim();
+      if (D1Service.sessionsMap.has(cleanAlt)) {
+        return D1Service.sessionsMap.get(cleanAlt)!;
+      }
+    }
+    if (this.db) {
+      try {
+        await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind(`session_${cleanRem}`).first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          D1Service.sessionsMap.set(cleanRem, parsed);
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    const defSession: UserSession = {
+      remitente: cleanRem,
+      estado: 'inicio',
+      datosTemporales: {},
+      historialMensajes: [],
+      updatedAt: new Date().toISOString()
+    };
+    D1Service.sessionsMap.set(cleanRem, defSession);
+    return defSession;
+  }
+
+  public async agregarMensajeHistorial(remitente: string, msg: any): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    if (!sesion.historialMensajes) sesion.historialMensajes = [];
+    sesion.historialMensajes.push(msg);
+    if (sesion.historialMensajes.length > 50) {
+      sesion.historialMensajes = sesion.historialMensajes.slice(-50);
+    }
+    await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+  }
+
+  public async addPendingOutgoing(
+    remitente: string,
+    text: string,
+    idConsulta?: string,
+    pdfUrl?: string,
+    pdfNombre?: string,
+    pdfBase64?: string,
+    imagenBase64?: string,
+    altRemitente?: string,
+    isForwardToDoctor: boolean = false
+  ): Promise<void> {
+    let targetJid = remitente;
+    let computedAlt = altRemitente;
+
+    if (idConsulta && !isForwardToDoctor) {
+      const itemMem = D1Service.inMemoryConsultas.find(c => c.id === idConsulta);
+      if (itemMem && itemMem.datos?.altRemitente) {
+        computedAlt = itemMem.datos.altRemitente;
+        if (computedAlt && computedAlt.includes('@lid')) {
+          targetJid = computedAlt;
+        }
+      }
+    }
+
+    const item: PendingOutgoingMsg = {
+      id: `out_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      remitente,
+      altRemitente: computedAlt,
+      targetJid,
+      text,
+      pdfUrl,
+      pdfNombre,
+      pdfBase64,
+      imagenBase64,
+      timestamp: new Date().toISOString()
+    };
+
+    D1Service.pendingOutgoingQueue.push(item);
+
+    if (this.db) {
+      try {
+        await this.initTables();
+        await this.db
+          .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+          .bind('pending_queue', JSON.stringify(D1Service.pendingOutgoingQueue), new Date().toISOString(), JSON.stringify(D1Service.pendingOutgoingQueue), new Date().toISOString())
+          .run();
+      } catch (e) {}
+    }
+  }
+
+  public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
+    if (this.db) {
+      try {
+        await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('pending_queue').first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            D1Service.pendingOutgoingQueue = [];
+            await this.db
+              .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+              .bind('pending_queue', '[]', new Date().toISOString(), '[]', new Date().toISOString())
+              .run();
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    const result = [...D1Service.pendingOutgoingQueue];
+    D1Service.pendingOutgoingQueue = [];
+    return result;
+  }
 }
