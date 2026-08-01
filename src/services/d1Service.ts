@@ -1,5 +1,5 @@
 import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem } from '../types';
-import { DEFAULT_MENU_TREE } from './firestoreService';
+import { DEFAULT_MENU_TREE, FirestoreService } from './firestoreService';
 
 export class D1Service {
   private db: any;
