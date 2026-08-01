@@ -1,7 +1,7 @@
 import { WebhookPayload, WebhookResponse, Env, MenuTreeConfig } from '../types';
 import { MESSAGES } from '../templates/messages';
 import { ScheduleService } from '../services/scheduleService';
-import { FirestoreService } from '../services/firestoreService';
+import { DBFactory } from '../services/dbFactory';
 import { ImageUploadService } from '../services/imageUploadService';
 
 function buildFullMenuMessage(menuTree: MenuTreeConfig): string {
@@ -21,7 +21,7 @@ export class StateEngine {
     payload: WebhookPayload,
     env?: Env
   ): Promise<WebhookResponse> {
-    const firestore = new FirestoreService(env);
+    const firestore = DBFactory.createService(env);
     const remitente = payload.remitente.trim();
     const altRemitente = payload.altRemitente ? payload.altRemitente.trim() : undefined;
     const pushName = payload.pushName ? payload.pushName.trim() : undefined;
@@ -255,10 +255,10 @@ export class StateEngine {
     pdfNombre?: string,
     env?: Env,
     timestamp?: string,
-    firestore?: FirestoreService,
+    firestore?: any,
     isVipBypass: boolean = false
   ): Promise<WebhookResponse> {
-    const fs = firestore || new FirestoreService(env);
+    const fs = firestore || DBFactory.createService(env);
     const ts = timestamp || new Date().toISOString();
 
     let uploadedImgUrl: string | undefined = undefined;

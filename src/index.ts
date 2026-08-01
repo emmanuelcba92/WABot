@@ -66,8 +66,8 @@ app.get('/admin', async (c) => {
 });
 
 app.get('/api/doctors', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const items = await firestore.getDoctors();
+  const db = DBFactory.createService(c.env);
+  const items = await db.getDoctors();
   return c.json({ items });
 });
 
@@ -75,8 +75,8 @@ app.post('/api/doctors', async (c) => {
   try {
     const body = await c.req.json();
     const items = body.items || [];
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveDoctors(items);
+    const db = DBFactory.createService(c.env);
+    await db.saveDoctors(items);
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar lista de médicos', details: e?.message }, 500);
@@ -84,8 +84,8 @@ app.post('/api/doctors', async (c) => {
 });
 
 app.get('/api/vip-contacts', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const items = await firestore.getVipContacts();
+  const db = DBFactory.createService(c.env);
+  const items = await db.getVipContacts();
   return c.json({ items });
 });
 
@@ -93,8 +93,8 @@ app.post('/api/vip-contacts', async (c) => {
   try {
     const body = await c.req.json();
     const items = body.items || [];
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveVipContacts(items);
+    const db = DBFactory.createService(c.env);
+    await db.saveVipContacts(items);
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar contactos VIP', details: e?.message }, 500);
@@ -102,8 +102,8 @@ app.post('/api/vip-contacts', async (c) => {
 });
 
 app.get('/api/users', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const users = await firestore.getUsers();
+  const db = DBFactory.createService(c.env);
+  const users = await db.getUsers();
   return c.json({ users });
 });
 
@@ -114,8 +114,8 @@ app.post('/api/users', async (c) => {
     if (!username || !role) {
       return c.json({ error: 'Username y rol son requeridos' }, 400);
     }
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveUser({
+    const db = DBFactory.createService(c.env);
+    await db.saveUser({
       username: username.toLowerCase().trim(),
       displayName: (displayName || username).trim(),
       email: (email || `${username}@coat.com.ar`).toLowerCase().trim(),
@@ -130,8 +130,8 @@ app.post('/api/users', async (c) => {
 app.delete('/api/users/:username', async (c) => {
   try {
     const username = c.req.param('username');
-    const firestore = new FirestoreService(c.env);
-    await firestore.deleteUser(username);
+    const db = DBFactory.createService(c.env);
+    await db.deleteUser(username);
     return c.json({ success: true });
   } catch (e: any) {
     return c.json({ error: 'Error al eliminar usuario', details: e?.message }, 500);
@@ -139,8 +139,8 @@ app.delete('/api/users/:username', async (c) => {
 });
 
 app.get('/api/quick-replies', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const items = await firestore.getQuickReplies();
+  const db = DBFactory.createService(c.env);
+  const items = await db.getQuickReplies();
   return c.json({ items });
 });
 
@@ -148,8 +148,8 @@ app.post('/api/quick-replies', async (c) => {
   try {
     const body = await c.req.json();
     const items = body.items || [];
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveQuickReplies(items);
+    const db = DBFactory.createService(c.env);
+    await db.saveQuickReplies(items);
     return c.json({ success: true, count: items.length });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar respuestas rápidas', details: e?.message }, 500);
@@ -188,8 +188,8 @@ app.post('/api/pdf-config/backup-template', async (c) => {
 });
 
 app.get('/api/tag-config', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const tags = await firestore.getTagConfig();
+  const db = DBFactory.createService(c.env);
+  const tags = await db.getTagConfig();
   return c.json({ tags });
 });
 
@@ -197,8 +197,8 @@ app.post('/api/tag-config', async (c) => {
   try {
     const body = await c.req.json();
     const tags = body.tags || {};
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveTagConfig(tags);
+    const db = DBFactory.createService(c.env);
+    await db.saveTagConfig(tags);
     return c.json({ success: true });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar etiquetas', details: e?.message }, 500);
@@ -206,8 +206,8 @@ app.post('/api/tag-config', async (c) => {
 });
 
 app.get('/api/schedule-config', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const mode = await firestore.getScheduleMode();
+  const db = DBFactory.createService(c.env);
+  const mode = await db.getScheduleMode();
   return c.json({ mode });
 });
 
@@ -215,8 +215,8 @@ app.post('/api/schedule-config', async (c) => {
   try {
     const body = await c.req.json();
     const mode = body.mode || 'auto';
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveScheduleMode(mode);
+    const db = DBFactory.createService(c.env);
+    await db.saveScheduleMode(mode);
     return c.json({ success: true, mode });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar schedule mode', details: e?.message }, 500);
@@ -224,8 +224,8 @@ app.post('/api/schedule-config', async (c) => {
 });
 
 app.get('/api/menu-tree', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const tree = await firestore.getMenuTree();
+  const db = DBFactory.createService(c.env);
+  const tree = await db.getMenuTree();
   return c.json({ tree });
 });
 
@@ -233,8 +233,8 @@ app.post('/api/menu-tree', async (c) => {
   try {
     const body = await c.req.json();
     const tree = body.tree || body;
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveMenuTree(tree);
+    const db = DBFactory.createService(c.env);
+    await db.saveMenuTree(tree);
     return c.json({
       success: true,
       mensaje: 'Árbol de menú y opciones actualizado exitosamente.'
@@ -245,8 +245,8 @@ app.post('/api/menu-tree', async (c) => {
 });
 
 app.get('/api/bot-config', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const config = await firestore.getBotConfig();
+  const db = DBFactory.createService(c.env);
+  const config = await db.getBotConfig();
   return c.json({
     config: {
       saludoBienvenida: config.saludoBienvenida || MESSAGES.SALUDO_BIENVENIDA,
@@ -262,8 +262,8 @@ app.get('/api/bot-config', async (c) => {
 app.post('/api/bot-config', async (c) => {
   try {
     const body = await c.req.json();
-    const firestore = new FirestoreService(c.env);
-    await firestore.saveBotConfig(body);
+    const db = DBFactory.createService(c.env);
+    await db.saveBotConfig(body);
     return c.json({ success: true, config: body });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar mensajes de bot-config', details: e?.message }, 500);
@@ -292,10 +292,10 @@ app.post('/webhook', async (c) => {
       pdfNombre: body.pdfNombre
     };
 
-    const firestore = new FirestoreService(c.env);
+    const db = DBFactory.createService(c.env);
 
     // Guardar el mensaje del paciente en el historial
-    await firestore.agregarMensajeHistorial(remitente, {
+    await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
       sender: 'paciente',
       text: mensaje || '(Imagen/Documento adjunto)',
@@ -303,15 +303,11 @@ app.post('/webhook', async (c) => {
       imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
     });
 
-    // PRE-CHECK CRÍTICO: Antes de invocar el bot, verificar si existe una consulta
-    // pendiente activa para este paciente. Esto cubre el caso donde la secretaría
-    // inicia el chat (sesión guardada con número limpio) y el paciente responde
-    // con JID @lid que no matchea la sesión guardada.
     const msgCleanLower = mensaje.toLowerCase().trim();
     const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu';
 
     if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64)) {
-      const adjuntado = await firestore.appendPacienteMensajeAConsulta(
+      const adjuntado = await db.appendPacienteMensajeAConsulta(
         remitente,
         mensaje,
         body.imagenBase64,
@@ -322,7 +318,6 @@ app.post('/webhook', async (c) => {
       );
 
       if (adjuntado) {
-        // Hay consulta activa: silencio absoluto del bot, el mensaje ya fue adjuntado
         const silentResult = {
           remitente,
           respuesta: '',
@@ -330,16 +325,14 @@ app.post('/webhook', async (c) => {
           enHorario: true,
           timestamp: new Date().toISOString()
         };
-        // Asegurarse de que la sesión refleje el estado correcto
-        await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+        await db.saveSesion(remitente, 'esperando_atencion_humana');
         return c.json(silentResult, 200);
       }
     }
 
-    // No hay consulta activa: procesar normalmente con el StateEngine
     const result = await StateEngine.processMessage(payload, c.env);
 
-    await firestore.agregarMensajeHistorial(remitente, {
+    await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_bot`,
       sender: 'bot',
       text: result.respuesta,
@@ -357,8 +350,8 @@ app.post('/webhook', async (c) => {
 
 app.get('/api/session/:remitente', async (c) => {
   const remitente = c.req.param('remitente');
-  const firestore = new FirestoreService(c.env);
-  const sesion = await firestore.getSesion(remitente);
+  const db = DBFactory.createService(c.env);
+  const sesion = await db.getSesion(remitente);
   return c.json(sesion);
 });
 
@@ -377,8 +370,8 @@ app.patch('/api/consultas/:id/etiquetas', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const etiquetas = body.etiquetas || [];
 
-  const firestore = new FirestoreService(c.env);
-  const ok = await firestore.actualizarEtiquetasConsulta(id, etiquetas);
+  const db = DBFactory.createService(c.env);
+  const ok = await db.actualizarEtiquetasConsulta(id, etiquetas);
 
   if (ok) {
     return c.json({ success: true, id, etiquetas });
@@ -392,8 +385,8 @@ app.patch('/api/consultas/:id/gestion', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { operador, release } = body;
 
-  const firestore = new FirestoreService(c.env);
-  const ok = await firestore.actualizarGestionConsulta(id, release ? null : operador);
+  const db = DBFactory.createService(c.env);
+  const ok = await db.actualizarGestionConsulta(id, release ? null : operador);
   return c.json({ success: ok, id, operador: release ? null : operador });
 });
 
@@ -489,18 +482,18 @@ app.patch('/api/consultas/:id', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const nuevoEstado = body.estado || 'atendido';
 
-  const firestore = new FirestoreService(c.env);
-  const ok = await firestore.actualizarEstadoConsulta(id, nuevoEstado);
+  const db = DBFactory.createService(c.env);
+  const ok = await db.actualizarEstadoConsulta(id, nuevoEstado);
 
   if (ok && nuevoEstado === 'atendido') {
-    const config = await firestore.getBotConfig();
+    const config = await db.getBotConfig();
     const closingMsg = config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO;
 
-    const consultas = await firestore.getConsultas();
-    const target = consultas.find(item => item.id === id);
+    const consultas = await db.getConsultas();
+    const target = consultas.find((item: any) => item.id === id);
     if (target && target.remitente) {
-      await firestore.saveSesion(target.remitente, 'inicio');
-      await firestore.addPendingOutgoing(target.remitente, closingMsg, id);
+      await db.saveSesion(target.remitente, 'inicio');
+      await db.addPendingOutgoing(target.remitente, closingMsg, id);
     }
   }
 
@@ -513,8 +506,8 @@ app.patch('/api/consultas/:id', async (c) => {
 
 app.post('/api/clear-consultas', async (c) => {
   try {
-    const firestore = new FirestoreService(c.env);
-    await firestore.clearAllConsultas();
+    const db = DBFactory.createService(c.env);
+    await db.clearAllConsultas();
     return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
   } catch (err: any) {
     console.error('Error en /api/clear-consultas:', err);
@@ -524,8 +517,8 @@ app.post('/api/clear-consultas', async (c) => {
 
 app.post('/api/seed-consultas', async (c) => {
   try {
-    const firestore = new FirestoreService(c.env);
-    const count = await firestore.seedConsultas();
+    const db = DBFactory.createService(c.env);
+    const count = await db.seedConsultas();
     return c.json({ success: true, count, message: `Se generaron ${count} consultas de prueba exitosamente.` });
   } catch (err: any) {
     return c.json({ error: 'Error al generar consultas de prueba', details: err?.message }, 500);
@@ -552,11 +545,11 @@ app.post('/api/iniciar-chat', async (c) => {
     }
 
     const remitente = cleanPhone;
-    const firestore = new FirestoreService(c.env);
+    const db = DBFactory.createService(c.env);
 
-    await firestore.saveSesion(remitente, 'esperando_atencion_humana');
+    await db.saveSesion(remitente, 'esperando_atencion_humana');
 
-    const idConsulta = await firestore.crearConsulta(remitente, 'Contacto Directo Secretaría', {
+    const idConsulta = await db.crearConsulta(remitente, 'Contacto Directo Secretaría', {
       tipoSolicitud: 'Contacto Directo Secretaría',
       contenidoMensaje: `💬 Chat Iniciado por Secretaría para ${nombre || remitente}`,
       pushName: nombre || null,
@@ -570,14 +563,14 @@ app.post('/api/iniciar-chat', async (c) => {
 
     const textoFinal = mensaje ? `👩‍⚕️ *[Secretaría]* ${mensaje}` : `👩‍⚕️ *[Secretaría]* Te enviamos un documento adjunto de la Clínica Médica.`;
 
-    await firestore.agregarMensajeHistorial(remitente, {
+    await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_sec_init`,
       sender: 'secretaria',
       text: textoFinal,
       timestamp: new Date().toISOString()
     });
 
-    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
+    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
 
     return c.json({
       success: true,
@@ -599,9 +592,9 @@ app.post('/api/forward-telemedicina', async (c) => {
       return c.json({ error: 'idConsulta y doctorPhone son requeridos' }, 400);
     }
 
-    const firestore = new FirestoreService(c.env);
-    const consultas = await firestore.getConsultas();
-    const target = consultas.find(item => item.id === idConsulta);
+    const db = DBFactory.createService(c.env);
+    const consultas = await db.getConsultas();
+    const target = consultas.find((item: any) => item.id === idConsulta);
 
     if (!target) {
       return c.json({ error: 'Consulta no encontrada' }, 404);
@@ -612,10 +605,8 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     const headerMsg = `🏥 *DERIVACIÓN PARA TELEMEDICINA - CLÍNICA COAT*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
 
-    // 1. Enviar Encabezado al Médico (isForwardToDoctor = true para no sobreescribir con el JID del paciente)
-    await firestore.addPendingOutgoing(doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    await db.addPendingOutgoing(doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
 
-    // 2. Enviar PDFs Adjuntos al Médico (Deduplicados)
     const respuestasPaciente = datos.respuestasPaciente || [];
     const rawPdfs = [
       ...(datos.pdfsAdjuntos || []),
@@ -634,11 +625,10 @@ app.post('/api/forward-telemedicina', async (c) => {
       const pdfItem = listPdfs[i];
       if (pdfItem.base64) {
         const label = listPdfs.length > 1 ? `📄 Documento PDF (${i + 1}/${listPdfs.length}): ${pdfItem.nombre || 'estudio.pdf'}` : `📄 Documento PDF: ${pdfItem.nombre || 'estudio.pdf'}`;
-        await firestore.addPendingOutgoing(doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
+        await db.addPendingOutgoing(doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
       }
     }
 
-    // 3. Enviar Imágenes Adjuntas al Médico (Deduplicadas por string base64)
     const displayImg = datos.imagenBase64 || datos.imagenUrl;
     const imgFromResp = respuestasPaciente.filter((r: any) => r.imagenBase64).map((r: any) => r.imagenBase64);
     const rawImagenes = [
@@ -661,12 +651,11 @@ app.post('/api/forward-telemedicina', async (c) => {
       const imgSrc = listImagenes[i];
       const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
       const label = listImagenes.length > 1 ? `📷 Foto Adjunta de Pedido Médico (${i + 1} de ${listImagenes.length})` : `📷 Pedido Médico / Foto Adjunta del Paciente`;
-      await firestore.addPendingOutgoing(doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
+      await db.addPendingOutgoing(doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
     }
 
-    // 4. Registrar en la consulta que fue derivada a Telemedicina
     const regMsg = `🩺 Telemedicina derivada a ${doctorName || 'Médico'} (${doctorPhone}) ${notaSecretaria ? `- "${notaSecretaria}"` : ''}`;
-    await firestore.registrarRespuestaSecretaria(idConsulta, regMsg);
+    await db.registrarRespuestaSecretaria(idConsulta, regMsg);
 
     return c.json({
       success: true,
@@ -687,23 +676,23 @@ app.post('/api/send-message', async (c) => {
       return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF)' }, 400);
     }
 
-    const firestore = new FirestoreService(c.env);
+    const db = DBFactory.createService(c.env);
 
     if (idConsulta) {
       const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
-      await firestore.registrarRespuestaSecretaria(idConsulta, textoReg);
+      await db.registrarRespuestaSecretaria(idConsulta, textoReg);
     }
 
     const textoFinal = respuesta ? `👩‍⚕️ *[Secretaría]* ${respuesta}` : `👩‍⚕️ *[Secretaría]* Te enviamos el documento adjunto con las indicaciones.`;
 
-    await firestore.agregarMensajeHistorial(remitente, {
+    await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_sec`,
       sender: 'secretaria',
       text: textoFinal,
       timestamp: new Date().toISOString()
     });
 
-    await firestore.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64);
+    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64);
 
     return c.json({
       success: true,
@@ -717,8 +706,8 @@ app.post('/api/send-message', async (c) => {
 });
 
 app.get('/api/pending-outgoing', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  const messages = await firestore.popPendingOutgoing();
+  const db = DBFactory.createService(c.env);
+  const messages = await db.popPendingOutgoing();
   return c.json({
     total: messages.length,
     messages
