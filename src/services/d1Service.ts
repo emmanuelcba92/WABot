@@ -646,10 +646,22 @@ export class D1Service {
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
   }
 
+  public async updateMessageSentKey(remitente: string, msgId: string, key: any): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    if (sesion.historialMensajes) {
+      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.baileysId === msgId);
+      if (msg) {
+        msg.key = key;
+        if (key && key.id) msg.baileysId = key.id;
+        await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+      }
+    }
+  }
+
   public async updateMessageReceipt(remitente: string, msgId: string, status: 'delivered' | 'read'): Promise<void> {
     const sesion = await this.getSesion(remitente);
     if (sesion.historialMensajes) {
-      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.baileysId === msgId || (m.key && m.key.id === msgId));
       if (msg) {
         msg.status = status;
         await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
@@ -657,28 +669,34 @@ export class D1Service {
     }
   }
 
-  public async deleteMessage(remitente: string, msgId: string): Promise<void> {
+  public async deleteMessage(remitente: string, msgId: string): Promise<{ key?: any }> {
     const sesion = await this.getSesion(remitente);
+    let key: any = null;
     if (sesion.historialMensajes) {
-      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.baileysId === msgId);
       if (msg) {
+        key = msg.key || (msg.baileysId ? { remoteJid: remitente, fromMe: true, id: msg.baileysId } : null);
         msg.text = '🚫 Mensaje eliminado por secretaría';
         msg.deleted = true;
         await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
       }
     }
+    return { key };
   }
 
-  public async editMessage(remitente: string, msgId: string, newText: string): Promise<void> {
+  public async editMessage(remitente: string, msgId: string, newText: string): Promise<{ key?: any }> {
     const sesion = await this.getSesion(remitente);
+    let key: any = null;
     if (sesion.historialMensajes) {
-      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.baileysId === msgId);
       if (msg) {
+        key = msg.key || (msg.baileysId ? { remoteJid: remitente, fromMe: true, id: msg.baileysId } : null);
         msg.text = `👩‍⚕️ *[Secretaría]* ${newText} _(✏️ Editado)_`;
         msg.edited = true;
         await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
       }
     }
+    return { key };
   }
 
   public async addPendingOutgoing(

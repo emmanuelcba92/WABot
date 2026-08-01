@@ -732,6 +732,21 @@ app.post('/api/send-message', async (c) => {
   }
 });
 
+app.post('/api/message-sent', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { remitente, msgId, key } = body;
+    if (remitente && msgId && key) {
+      const db = DBFactory.createService(c.env);
+      await db.updateMessageSentKey(remitente, msgId, key);
+      invalidateConsultasCache();
+    }
+    return c.json({ ok: true });
+  } catch (e) {
+    return c.json({ ok: false });
+  }
+});
+
 app.post('/api/message-receipt', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -755,8 +770,8 @@ app.post('/api/delete-message', async (c) => {
       return c.json({ error: 'Faltan parámetros' }, 400);
     }
     const db = DBFactory.createService(c.env);
-    await db.deleteMessage(remitente, msgId);
-    await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId);
+    const { key } = await db.deleteMessage(remitente, msgId);
+    await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId, key);
     invalidateConsultasCache();
     return c.json({ success: true, msgId });
   } catch (e: any) {
@@ -772,8 +787,8 @@ app.post('/api/edit-message', async (c) => {
       return c.json({ error: 'Faltan parámetros' }, 400);
     }
     const db = DBFactory.createService(c.env);
-    await db.editMessage(remitente, msgId, newText);
-    await db.addPendingOutgoing(remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId);
+    const { key } = await db.editMessage(remitente, msgId, newText);
+    await db.addPendingOutgoing(remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId, key);
     invalidateConsultasCache();
     return c.json({ success: true, msgId, newText });
   } catch (e: any) {

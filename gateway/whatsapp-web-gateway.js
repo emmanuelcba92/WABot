@@ -440,6 +440,11 @@ process.on('unhandledRejection', (reason, promise) => {
                 if (sentRes && sentRes.key) {
                   if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
                   global._sentMsgKeys.set(msg.id, sentRes.key);
+                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                  }).catch(() => {});
                 }
                 console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
                 sendSuccess = true;
@@ -454,6 +459,11 @@ process.on('unhandledRejection', (reason, promise) => {
                 if (sentRes && sentRes.key) {
                   if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
                   global._sentMsgKeys.set(msg.id, sentRes.key);
+                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                  }).catch(() => {});
                 }
                 console.log(`📤 Imagen enviada a ${targetJid}.`);
                 sendSuccess = true;
@@ -463,6 +473,11 @@ process.on('unhandledRejection', (reason, promise) => {
                 if (sentRes && sentRes.key) {
                   if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
                   global._sentMsgKeys.set(msg.id, sentRes.key);
+                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                  }).catch(() => {});
                 }
                 console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
                 sendSuccess = true;

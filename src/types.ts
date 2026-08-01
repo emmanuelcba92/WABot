@@ -34,6 +34,8 @@ export interface ChatMessage {
   status?: 'sent' | 'delivered' | 'read';
   edited?: boolean;
   deleted?: boolean;
+  baileysId?: string;
+  key?: any;
 }
 
 export interface UserSession {
