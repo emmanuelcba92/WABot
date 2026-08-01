@@ -126,6 +126,27 @@ async function startWhatsAppGateway() {
     browser: ['WA Bot Clínica', 'Chrome', '1.0.0']
   });
 
+const logFilePath = path.join(__dirname, 'bot_errors.log');
+
+function logErrorToFile(msg) {
+  try {
+    const line = typeof msg === 'string' ? msg : JSON.stringify(msg);
+    fs.appendFileSync(logFilePath, `${line}\n`);
+  } catch(e) {}
+}
+
+process.on('uncaughtException', (err) => {
+  const errText = `[${new Date().toISOString()}] 💥 EXCEPCIÓN NO CAPTURADA: ${err?.stack || err}`;
+  console.error(errText);
+  logErrorToFile(errText);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  const errText = `[${new Date().toISOString()}] 💥 PROCESO RECHAZADO: ${reason?.stack || reason}`;
+  console.error(errText);
+  logErrorToFile(errText);
+});
+
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
@@ -134,10 +155,22 @@ async function startWhatsAppGateway() {
       console.log('⚡ ESCANEA EL SIGUIENTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:');
     }
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('⚠️ Conexión cerrada. Reintentando reconexión...', shouldReconnect);
-      if (shouldReconnect) {
-        setTimeout(startWhatsAppGateway, 3000);
+      const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const timeStr = new Date().toLocaleTimeString('es-AR');
+
+      console.log(`⚠️ [${timeStr}] Conexión cerrada (Código: ${statusCode || 'red/desconocido'}). Reintentando en 3 segundos...`);
+      logErrorToFile(`[${new Date().toISOString()}] Conexión cerrada. Código: ${statusCode || 'desconocido'}`);
+
+      if (!isLoggedOut) {
+        setTimeout(() => {
+          startWhatsAppGateway().catch(err => {
+            console.error('❌ Error al reconectar:', err);
+            logErrorToFile(`[${new Date().toISOString()}] Error en reconexión: ${err?.stack || err}`);
+          });
+        }, 3000);
+      } else {
+        console.log('🔒 Sesión de WhatsApp cerrada desde el teléfono. Borrá la carpeta auth_info_baileys para volver a vincular.');
       }
     } else if (connection === 'open') {
       console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
