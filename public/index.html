@@ -1604,7 +1604,7 @@
       fetchMenuTree();
       fetchConsultas();
       checkHeartbeatStatus();
-      setInterval(fetchConsultas, 4000);
+      setInterval(fetchConsultas, 1500);
       setInterval(fetchScheduleConfig, 10000);
       setInterval(checkHeartbeatStatus, 10000);
 
@@ -3536,10 +3536,14 @@
           respuestasSecretaria.forEach((r, idx) => {
             const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 1) * 1000);
             allStreamMsgs.push({
+              id: r.id || `sec_${idx}`,
               type: 'sec',
               senderName: '👩‍⚕️ Secretaría',
               text: r.texto,
               timestamp: ts,
+              status: r.status || 'sent',
+              deleted: r.deleted || false,
+              edited: r.edited || false,
               cssClass: 'chat-bubble-sec',
               headerColor: '#a7f3d0'
             });
@@ -3808,6 +3812,8 @@
       }
 
       isSendingResponse[idConsulta] = true;
+      if (textarea) textarea.value = '';
+      delete draftResponses[idConsulta];
 
       try {
         const res = await fetch('/api/send-message', {
@@ -3825,8 +3831,6 @@
 
         const data = await res.json();
         if (data.success) {
-          if (textarea) textarea.value = '';
-          delete draftResponses[idConsulta];
           delete selectedPdfs[idConsulta];
           delete customPdfBase64[idConsulta];
           delete customPdfNames[idConsulta];

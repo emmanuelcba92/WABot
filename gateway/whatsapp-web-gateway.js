@@ -413,18 +413,20 @@ process.on('unhandledRejection', (reason, promise) => {
           for (const targetJid of targets) {
             try {
               if (msg.action === 'delete') {
-                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId));
+                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId)) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
                 if (targetKey) {
-                  await sock.sendMessage(targetJid, { delete: targetKey });
-                  console.log(`🗑️ Mensaje eliminado en WhatsApp para ${targetJid}.`);
+                  const sendJid = targetKey.remoteJid || targetJid;
+                  await sock.sendMessage(sendJid, { delete: targetKey });
+                  console.log(`🗑️ Mensaje eliminado en WhatsApp para ${sendJid}.`);
                   sendSuccess = true;
                   break;
                 }
               } else if (msg.action === 'edit') {
-                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId));
+                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId)) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
                 if (targetKey) {
-                  await sock.sendMessage(targetJid, { edit: targetKey, text: msg.text });
-                  console.log(`✏️ Mensaje editado en WhatsApp para ${targetJid}.`);
+                  const sendJid = targetKey.remoteJid || targetJid;
+                  await sock.sendMessage(sendJid, { edit: targetKey, text: msg.text });
+                  console.log(`✏️ Mensaje editado en WhatsApp para ${sendJid}.`);
                   sendSuccess = true;
                   break;
                 }
