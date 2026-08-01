@@ -1,5 +1,5 @@
 import { Env, UserSession, MenuTreeConfig, StateType, DoctorItem } from '../types';
-import { DEFAULT_MENU_TREE, FirestoreService } from './firestoreService';
+import { DEFAULT_MENU_TREE } from './firestoreService';
 
 export class D1Service {
   private db: any;
@@ -73,13 +73,8 @@ export class D1Service {
       }
       return items;
     } catch (e) {
-      console.error('Error fetching consultas from D1, falling back to Firestore:', e);
-      try {
-        const firestore = new FirestoreService(this.env);
-        return await firestore.getConsultas(estadoFilter);
-      } catch (fsErr) {
-        return D1Service.inMemoryConsultas;
-      }
+      console.error('Error fetching consultas from D1:', e);
+      return D1Service.inMemoryConsultas;
     }
   }
 

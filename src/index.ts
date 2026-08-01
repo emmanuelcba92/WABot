@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { Env, WebhookPayload } from './types';
 import { StateEngine } from './stateMachine/engine';
 import { MESSAGES } from './templates/messages';
-import { FirestoreService, DEFAULT_MENU_TREE } from './services/firestoreService';
+import { DEFAULT_MENU_TREE } from './services/firestoreService';
 import { DBFactory, DBProviderType } from './services/dbFactory';
 
 const app = new Hono<{ Bindings: Env }>();
