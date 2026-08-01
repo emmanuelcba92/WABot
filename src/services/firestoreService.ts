@@ -1210,7 +1210,7 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      // 1. Borrar todas las consultas de /consultas
+      // 1. Borrar todas las consultas de /consultas (en tandas de a 10 subrequests para Cloudflare)
       let hasMoreC = true;
       while (hasMoreC) {
         const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -1218,11 +1218,14 @@ export class FirestoreService {
         if (resC.ok) {
           const jsonC: any = await resC.json();
           if (jsonC.documents && jsonC.documents.length > 0) {
-            const deletePromises = jsonC.documents.map((doc: any) => {
-              const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-              return fetch(delUrl, { method: 'DELETE' });
-            });
-            await Promise.all(deletePromises);
+            const docs = jsonC.documents;
+            for (let i = 0; i < docs.length; i += 10) {
+              const chunk = docs.slice(i, i + 10);
+              await Promise.all(chunk.map((doc: any) => {
+                const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+                return fetch(delUrl, { method: 'DELETE' });
+              }));
+            }
           } else {
             hasMoreC = false;
           }
@@ -1231,34 +1234,33 @@ export class FirestoreService {
         }
       }
 
-      // 2. Borrar todas las sesiones en /sesiones excepto configuraciones y usuarios
+      // 2. Borrar todas las sesiones en /sesiones excepto configuraciones y usuarios (en tandas de 10)
       let hasMoreS = true;
       while (hasMoreS) {
         const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
         const resS = await fetch(urlS);
         if (resS.ok) {
           const jsonS: any = await resS.json();
-          let countInPage = 0;
           if (jsonS.documents && jsonS.documents.length > 0) {
-            const deletePromises: Promise<any>[] = [];
-            for (const doc of jsonS.documents) {
-              if (
-                !doc.name.includes('/sesiones/users_config') &&
-                !doc.name.includes('/sesiones/bot_') &&
-                !doc.name.includes('/sesiones/global_') &&
-                !doc.name.includes('/sesiones/tag_') &&
-                !doc.name.includes('/sesiones/quick_') &&
-                !doc.name.includes('/sesiones/pdf_') &&
-                !doc.name.includes('/sesiones/vip_') &&
-                !doc.name.includes('/sesiones/doctor_')
-              ) {
-                const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-                deletePromises.push(fetch(delUrl, { method: 'DELETE' }));
-                countInPage++;
+            const validDocs = jsonS.documents.filter((doc: any) =>
+              !doc.name.includes('/sesiones/users_config') &&
+              !doc.name.includes('/sesiones/bot_') &&
+              !doc.name.includes('/sesiones/global_') &&
+              !doc.name.includes('/sesiones/tag_') &&
+              !doc.name.includes('/sesiones/quick_') &&
+              !doc.name.includes('/sesiones/pdf_') &&
+              !doc.name.includes('/sesiones/vip_') &&
+              !doc.name.includes('/sesiones/doctor_')
+            );
+
+            if (validDocs.length > 0) {
+              for (let i = 0; i < validDocs.length; i += 10) {
+                const chunk = validDocs.slice(i, i + 10);
+                await Promise.all(chunk.map((doc: any) => {
+                  const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+                  return fetch(delUrl, { method: 'DELETE' });
+                }));
               }
-            }
-            if (deletePromises.length > 0) {
-              await Promise.all(deletePromises);
             } else {
               hasMoreS = false;
             }
@@ -1271,6 +1273,7 @@ export class FirestoreService {
       }
     } catch (e) {
       console.error('Error al vaciar consultas y sesiones en Firestore:', e);
+      throw e;
     }
   }
 

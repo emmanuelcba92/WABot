@@ -1912,18 +1912,21 @@
     async function limpiarTodasConsultas() {
       if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
         try {
-          allConsultas = [];
-          renderConsultas();
-          updateBadges();
-
           const res = await fetch('/api/clear-consultas', { method: 'POST' });
           const data = await res.json();
           if (data.success) {
+            allConsultas = [];
+            renderConsultas();
+            updateBadges();
             alert('🧹 Se han borrado todas las solicitudes de prueba.');
             fetchConsultas(true);
+          } else {
+            console.error('Error servidor clear-consultas:', data);
+            alert('⚠️ Error al limpiar solicitudes:\n' + (data.details || data.error || 'Error en el servidor'));
           }
         } catch (e) {
-          alert('Error al limpiar solicitudes.');
+          console.error('Error red clear-consultas:', e);
+          alert('⚠️ Error de conexión al limpiar solicitudes: ' + (e.message || e));
         }
       }
     }

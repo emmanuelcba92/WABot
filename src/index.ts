@@ -512,9 +512,14 @@ app.patch('/api/consultas/:id', async (c) => {
 });
 
 app.post('/api/clear-consultas', async (c) => {
-  const firestore = new FirestoreService(c.env);
-  await firestore.clearAllConsultas();
-  return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
+  try {
+    const firestore = new FirestoreService(c.env);
+    await firestore.clearAllConsultas();
+    return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
+  } catch (err: any) {
+    console.error('Error en /api/clear-consultas:', err);
+    return c.json({ error: 'Error al limpiar solicitudes', details: err?.message || String(err) }, 500);
+  }
 });
 
 app.post('/api/seed-consultas', async (c) => {
