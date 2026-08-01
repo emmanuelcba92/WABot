@@ -46,7 +46,7 @@ export class StateEngine {
     // 1. CHECK SI EL REMITENTE ES UN CONTACTO PRIORITARIO (VIP)
     // Para contactos prioritarios, BYPASS COMPLETO DEL BOT: escriben libremente y se envía directo a secretaría.
     const vipContacts = await firestore.getVipContacts();
-    const vipMatch = vipContacts.find(v => {
+    const vipMatch = (vipContacts || []).find((v: any) => {
       const vPhone = (v.phone || '').trim().toLowerCase();
       if (!vPhone) return false;
       const rLower = remitente.toLowerCase();
@@ -96,16 +96,13 @@ export class StateEngine {
         consultaEncontrada = await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente, pushName);
       }
 
-      // Si no hay ninguna consulta pendiente activa (ej: se hizo "Limpiar Todo"),
-      // resetear la sesión y dejar que el bot procese el mensaje normalmente.
       if (!consultaEncontrada) {
         console.log(`⚠️ [ENGINE] Estado esperando_atencion_humana pero sin consulta activa para ${remitente}. Reseteando a 'inicio'.`);
         await firestore.saveSesion(remitente, 'inicio');
-        // Fall-through: el mensaje se procesará como si fuera estado 'inicio'
       } else {
         return {
           remitente,
-          respuesta: '', // SILENCIO ABSOLUTO DEL BOT: LA SECRETARÍA ESTÁ CONVERSANDO DIRECTAMENTE
+          respuesta: '',
           estadoActual: 'esperando_atencion_humana',
           enHorario: true,
           timestamp
@@ -113,7 +110,6 @@ export class StateEngine {
       }
     }
 
-    // Si el usuario envía reset / cancelar, volver al menú inicial
     if (esSaludoExplicit) {
       await firestore.saveSesion(remitente, 'inicio');
       return {
@@ -128,7 +124,7 @@ export class StateEngine {
     // 4. MÁQUINA DE ESTADOS - PROCESAMIENTO SEGÚN EL MENÚ DINÁMICO
     switch (sesion.estado) {
       case 'inicio': {
-        const itemElegido = (menuTree.items || []).find(i => i.key.toLowerCase() === msgClean);
+        const itemElegido = (menuTree.items || []).find((i: any) => i.key.toLowerCase() === msgClean);
 
         if (!itemElegido) {
           return {
@@ -144,7 +140,7 @@ export class StateEngine {
           await firestore.saveSesion(remitente, 'esperando_sub_a', { parentKey: itemElegido.key });
 
           let subText = `*${itemElegido.label}*\nPor favor responde con el número de la opción elegida:\n\n`;
-          (itemElegido.subItems || []).forEach(sub => {
+          (itemElegido.subItems || []).forEach((sub: any) => {
             subText += `*${sub.key})* ${sub.label}\n`;
           });
 
@@ -186,14 +182,14 @@ export class StateEngine {
 
       case 'esperando_sub_a': {
         const parentKey = sesion.datosTemporales?.parentKey || 'a';
-        const parentItem = (menuTree.items || []).find(i => i.key.toLowerCase() === parentKey.toLowerCase());
+        const parentItem = (menuTree.items || []).find((i: any) => i.key.toLowerCase() === parentKey.toLowerCase());
         const subItems = parentItem?.subItems || [];
 
-        const subElegido = subItems.find(s => s.key.toLowerCase() === msgClean);
+        const subElegido = subItems.find((s: any) => s.key.toLowerCase() === msgClean);
 
         if (!subElegido) {
           let subText = `⚠️ Opción no válida. Por favor responde con el número de la opción elegida:\n\n`;
-          subItems.forEach(sub => {
+          subItems.forEach((sub: any) => {
             subText += `*${sub.key})* ${sub.label}\n`;
           });
           return {
