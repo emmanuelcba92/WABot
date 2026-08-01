@@ -152,7 +152,8 @@ process.on('unhandledRejection', (reason, promise) => {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
-      console.log('⚡ ESCANEA EL SIGUIENTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:');
+      console.log('\n⚡ ESCANEA EL SIGUIENTE CÓDIGO QR CON EL WHATSAPP DE LA CLÍNICA:');
+      qrcode.generate(qr, { small: true });
     }
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
