@@ -810,6 +810,7 @@
         <button class="sub-nav-btn" id="subTabVipBtn" onclick="switchSettingsSubTab('vip')">⭐ 6. Contactos Prioritarios</button>
         <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
         <button class="sub-nav-btn" id="subTabUsersBtn" onclick="switchSettingsSubTab('users')">👥 8. Gestión de Usuarios & Roles</button>
+        <button class="sub-nav-btn" id="subTabClinicBtn" onclick="switchSettingsSubTab('clinic')">🏥 9. Configuración de la Clínica</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -997,6 +998,42 @@
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 10px;" onclick="saveDoctorsConfig()">
           💾 Guardar Directorio de Médicos
         </button>
+      </div>
+
+      <!-- SUB-SECCIÓN 9: CONFIGURACIÓN DE LA CLÍNICA -->
+      <div id="subSettingsClinic" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">🏥 Configuración de la Clínica</h3>
+          <p style="font-size: 0.86rem; color: var(--muted);">Configura el nombre, la dirección y las coordenadas GPS de la clínica. Estos datos se usan automáticamente al enviar la ubicación a los pacientes.</p>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Nombre de la Clínica</label>
+            <input type="text" id="clinicNombre" placeholder="ej: Clínica Médica COAT" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Dirección (texto libre)</label>
+            <input type="text" id="clinicDireccion" placeholder="ej: Av. Vélez Sarsfield 468, Córdoba" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Latitud GPS</label>
+              <input type="number" step="any" id="clinicLat" placeholder="-31.416667" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+            </div>
+            <div style="flex: 1;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Longitud GPS</label>
+              <input type="number" step="any" id="clinicLng" placeholder="-64.183333" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+          <div style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #94a3b8;">
+            💡 <strong style="color: #38bdf8;">¿Cómo obtener coordenadas?</strong> Buscá la clínica en <a href="https://maps.google.com" target="_blank" style="color: #38bdf8;">Google Maps</a>, hacé clic derecho en el mapa → "¿Qué hay aquí?" y copiá los números (ej: <code>-31.416, -64.183</code>).
+          </div>
+          <div id="clinicPreview" style="font-size: 0.83rem; color: #64748b; font-style: italic;"></div>
+          <button class="btn" onclick="saveClinicConfig()" style="align-self: flex-start; padding: 10px 22px;">
+            💾 Guardar Configuración de la Clínica
+          </button>
+        </div>
       </div>
 
       <!-- SUB-SECCIÓN 8: GESTIÓN DE USUARIOS Y ROLES (SOLO ADMINS) -->
@@ -2185,10 +2222,20 @@
     }
 
     function sendLocationGps(idConsulta, remitente) {
-      const text = "📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 468, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333";
-      const textarea = document.getElementById(`replyText_${idConsulta}`);
-      if (textarea) textarea.value = text;
-      responderViaApi(idConsulta, remitente);
+      fetch('/api/clinic-config').then(r => r.json()).then(cfg => {
+        const nombre = cfg.nombre || 'Clínica COAT';
+        const dir = cfg.direccion || 'Av. Vélez Sarsfield 468, Córdoba';
+        const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat || -31.416667},${cfg.lng || -64.183333}`;
+        const text = `📍 *Ubicación de ${nombre}:*\n${dir}.\n🗺️ Abrir en GPS / Google Maps: ${url}`;
+        const textarea = document.getElementById(`replyText_${idConsulta}`);
+        if (textarea) textarea.value = text;
+        responderViaApi(idConsulta, remitente);
+      }).catch(() => {
+        const text = "📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 468, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333";
+        const textarea = document.getElementById(`replyText_${idConsulta}`);
+        if (textarea) textarea.value = text;
+        responderViaApi(idConsulta, remitente);
+      });
     }
 
     function triggerEditMsgModal(remitente, msgId, idConsulta) {
@@ -2297,9 +2344,11 @@
       const btnDoc = document.getElementById('subTabDocBtn');
       const btnDb = document.getElementById('subTabDbBtn');
       const btnUsers = document.getElementById('subTabUsersBtn');
+      const secClinic = document.getElementById('subSettingsClinic');
+      const btnClinic = document.getElementById('subTabClinicBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers].filter(Boolean).forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers].filter(Boolean).forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers, btnClinic].filter(Boolean).forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers, secClinic].filter(Boolean).forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -2331,9 +2380,70 @@
         if (secUsers) secUsers.style.display = 'flex';
         if (btnUsers) btnUsers.classList.add('active');
         renderUsersEditor();
+      } else if (subTab === 'clinic') {
+        if (secClinic) secClinic.style.display = 'flex';
+        if (btnClinic) btnClinic.classList.add('active');
+        loadClinicConfigEditor();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
+      }
+    }
+
+    async function loadClinicConfigEditor() {
+      try {
+        const res = await fetch('/api/clinic-config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        const n = document.getElementById('clinicNombre');
+        const d = document.getElementById('clinicDireccion');
+        const la = document.getElementById('clinicLat');
+        const lo = document.getElementById('clinicLng');
+        if (n) n.value = cfg.nombre || '';
+        if (d) d.value = cfg.direccion || '';
+        if (la) la.value = cfg.lat || '';
+        if (lo) lo.value = cfg.lng || '';
+        updateClinicPreview(cfg);
+      } catch (e) {}
+    }
+
+    function updateClinicPreview(cfg) {
+      const el = document.getElementById('clinicPreview');
+      if (!el) return;
+      const nombre = cfg.nombre || 'Clínica COAT';
+      const dir = cfg.direccion || '';
+      const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat},${cfg.lng}`;
+      if (dir) {
+        el.innerHTML = `<span style="color: #38bdf8;">📱 Vista previa del mensaje:</span><br><em style="color: #e2e8f0;">📍 *Ubicación de ${nombre}:*<br>${dir}.<br>🗺️ ${url}</em>`;
+      }
+    }
+
+    async function saveClinicConfig() {
+      const nombre = document.getElementById('clinicNombre')?.value?.trim();
+      const direccion = document.getElementById('clinicDireccion')?.value?.trim();
+      const lat = parseFloat(document.getElementById('clinicLat')?.value);
+      const lng = parseFloat(document.getElementById('clinicLng')?.value);
+
+      if (!nombre || !direccion) {
+        alert('⚠️ Ingresá al menos el nombre y la dirección de la clínica.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/clinic-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, direccion, lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          updateClinicPreview(data.config);
+          alert('✅ Configuración de la clínica guardada exitosamente.');
+        } else {
+          alert('⚠️ Error al guardar: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('⚠️ Error de conexión al guardar la configuración.');
       }
     }
 

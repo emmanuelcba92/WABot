@@ -72,6 +72,7 @@ export interface PendingOutgoingMsg {
   action?: 'send' | 'delete' | 'edit';
   targetMsgId?: string;
   targetMsgKey?: any;
+  internalMsgId?: string;
 }
 
 export interface WebhookPayload {

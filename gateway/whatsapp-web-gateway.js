@@ -470,7 +470,7 @@ process.on('unhandledRejection', (reason, promise) => {
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
                   }).catch(() => {});
                 }
                 console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
@@ -489,7 +489,7 @@ process.on('unhandledRejection', (reason, promise) => {
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
                   }).catch(() => {});
                 }
                 console.log(`📤 Imagen enviada a ${targetJid}.`);
@@ -503,7 +503,7 @@ process.on('unhandledRejection', (reason, promise) => {
                   fetch('https://app.cpcoat.workers.dev/api/message-sent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, key: sentRes.key })
+                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
                   }).catch(() => {});
                 }
                 console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);

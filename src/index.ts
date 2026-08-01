@@ -699,6 +699,44 @@ app.patch('/api/consultas/:id', async (c) => {
   }
 });
 
+app.get('/api/clinic-config', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const row = await (db as any).db?.prepare('SELECT data FROM bot_config WHERE id = ?').bind('clinic_config').first();
+    if (row && row.data) {
+      return c.json(JSON.parse(row.data));
+    }
+    return c.json({
+      nombre: 'Clínica Médica COAT',
+      direccion: 'Av. Vélez Sarsfield 468, Córdoba',
+      lat: -31.416667,
+      lng: -64.183333,
+      mapsUrl: 'https://maps.google.com/?q=-31.416667,-64.183333'
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al obtener configuración de la clínica' }, 500);
+  }
+});
+
+app.post('/api/clinic-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { nombre, direccion, lat, lng } = body;
+    const mapsUrl = (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : body.mapsUrl || '';
+    const config = { nombre, direccion, lat, lng, mapsUrl };
+    const db = DBFactory.createService(c.env);
+    if ((db as any).db) {
+      await (db as any).db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('clinic_config', JSON.stringify(config), new Date().toISOString(), JSON.stringify(config), new Date().toISOString())
+        .run();
+    }
+    return c.json({ success: true, config });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar configuración de la clínica', details: e?.message }, 500);
+  }
+});
+
 app.post('/api/clear-consultas', async (c) => {
   try {
     const db = DBFactory.createService(c.env);
@@ -873,28 +911,32 @@ app.post('/api/send-message', async (c) => {
       return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF)' }, 400);
     }
 
+    // Single shared msgId that threads through ALL storage so edit/delete/receipts can find the entry
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
     const db = DBFactory.createService(c.env);
 
     if (idConsulta) {
       const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
-      await db.registrarRespuestaSecretaria(idConsulta, textoReg);
+      await db.registrarRespuestaSecretaria(idConsulta, textoReg, msgId);
     }
 
     const textoFinal = respuesta ? `👩‍⚕️ *[Secretaría]* ${respuesta}` : `👩‍⚕️ *[Secretaría]* Te enviamos el documento adjunto con las indicaciones.`;
 
     await db.agregarMensajeHistorial(remitente, {
-      id: `msg_${Date.now()}_sec`,
+      id: msgId,
       sender: 'secretaria',
       text: textoFinal,
       timestamp: new Date().toISOString()
     });
 
-    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64);
+    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, undefined, false, 'send', msgId);
     invalidateConsultasCache();
 
     return c.json({
       success: true,
       remitente,
+      msgId,
       respuestaEnviada: respuesta,
       timestamp: new Date().toISOString()
     });
@@ -906,10 +948,10 @@ app.post('/api/send-message', async (c) => {
 app.post('/api/message-sent', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { remitente, msgId, key } = body;
+    const { remitente, msgId, internalMsgId, key } = body;
     if (remitente && msgId && key) {
       const db = DBFactory.createService(c.env);
-      await db.updateMessageSentKey(remitente, msgId, key);
+      await (db as any).updateMessageSentKey(remitente, msgId, key, internalMsgId);
       invalidateConsultasCache();
     }
     return c.json({ ok: true });

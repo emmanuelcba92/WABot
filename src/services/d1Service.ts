@@ -253,7 +253,7 @@ export class D1Service {
     return await this.actualizarEstadoConsulta(id, nuevoEstado);
   }
 
-  public async responderConsulta(idConsulta: string, texto: string, usuario: string, pdfBase64?: string, pdfNombre?: string): Promise<boolean> {
+  public async responderConsulta(idConsulta: string, texto: string, usuario: string, pdfBase64?: string, pdfNombre?: string, msgId?: string): Promise<boolean> {
     const consultas = await this.getConsultas();
     const target = consultas.find((c: any) => c.id === idConsulta);
     if (!target) return false;
@@ -262,11 +262,13 @@ export class D1Service {
     const respuestasSecretaria = datos.respuestasSecretaria || [];
 
     respuestasSecretaria.push({
+      id: msgId || `sec_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
       texto,
       usuario,
       pdfBase64: pdfBase64 || null,
       pdfNombre: pdfNombre || null,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status: 'sent'
     });
 
     datos.respuestasSecretaria = respuestasSecretaria;
@@ -276,8 +278,8 @@ export class D1Service {
     return await this.actualizarDatosConsulta(idConsulta, datos);
   }
 
-  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string): Promise<void> {
-    await this.responderConsulta(idConsulta, respuestaTexto, 'Secretaría');
+  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string, msgId?: string): Promise<void> {
+    await this.responderConsulta(idConsulta, respuestaTexto, 'Secretaría', undefined, undefined, msgId);
   }
 
   public async actualizarEtiquetasConsulta(id: string, etiquetas: string[]): Promise<boolean> {
@@ -751,10 +753,10 @@ export class D1Service {
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
   }
 
-  public async updateMessageSentKey(remitente: string, msgId: string, key: any): Promise<void> {
+  public async updateMessageSentKey(remitente: string, msgId: string, key: any, internalMsgId?: string): Promise<void> {
     const sesion = await this.getSesion(remitente);
     if (sesion.historialMensajes) {
-      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.baileysId === msgId);
+      const msg = sesion.historialMensajes.find(m => m.id === msgId || m.id === internalMsgId || m.baileysId === msgId);
       if (msg) {
         msg.key = key;
         if (key && key.id) msg.baileysId = key.id;
@@ -762,9 +764,17 @@ export class D1Service {
       }
     }
 
+    // Register key in sentKeysMap for later delete/edit lookup
+    if (key && key.id) {
+      // This runs in gateway local context, not in Worker — but kept for completeness
+    }
+
     const consulta = D1Service.inMemoryConsultas.find(c => c.remitente === remitente || (c.datos && c.datos.altRemitente === remitente));
     if (consulta && consulta.datos && consulta.datos.respuestasSecretaria) {
-      const r = consulta.datos.respuestasSecretaria.find((x: any) => x.id === msgId || x.baileysId === msgId);
+      // Search by out_ id, internalMsgId (msg_...), or baileysId
+      const r = consulta.datos.respuestasSecretaria.find((x: any) =>
+        x.id === msgId || x.id === internalMsgId || x.baileysId === msgId
+      );
       if (r) {
         r.key = key;
         if (key && key.id) r.baileysId = key.id;
@@ -875,7 +885,8 @@ export class D1Service {
       timestamp: new Date().toISOString(),
       action,
       targetMsgId,
-      targetMsgKey
+      targetMsgKey,
+      internalMsgId: targetMsgId  // used by gateway /api/message-sent to update respuestasSecretaria
     };
 
     if (this.db) {
