@@ -341,6 +341,7 @@ app.post('/webhook', async (c) => {
       interactive: result.interactive
     });
 
+    invalidateConsultasCache();
     return c.json(result, 200);
   } catch (err: any) {
     console.error('Error en /webhook:', err);
@@ -355,14 +356,31 @@ app.get('/api/session/:remitente', async (c) => {
   return c.json(sesion);
 });
 
+let cachedConsultasMap = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL_MS = 10000;
+
+function invalidateConsultasCache() {
+  cachedConsultasMap.clear();
+}
+
 app.get('/api/consultas', async (c) => {
-  const estado = c.req.query('estado');
+  const estado = c.req.query('estado') || 'todas';
+  const now = Date.now();
+  const cached = cachedConsultasMap.get(estado);
+
+  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+    return c.json(cached.data);
+  }
+
   const db = DBFactory.createService(c.env);
   const consultas = await db.getConsultas(estado);
-  return c.json({
+  const responseData = {
     total: consultas.length,
     consultas
-  });
+  };
+
+  cachedConsultasMap.set(estado, { data: responseData, timestamp: now });
+  return c.json(responseData);
 });
 
 app.patch('/api/consultas/:id/etiquetas', async (c) => {
@@ -499,6 +517,7 @@ app.patch('/api/consultas/:id', async (c) => {
     }
 
     if (ok) {
+      invalidateConsultasCache();
       return c.json({ success: true, id, estado: nuevoEstado });
     } else {
       return c.json({ error: 'No se pudo actualizar el estado de la consulta' }, 500);
@@ -513,6 +532,7 @@ app.post('/api/clear-consultas', async (c) => {
   try {
     const db = DBFactory.createService(c.env);
     await db.clearAllConsultas();
+    invalidateConsultasCache();
     return c.json({ success: true, message: 'Todas las solicitudes han sido eliminadas' });
   } catch (err: any) {
     console.error('Error en /api/clear-consultas:', err);
@@ -524,6 +544,7 @@ app.post('/api/seed-consultas', async (c) => {
   try {
     const db = DBFactory.createService(c.env);
     const count = await db.seedConsultas();
+    invalidateConsultasCache();
     return c.json({ success: true, count, message: `Se generaron ${count} consultas de prueba exitosamente.` });
   } catch (err: any) {
     return c.json({ error: 'Error al generar consultas de prueba', details: err?.message }, 500);
@@ -698,6 +719,7 @@ app.post('/api/send-message', async (c) => {
     });
 
     await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64);
+    invalidateConsultasCache();
 
     return c.json({
       success: true,
