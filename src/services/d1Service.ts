@@ -225,7 +225,7 @@ export class D1Service {
     return true;
   }
 
-  public async marcarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
+  public async actualizarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
     const consultas = await this.getConsultas();
     const target = consultas.find((c: any) => c.id === id);
     if (target) {
@@ -245,6 +245,10 @@ export class D1Service {
       }
     }
     return true;
+  }
+
+  public async marcarEstadoConsulta(id: string, nuevoEstado: string): Promise<boolean> {
+    return await this.actualizarEstadoConsulta(id, nuevoEstado);
   }
 
   public async responderConsulta(idConsulta: string, texto: string, usuario: string, pdfBase64?: string, pdfNombre?: string): Promise<boolean> {

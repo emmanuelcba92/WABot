@@ -478,29 +478,34 @@ app.get('/api/heartbeat-status', async (c) => {
 });
 
 app.patch('/api/consultas/:id', async (c) => {
-  const id = c.req.param('id');
-  const body = await c.req.json().catch(() => ({}));
-  const nuevoEstado = body.estado || 'atendido';
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const nuevoEstado = body.estado || 'atendido';
 
-  const db = DBFactory.createService(c.env);
-  const ok = await db.actualizarEstadoConsulta(id, nuevoEstado);
+    const db = DBFactory.createService(c.env);
+    const ok = await db.actualizarEstadoConsulta(id, nuevoEstado);
 
-  if (ok && nuevoEstado === 'atendido') {
-    const config = await db.getBotConfig();
-    const closingMsg = config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO;
+    if (ok && nuevoEstado === 'atendido') {
+      const config = await db.getBotConfig();
+      const closingMsg = config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO;
 
-    const consultas = await db.getConsultas();
-    const target = consultas.find((item: any) => item.id === id);
-    if (target && target.remitente) {
-      await db.saveSesion(target.remitente, 'inicio');
-      await db.addPendingOutgoing(target.remitente, closingMsg, id);
+      const consultas = await db.getConsultas();
+      const target = consultas.find((item: any) => item.id === id);
+      if (target && target.remitente) {
+        await db.saveSesion(target.remitente, 'inicio');
+        await db.addPendingOutgoing(target.remitente, closingMsg, id);
+      }
     }
-  }
 
-  if (ok) {
-    return c.json({ success: true, id, estado: nuevoEstado });
-  } else {
-    return c.json({ error: 'No se pudo actualizar el estado de la consulta' }, 500);
+    if (ok) {
+      return c.json({ success: true, id, estado: nuevoEstado });
+    } else {
+      return c.json({ error: 'No se pudo actualizar el estado de la consulta' }, 500);
+    }
+  } catch (err: any) {
+    console.error('Error en PATCH /api/consultas/:id:', err);
+    return c.json({ error: 'Error al actualizar estado de consulta', details: err?.message }, 500);
   }
 });
 
