@@ -1202,6 +1202,27 @@ export class FirestoreService {
     return FirestoreService.lastHeartbeatTimestamp;
   }
 
+  private async batchDeleteDocs(docNames: string[]): Promise<void> {
+    if (!this.projectId || docNames.length === 0) return;
+
+    // Firestore batchWrite permite hasta 500 escrituras/borrados en 1 solo request HTTP
+    const chunkSize = 300;
+    for (let i = 0; i < docNames.length; i += chunkSize) {
+      const chunk = docNames.slice(i, i + chunkSize);
+      const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents:batchWrite${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+
+      const body = {
+        writes: chunk.map(name => ({ delete: name }))
+      };
+
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    }
+  }
+
   public async clearAllConsultas(): Promise<void> {
     FirestoreService.inMemoryConsultas = [];
     FirestoreService.inMemorySessions.clear();
@@ -1210,7 +1231,7 @@ export class FirestoreService {
     if (!this.projectId) return;
 
     try {
-      // 1. Borrar todas las consultas de /consultas (en tandas de a 10 subrequests para Cloudflare)
+      // 1. Obtener todas las consultas y borrarlas en 1 SOLO batchWrite (1 solo subrequest HTTP)
       let hasMoreC = true;
       while (hasMoreC) {
         const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -1218,14 +1239,8 @@ export class FirestoreService {
         if (resC.ok) {
           const jsonC: any = await resC.json();
           if (jsonC.documents && jsonC.documents.length > 0) {
-            const docs = jsonC.documents;
-            for (let i = 0; i < docs.length; i += 10) {
-              const chunk = docs.slice(i, i + 10);
-              await Promise.all(chunk.map((doc: any) => {
-                const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-                return fetch(delUrl, { method: 'DELETE' });
-              }));
-            }
+            const names = jsonC.documents.map((d: any) => d.name);
+            await this.batchDeleteDocs(names);
           } else {
             hasMoreC = false;
           }
@@ -1234,7 +1249,7 @@ export class FirestoreService {
         }
       }
 
-      // 2. Borrar todas las sesiones en /sesiones excepto configuraciones y usuarios (en tandas de 10)
+      // 2. Obtener sesiones y borrarlas en 1 SOLO batchWrite
       let hasMoreS = true;
       while (hasMoreS) {
         const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -1242,25 +1257,21 @@ export class FirestoreService {
         if (resS.ok) {
           const jsonS: any = await resS.json();
           if (jsonS.documents && jsonS.documents.length > 0) {
-            const validDocs = jsonS.documents.filter((doc: any) =>
-              !doc.name.includes('/sesiones/users_config') &&
-              !doc.name.includes('/sesiones/bot_') &&
-              !doc.name.includes('/sesiones/global_') &&
-              !doc.name.includes('/sesiones/tag_') &&
-              !doc.name.includes('/sesiones/quick_') &&
-              !doc.name.includes('/sesiones/pdf_') &&
-              !doc.name.includes('/sesiones/vip_') &&
-              !doc.name.includes('/sesiones/doctor_')
-            );
+            const validNames = jsonS.documents
+              .map((d: any) => d.name)
+              .filter((name: string) =>
+                !name.includes('/sesiones/users_config') &&
+                !name.includes('/sesiones/bot_') &&
+                !name.includes('/sesiones/global_') &&
+                !name.includes('/sesiones/tag_') &&
+                !name.includes('/sesiones/quick_') &&
+                !name.includes('/sesiones/pdf_') &&
+                !name.includes('/sesiones/vip_') &&
+                !name.includes('/sesiones/doctor_')
+              );
 
-            if (validDocs.length > 0) {
-              for (let i = 0; i < validDocs.length; i += 10) {
-                const chunk = validDocs.slice(i, i + 10);
-                await Promise.all(chunk.map((doc: any) => {
-                  const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
-                  return fetch(delUrl, { method: 'DELETE' });
-                }));
-              }
+            if (validNames.length > 0) {
+              await this.batchDeleteDocs(validNames);
             } else {
               hasMoreS = false;
             }
