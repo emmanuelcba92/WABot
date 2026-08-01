@@ -1295,6 +1295,24 @@
         </div>
       </div>
     </div>
+  <!-- MODAL PARA EDITAR MENSAJE DE SECRETARÍA -->
+  <div id="modalEditMessage" class="lightbox-modal" style="display: none;" onclick="closeEditMsgModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 550px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.05rem; color: #38bdf8; font-weight: 700;">✏️ Editar Mensaje Enviado</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeEditMsgModal()">✕</button>
+      </div>
+
+      <div class="settings-group">
+        <label>Nuevo Texto del Mensaje:</label>
+        <textarea id="editMsgInput" style="min-height: 110px; font-size: 0.9rem;" placeholder="Escribe el nuevo texto corregido..."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="closeEditMsgModal()">Cancelar</button>
+        <button class="btn" onclick="submitEditMessage()">✅ Guardar y Actualizar en WhatsApp</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -2189,6 +2207,64 @@
     async function savePdfItemsConfigGlobal() {
       await savePdfItemsConfig();
       closePdfModalGlobal();
+    }
+
+    let activeEditTarget = null;
+
+    function openEditMsgModal(remitente, msgId, idConsulta, currentText) {
+      activeEditTarget = { remitente, msgId, idConsulta };
+      const clean = (currentText || '').replace(/^👩‍⚕️ \*\[Secretaría\]\* /, '').replace(/ _\(✏️ Editado\)$/, '');
+      document.getElementById('editMsgInput').value = clean;
+      document.getElementById('modalEditMessage').style.display = 'flex';
+    }
+
+    function closeEditMsgModal() {
+      activeEditTarget = null;
+      document.getElementById('modalEditMessage').style.display = 'none';
+    }
+
+    async function submitEditMessage() {
+      if (!activeEditTarget) return;
+      const newText = document.getElementById('editMsgInput').value.trim();
+      if (!newText) return alert('El mensaje no puede estar vacío.');
+
+      try {
+        const res = await fetch('/api/edit-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente: activeEditTarget.remitente,
+            msgId: activeEditTarget.msgId,
+            idConsulta: activeEditTarget.idConsulta,
+            newText
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeEditMsgModal();
+          fetchConsultas(true);
+        }
+      } catch (e) {
+        alert('Error al editar el mensaje.');
+      }
+    }
+
+    async function deleteMsgFromWeb(remitente, msgId, idConsulta) {
+      if (confirm('🗑️ ¿Estás seguro/a de eliminar este mensaje para todos en WhatsApp?')) {
+        try {
+          const res = await fetch('/api/delete-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ remitente, msgId, idConsulta })
+          });
+          const data = await res.json();
+          if (data.success) {
+            fetchConsultas(true);
+          }
+        } catch (e) {
+          alert('Error al eliminar mensaje.');
+        }
+      }
     }
 
     function switchMainTab(tab) {
@@ -3619,9 +3695,17 @@
                     </div>
                   ` : ''}
 
-                  <div style="font-size: 0.68rem; color: #8696a0; text-align: right; margin-top: 4px;">
-                    ${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                    ${m.type === 'sec' ? '<span style="color: #53bdeb; font-weight: bold; margin-left: 3px;">✓✓</span>' : ''}
+                  <div style="font-size: 0.68rem; color: #8696a0; text-align: right; margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                    ${m.type === 'sec' && !m.deleted ? `
+                      <span onclick="openEditMsgModal('${c.remitente}', '${m.id}', '${c.id}', \`${(m.text || '').replace(/`/g, '\\`').replace(/'/g, "\\'")}\`)" style="cursor: pointer; opacity: 0.7;" title="Editar mensaje en WhatsApp">✏️</span>
+                      <span onclick="deleteMsgFromWeb('${c.remitente}', '${m.id}', '${c.id}')" style="cursor: pointer; opacity: 0.7;" title="Eliminar mensaje para todos">🗑️</span>
+                    ` : ''}
+                    <span>${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    ${m.type === 'sec' ? (
+                      m.status === 'read' 
+                        ? '<span style="color: #53bdeb; font-weight: bold;" title="Leído por el paciente">✓✓</span>' 
+                        : (m.status === 'delivered' ? '<span style="color: #8696a0; font-weight: bold;" title="Entregado al celular">✓✓</span>' : '<span style="color: #8696a0; font-weight: bold;" title="Enviado">✓</span>')
+                    ) : ''}
                   </div>
                 </div>
               `).join('')}

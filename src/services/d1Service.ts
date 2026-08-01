@@ -638,11 +638,47 @@ export class D1Service {
   public async agregarMensajeHistorial(remitente: string, msg: any): Promise<void> {
     const sesion = await this.getSesion(remitente);
     if (!sesion.historialMensajes) sesion.historialMensajes = [];
+    if (!msg.status && msg.sender === 'secretaria') msg.status = 'sent';
     sesion.historialMensajes.push(msg);
     if (sesion.historialMensajes.length > 50) {
       sesion.historialMensajes = sesion.historialMensajes.slice(-50);
     }
     await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+  }
+
+  public async updateMessageReceipt(remitente: string, msgId: string, status: 'delivered' | 'read'): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    if (sesion.historialMensajes) {
+      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      if (msg) {
+        msg.status = status;
+        await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+      }
+    }
+  }
+
+  public async deleteMessage(remitente: string, msgId: string): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    if (sesion.historialMensajes) {
+      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      if (msg) {
+        msg.text = '🚫 Mensaje eliminado por secretaría';
+        msg.deleted = true;
+        await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+      }
+    }
+  }
+
+  public async editMessage(remitente: string, msgId: string, newText: string): Promise<void> {
+    const sesion = await this.getSesion(remitente);
+    if (sesion.historialMensajes) {
+      const msg = sesion.historialMensajes.find(m => m.id === msgId);
+      if (msg) {
+        msg.text = `👩‍⚕️ *[Secretaría]* ${newText} _(✏️ Editado)_`;
+        msg.edited = true;
+        await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+      }
+    }
   }
 
   public async addPendingOutgoing(
@@ -654,7 +690,10 @@ export class D1Service {
     pdfBase64?: string,
     imagenBase64?: string,
     altRemitente?: string,
-    isForwardToDoctor: boolean = false
+    isForwardToDoctor: boolean = false,
+    action: 'send' | 'delete' | 'edit' = 'send',
+    targetMsgId?: string,
+    targetMsgKey?: any
   ): Promise<void> {
     let targetJid = remitente;
     let computedAlt = altRemitente;
@@ -679,7 +718,10 @@ export class D1Service {
       pdfNombre,
       pdfBase64,
       imagenBase64,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      action,
+      targetMsgId,
+      targetMsgKey
     };
 
     D1Service.pendingOutgoingQueue.push(item);

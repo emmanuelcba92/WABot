@@ -31,6 +31,9 @@ export interface ChatMessage {
   timestamp: string;
   imageUrl?: string;
   interactive?: InteractiveMessage;
+  status?: 'sent' | 'delivered' | 'read';
+  edited?: boolean;
+  deleted?: boolean;
 }
 
 export interface UserSession {
@@ -52,6 +55,9 @@ export interface PendingOutgoingMsg {
   pdfBase64?: string;
   imagenBase64?: string;
   timestamp: string;
+  action?: 'send' | 'delete' | 'edit';
+  targetMsgId?: string;
+  targetMsgKey?: any;
 }
 
 export interface WebhookPayload {

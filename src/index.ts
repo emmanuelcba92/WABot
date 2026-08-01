@@ -732,13 +732,53 @@ app.post('/api/send-message', async (c) => {
   }
 });
 
-app.get('/api/pending-outgoing', async (c) => {
-  const db = DBFactory.createService(c.env);
-  const messages = await db.popPendingOutgoing();
-  return c.json({
-    total: messages.length,
-    messages
-  });
+app.post('/api/message-receipt', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { remitente, msgId, status } = body;
+    if (remitente && msgId && status) {
+      const db = DBFactory.createService(c.env);
+      await db.updateMessageReceipt(remitente, msgId, status);
+      invalidateConsultasCache();
+    }
+    return c.json({ ok: true });
+  } catch (e) {
+    return c.json({ ok: false });
+  }
+});
+
+app.post('/api/delete-message', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { remitente, msgId, idConsulta } = body;
+    if (!remitente || !msgId) {
+      return c.json({ error: 'Faltan parámetros' }, 400);
+    }
+    const db = DBFactory.createService(c.env);
+    await db.deleteMessage(remitente, msgId);
+    await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId);
+    invalidateConsultasCache();
+    return c.json({ success: true, msgId });
+  } catch (e: any) {
+    return c.json({ error: 'Error al eliminar mensaje', details: e?.message }, 500);
+  }
+});
+
+app.post('/api/edit-message', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { remitente, msgId, idConsulta, newText } = body;
+    if (!remitente || !msgId || !newText) {
+      return c.json({ error: 'Faltan parámetros' }, 400);
+    }
+    const db = DBFactory.createService(c.env);
+    await db.editMessage(remitente, msgId, newText);
+    await db.addPendingOutgoing(remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId);
+    invalidateConsultasCache();
+    return c.json({ success: true, msgId, newText });
+  } catch (e: any) {
+    return c.json({ error: 'Error al editar mensaje', details: e?.message }, 500);
+  }
 });
 
 export default app;

@@ -177,6 +177,21 @@ process.on('unhandledRejection', (reason, promise) => {
       console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
       console.log('📡 Escuchando mensajes entrantes en tiempo real y sintonizando mensajes offline...');
       sendHeartbeatPing();
+  const sentMsgKeys = new Map();
+
+  sock.ev.on('message-receipt.update', async (events) => {
+    for (const receipt of events) {
+      const jid = receipt.key.remoteJid;
+      const msgId = receipt.key.id;
+      const receiptType = (receipt.receipt && (receipt.receipt.userJid || receipt.receipt.readTimestamp)) ? 'read' : 'delivered';
+
+      try {
+        await fetch('https://app.cpcoat.workers.dev/api/message-receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remitente: jid, msgId, status: receiptType })
+        });
+      } catch (e) {}
     }
   });
 
@@ -380,30 +395,58 @@ process.on('unhandledRejection', (reason, promise) => {
           let sendSuccess = false;
           for (const targetJid of targets) {
             try {
-              if (msg.pdfBase64 && msg.pdfNombre) {
+              if (msg.action === 'delete') {
+                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId));
+                if (targetKey) {
+                  await sock.sendMessage(targetJid, { delete: targetKey });
+                  console.log(`🗑️ Mensaje eliminado en WhatsApp para ${targetJid}.`);
+                  sendSuccess = true;
+                  break;
+                }
+              } else if (msg.action === 'edit') {
+                const targetKey = msg.targetMsgKey || (global._sentMsgKeys && global._sentMsgKeys.get(msg.targetMsgId));
+                if (targetKey) {
+                  await sock.sendMessage(targetJid, { edit: targetKey, text: msg.text });
+                  console.log(`✏️ Mensaje editado en WhatsApp para ${targetJid}.`);
+                  sendSuccess = true;
+                  break;
+                }
+              } else if (msg.pdfBase64 && msg.pdfNombre) {
                 const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
                 const buffer = Buffer.from(base64Data, 'base64');
-                await sock.sendMessage(targetJid, {
+                const sentRes = await sock.sendMessage(targetJid, {
                   document: buffer,
                   mimetype: 'application/pdf',
                   fileName: msg.pdfNombre,
                   caption: msg.text || undefined
                 });
+                if (sentRes && sentRes.key) {
+                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
+                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                }
                 console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
                 sendSuccess = true;
                 break;
               } else if (msg.imagenBase64) {
                 const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
                 const buffer = Buffer.from(base64Data, 'base64');
-                await sock.sendMessage(targetJid, {
+                const sentRes = await sock.sendMessage(targetJid, {
                   image: buffer,
                   caption: msg.text || undefined
                 });
+                if (sentRes && sentRes.key) {
+                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
+                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                }
                 console.log(`📤 Imagen enviada a ${targetJid}.`);
                 sendSuccess = true;
                 break;
               } else if (msg.text) {
-                await sock.sendMessage(targetJid, { text: msg.text });
+                const sentRes = await sock.sendMessage(targetJid, { text: msg.text });
+                if (sentRes && sentRes.key) {
+                  if (!global._sentMsgKeys) global._sentMsgKeys = new Map();
+                  global._sentMsgKeys.set(msg.id, sentRes.key);
+                }
                 console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
                 sendSuccess = true;
                 break;
