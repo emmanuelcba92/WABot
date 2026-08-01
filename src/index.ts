@@ -364,8 +364,8 @@ app.get('/api/session/:remitente', async (c) => {
 
 app.get('/api/consultas', async (c) => {
   const estado = c.req.query('estado');
-  const firestore = new FirestoreService(c.env);
-  const consultas = await firestore.getConsultas(estado);
+  const db = DBFactory.createService(c.env);
+  const consultas = await db.getConsultas(estado);
   return c.json({
     total: consultas.length,
     consultas

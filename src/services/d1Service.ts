@@ -3,10 +3,12 @@ import { DEFAULT_MENU_TREE } from './firestoreService';
 
 export class D1Service {
   private db: any;
+  private env: any;
 
   private static inMemoryConsultas: Array<Record<string, any>> = [];
 
   constructor(env?: Env) {
+    this.env = env;
     this.db = env?.DB;
   }
 
@@ -14,28 +16,25 @@ export class D1Service {
 
   private async initTables() {
     if (!this.db || D1Service.tablesInitialized) return;
-    try {
-      await this.db.batch([
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS consultas (
-          id TEXT PRIMARY KEY,
-          remitente TEXT NOT NULL,
-          estado TEXT NOT NULL DEFAULT 'pendiente',
-          opcion TEXT,
-          datos TEXT,
-          timestamp INTEGER NOT NULL,
-          createdAt TEXT NOT NULL
-        )`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS bot_config (id TEXT PRIMARY KEY DEFAULT 'config', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS menu_tree (id TEXT PRIMARY KEY DEFAULT 'tree', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS vip_contacts (id TEXT PRIMARY KEY DEFAULT 'vip', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS quick_replies (id TEXT PRIMARY KEY DEFAULT 'replies', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS pdf_config (id TEXT PRIMARY KEY DEFAULT 'pdfs', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS tag_config (id TEXT PRIMARY KEY DEFAULT 'tags', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`),
-        this.db.prepare(`CREATE TABLE IF NOT EXISTS heartbeat (id TEXT PRIMARY KEY DEFAULT 'ping', lastPing INTEGER NOT NULL)`)
-      ]);
-      D1Service.tablesInitialized = true;
-    } catch (e) {
-      console.error('Error initializing D1 tables:', e);
+    D1Service.tablesInitialized = true;
+
+    const queries = [
+      `CREATE TABLE IF NOT EXISTS consultas (id TEXT PRIMARY KEY, remitente TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'pendiente', opcion TEXT, datos TEXT, timestamp INTEGER NOT NULL, createdAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS bot_config (id TEXT PRIMARY KEY DEFAULT 'config', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS menu_tree (id TEXT PRIMARY KEY DEFAULT 'tree', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS vip_contacts (id TEXT PRIMARY KEY DEFAULT 'vip', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS quick_replies (id TEXT PRIMARY KEY DEFAULT 'replies', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS pdf_config (id TEXT PRIMARY KEY DEFAULT 'pdfs', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS tag_config (id TEXT PRIMARY KEY DEFAULT 'tags', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS heartbeat (id TEXT PRIMARY KEY DEFAULT 'ping', lastPing INTEGER NOT NULL)`
+    ];
+
+    for (const q of queries) {
+      try {
+        await this.db.prepare(q).run();
+      } catch (e) {
+        console.error('Error creating D1 table:', e);
+      }
     }
   }
 
@@ -74,8 +73,13 @@ export class D1Service {
       }
       return items;
     } catch (e) {
-      console.error('Error fetching consultas from D1:', e);
-      return D1Service.inMemoryConsultas;
+      console.error('Error fetching consultas from D1, falling back to Firestore:', e);
+      try {
+        const firestore = new FirestoreService(this.env);
+        return await firestore.getConsultas(estadoFilter);
+      } catch (fsErr) {
+        return D1Service.inMemoryConsultas;
+      }
     }
   }
 
