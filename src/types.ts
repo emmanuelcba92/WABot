@@ -41,6 +41,19 @@ export interface UserSession {
   updatedAt: string;
 }
 
+export interface PendingOutgoingMsg {
+  id: string;
+  remitente: string;
+  altRemitente?: string;
+  targetJid?: string;
+  text: string;
+  pdfUrl?: string;
+  pdfNombre?: string;
+  pdfBase64?: string;
+  imagenBase64?: string;
+  timestamp: string;
+}
+
 export interface WebhookPayload {
   remitente: string;
   altRemitente?: string;
