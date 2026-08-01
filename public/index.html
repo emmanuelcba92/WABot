@@ -1912,6 +1912,10 @@
     async function limpiarTodasConsultas() {
       if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
         try {
+          allConsultas = [];
+          renderConsultas();
+          updateBadges();
+
           const res = await fetch('/api/clear-consultas', { method: 'POST' });
           const data = await res.json();
           if (data.success) {

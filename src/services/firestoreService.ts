@@ -1205,11 +1205,12 @@ export class FirestoreService {
   public async clearAllConsultas(): Promise<void> {
     FirestoreService.inMemoryConsultas = [];
     FirestoreService.inMemorySessions.clear();
+    FirestoreService.consultasCache = { items: [], lastFetch: 0 };
 
     if (!this.projectId) return;
 
     try {
-      // 1. Borrar todas las consultas de /consultas (paginación completa)
+      // 1. Borrar todas las consultas de /consultas
       let hasMoreC = true;
       while (hasMoreC) {
         const urlC = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
@@ -1217,9 +1218,11 @@ export class FirestoreService {
         if (resC.ok) {
           const jsonC: any = await resC.json();
           if (jsonC.documents && jsonC.documents.length > 0) {
-            for (const doc of jsonC.documents) {
-              await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
-            }
+            const deletePromises = jsonC.documents.map((doc: any) => {
+              const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+              return fetch(delUrl, { method: 'DELETE' });
+            });
+            await Promise.all(deletePromises);
           } else {
             hasMoreC = false;
           }
@@ -1228,32 +1231,38 @@ export class FirestoreService {
         }
       }
 
-      // 2. Borrar todas las sesiones activas de usuarios en /sesiones (conservando las configuraciones)
+      // 2. Borrar todas las sesiones en /sesiones excepto configuraciones y usuarios
       let hasMoreS = true;
       while (hasMoreS) {
         const urlS = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/sesiones?pageSize=300${this.apiKey ? `&key=${this.apiKey}` : ''}`;
         const resS = await fetch(urlS);
         if (resS.ok) {
           const jsonS: any = await resS.json();
-          let deletedInThisPage = 0;
+          let countInPage = 0;
           if (jsonS.documents && jsonS.documents.length > 0) {
+            const deletePromises: Promise<any>[] = [];
             for (const doc of jsonS.documents) {
               if (
+                !doc.name.includes('/sesiones/users_config') &&
                 !doc.name.includes('/sesiones/bot_') &&
                 !doc.name.includes('/sesiones/global_') &&
                 !doc.name.includes('/sesiones/tag_') &&
                 !doc.name.includes('/sesiones/quick_') &&
                 !doc.name.includes('/sesiones/pdf_') &&
                 !doc.name.includes('/sesiones/vip_') &&
-                !doc.name.includes('/sesiones/doctor_') &&
-                !doc.name.includes('/sesiones/pending_')
+                !doc.name.includes('/sesiones/doctor_')
               ) {
-                await fetch(`https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`, { method: 'DELETE' });
-                deletedInThisPage++;
+                const delUrl = `https://firestore.googleapis.com/v1/${doc.name}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+                deletePromises.push(fetch(delUrl, { method: 'DELETE' }));
+                countInPage++;
               }
             }
-          }
-          if (deletedInThisPage === 0) {
+            if (deletePromises.length > 0) {
+              await Promise.all(deletePromises);
+            } else {
+              hasMoreS = false;
+            }
+          } else {
             hasMoreS = false;
           }
         } else {
@@ -1368,7 +1377,7 @@ export class FirestoreService {
     if (this.projectId) {
       try {
         for (const item of seeded) {
-          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?documentId=${item.id}${this.apiKey ? `?key=${this.apiKey}` : ''}`;
+          const url = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/consultas?documentId=${item.id}${this.apiKey ? `&key=${this.apiKey}` : ''}`;
           await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
