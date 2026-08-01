@@ -270,6 +270,30 @@ export class D1Service {
     return await this.actualizarDatosConsulta(idConsulta, datos);
   }
 
+  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string): Promise<void> {
+    await this.responderConsulta(idConsulta, respuestaTexto, 'Secretaría');
+  }
+
+  public async actualizarEtiquetasConsulta(id: string, etiquetas: string[]): Promise<boolean> {
+    const consultas = await this.getConsultas();
+    const target = consultas.find((c: any) => c.id === id);
+    if (!target) return false;
+
+    const datos = target.datos || {};
+    datos.etiquetas = etiquetas;
+    return await this.actualizarDatosConsulta(id, datos);
+  }
+
+  public async actualizarGestionConsulta(id: string, operador: string | null): Promise<boolean> {
+    const consultas = await this.getConsultas();
+    const target = consultas.find((c: any) => c.id === id);
+    if (!target) return false;
+
+    const datos = target.datos || {};
+    datos.operadorAsignado = operador;
+    return await this.actualizarDatosConsulta(id, datos);
+  }
+
   public async getMenuTree(): Promise<MenuTreeConfig> {
     if (!this.db) return DEFAULT_MENU_TREE;
     try {
@@ -316,12 +340,38 @@ export class D1Service {
     }
   }
 
+  public async getDoctors(): Promise<DoctorItem[]> {
+    if (!this.db) return [];
+    try {
+      await this.initTables();
+      const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('doctor_config').first();
+      if (row && row.data) {
+        const parsed = JSON.parse(row.data);
+        return parsed.items || [];
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  public async saveDoctors(items: DoctorItem[]): Promise<void> {
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('doctor_config', JSON.stringify({ items }), new Date().toISOString(), JSON.stringify({ items }), new Date().toISOString())
+        .run();
+    } catch (e) {}
+  }
+
   public async getVipContacts(): Promise<any[]> {
     if (!this.db) return [];
     try {
+      await this.initTables();
       const row = await this.db.prepare('SELECT data FROM vip_contacts WHERE id = ?').bind('vip').first();
       if (row && row.data) {
-        return JSON.parse(row.data);
+        const parsed = JSON.parse(row.data);
+        return parsed.items || [];
       }
     } catch (e) {}
     return [];
@@ -330,9 +380,10 @@ export class D1Service {
   public async saveVipContacts(items: any[]): Promise<void> {
     if (!this.db) return;
     try {
+      await this.initTables();
       await this.db
         .prepare('INSERT INTO vip_contacts (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
-        .bind('vip', JSON.stringify(items), new Date().toISOString(), JSON.stringify(items), new Date().toISOString())
+        .bind('vip', JSON.stringify({ items }), new Date().toISOString(), JSON.stringify({ items }), new Date().toISOString())
         .run();
     } catch (e) {}
   }
@@ -340,9 +391,11 @@ export class D1Service {
   public async getQuickReplies(): Promise<any[]> {
     if (!this.db) return [];
     try {
+      await this.initTables();
       const row = await this.db.prepare('SELECT data FROM quick_replies WHERE id = ?').bind('replies').first();
       if (row && row.data) {
-        return JSON.parse(row.data);
+        const parsed = JSON.parse(row.data);
+        return parsed.items || [];
       }
     } catch (e) {}
     return [];
@@ -351,9 +404,10 @@ export class D1Service {
   public async saveQuickReplies(items: any[]): Promise<void> {
     if (!this.db) return;
     try {
+      await this.initTables();
       await this.db
         .prepare('INSERT INTO quick_replies (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
-        .bind('replies', JSON.stringify(items), new Date().toISOString(), JSON.stringify(items), new Date().toISOString())
+        .bind('replies', JSON.stringify({ items }), new Date().toISOString(), JSON.stringify({ items }), new Date().toISOString())
         .run();
     } catch (e) {}
   }
@@ -361,9 +415,11 @@ export class D1Service {
   public async getPdfConfig(): Promise<any[]> {
     if (!this.db) return [];
     try {
+      await this.initTables();
       const row = await this.db.prepare('SELECT data FROM pdf_config WHERE id = ?').bind('pdfs').first();
       if (row && row.data) {
-        return JSON.parse(row.data);
+        const parsed = JSON.parse(row.data);
+        return parsed.items || [];
       }
     } catch (e) {}
     return [];
@@ -372,9 +428,54 @@ export class D1Service {
   public async savePdfConfig(items: any[]): Promise<void> {
     if (!this.db) return;
     try {
+      await this.initTables();
       await this.db
         .prepare('INSERT INTO pdf_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
-        .bind('pdfs', JSON.stringify(items), new Date().toISOString(), JSON.stringify(items), new Date().toISOString())
+        .bind('pdfs', JSON.stringify({ items }), new Date().toISOString(), JSON.stringify({ items }), new Date().toISOString())
+        .run();
+    } catch (e) {}
+  }
+
+  public async getUsers(): Promise<any[]> {
+    if (!this.db) return [];
+    try {
+      await this.initTables();
+      const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('users_list').first();
+      if (row && row.data) {
+        const parsed = JSON.parse(row.data);
+        return parsed.users || [];
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  public async saveUser(user: any): Promise<void> {
+    const users = await this.getUsers();
+    const existingIdx = users.findIndex((u: any) => u.username === user.username);
+    if (existingIdx >= 0) {
+      users[existingIdx] = { ...users[existingIdx], ...user };
+    } else {
+      users.push({ ...user, createdAt: new Date().toISOString() });
+    }
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('users_list', JSON.stringify({ users }), new Date().toISOString(), JSON.stringify({ users }), new Date().toISOString())
+        .run();
+    } catch (e) {}
+  }
+
+  public async deleteUser(username: string): Promise<void> {
+    const users = await this.getUsers();
+    const filtered = users.filter((u: any) => u.username !== username);
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('users_list', JSON.stringify({ users: filtered }), new Date().toISOString(), JSON.stringify({ users: filtered }), new Date().toISOString())
         .run();
     } catch (e) {}
   }
@@ -611,5 +712,37 @@ export class D1Service {
     const result = [...D1Service.pendingOutgoingQueue];
     D1Service.pendingOutgoingQueue = [];
     return result;
+  }
+
+  public async clearAllConsultas(): Promise<void> {
+    D1Service.inMemoryConsultas = [];
+    if (this.db) {
+      try {
+        await this.initTables();
+        await this.db.prepare('DELETE FROM consultas').run();
+      } catch (e) {
+        console.error('Error clearing consultas in D1:', e);
+      }
+    }
+  }
+
+  public async seedConsultas(): Promise<number> {
+    await this.clearAllConsultas();
+    const mockNames = ['Carlos Gómez', 'María Rodríguez', 'Juan Pérez', 'Ana Martínez', 'Lucas Silva'];
+    const mockOptions = ['Médico ORL (Otorrinolaringología)', 'Estudios Médicos', 'Cirugías', 'Telemedicina'];
+
+    for (let i = 0; i < mockNames.length; i++) {
+      const name = mockNames[i];
+      const option = mockOptions[i % mockOptions.length];
+      const phone = `54935100000${i + 1}`;
+      await this.crearConsulta(phone, option, {
+        pushName: name,
+        contenidoMensaje: `Solicitud de prueba #${i + 1} para ${name}`,
+        lineasParseadas: [`Nombre: ${name}`, `Opción: ${option}`],
+        respuestasPaciente: [],
+        respuestasSecretaria: []
+      });
+    }
+    return mockNames.length;
   }
 }
