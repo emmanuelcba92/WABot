@@ -756,7 +756,13 @@ export class D1Service {
       if (r) {
         r.key = key;
         if (key && key.id) r.baileysId = key.id;
-        await this.saveConsulta(consulta);
+        if (this.db) {
+          try {
+            await this.db.prepare('UPDATE consultas SET datos = ? WHERE id = ?')
+              .bind(JSON.stringify(consulta.datos), consulta.id)
+              .run();
+          } catch(e) {}
+        }
       }
     }
   }
@@ -776,7 +782,13 @@ export class D1Service {
       const r = consulta.datos.respuestasSecretaria.find((x: any) => x.id === msgId || x.baileysId === msgId || (x.key && x.key.id === msgId));
       if (r) {
         r.status = status;
-        await this.saveConsulta(consulta);
+        if (this.db) {
+          try {
+            await this.db.prepare('UPDATE consultas SET datos = ? WHERE id = ?')
+              .bind(JSON.stringify(consulta.datos), consulta.id)
+              .run();
+          } catch(e) {}
+        }
       }
     }
   }
