@@ -925,6 +925,10 @@ app.patch('/api/consultas/:id', async (c) => {
       const target = consultas.find((item: any) => item.id === id);
       if (target && target.remitente) {
         await db.saveSesion(target.remitente, 'inicio');
+        // También resetear la sesión del altRemitente si existe
+        if (target.datos?.altRemitente) {
+          await db.saveSesion(target.datos.altRemitente, 'inicio');
+        }
         await addPendingAndNotify(db, target.remitente, closingMsg, id);
 
         const readCfg = await (db as any).getWhatsappReadConfig?.();
