@@ -12,14 +12,12 @@
     "FIREBASE_PROJECT_ID": "botwa-524e8",
     "FIREBASE_API_KEY": "AIzaSyAHiCtupbis8HCKfDt14s_DFs8llQ3YAHo",
     "DB_PROVIDER": "d1",
-    "TELEGRAM_BOT_TOKEN": "",
-    "TELEGRAM_CHAT_ID": "",
-    "RESEND_API_KEY": "",
-    "ALERT_EMAIL": "admin@coat.com.ar"
+    "ALERT_EMAIL": "emmanuel.ag92@gmail.com"
   },
   "triggers": {
-    "crons": ["*/2 * * * *"]
+    "crons": ["* * * * *"]
   },
+
   "d1_databases": [
     {
       "binding": "DB",

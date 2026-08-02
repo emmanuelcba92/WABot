@@ -1067,9 +1067,10 @@ async function scheduledWatchdog(env: any) {
     const lastPing = await db.getHeartbeatPing();
     const elapsed = lastPing > 0 ? Date.now() - lastPing : 999999999;
     const elapsedSeconds = Math.floor(elapsed / 1000);
-    const isOnline = lastPing > 0 && elapsed <= 180000; // 3 minutos de tolerancia
+    const isOnline = lastPing > 0 && elapsed <= 90000; // 90 segundos de tolerancia (1.5 min)
 
-    if (!isOnline && elapsedSeconds > 180) {
+    if (!isOnline && elapsedSeconds > 90) {
+
       // Verificar si ya se envió la alerta de esta caída (para no spamear durante la noche)
       let alreadyAlerted = false;
       try {
