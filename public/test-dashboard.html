@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Test Dashboard - WhatsApp Bot</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #00a884;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --info: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .card h2 { font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+    .card p { font-size: 0.84rem; color: var(--muted); }
+    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px; }
+    input, textarea, select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: var(--primary); }
+    textarea { min-height: 80px; resize: vertical; }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #000; }
+    .btn-info { background: var(--info); color: #000; }
+    .btn-secondary { background: #374151; color: var(--text); }
+    .log {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-success { color: #34d399; }
+    .log-error { color: #f87171; }
+    .log-info { color: #38bdf8; }
+    .log-warn { color: #fbbf24; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .status-online { background: #059669; color: #fff; }
+    .status-offline { background: #dc2626; color: #fff; }
+    .status-pending { background: #d97706; color: #fff; }
+    .row { display: flex; gap: 10px; align-items: flex-end; }
+    .row > * { flex: 1; }
+    .row > button { flex: 0; }
+    .sse-indicator {
+      width: 12px; height: 12px; border-radius: 50%;
+      display: inline-block; margin-right: 6px;
+    }
+    .sse-connected { background: #34d399; }
+    .sse-disconnected { background: #ef4444; }
+    .sse-connecting { background: #fbbf24; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Dashboard - WhatsApp Bot</h1>
+  <p class="subtitle">Herramienta de pruebas para el sistema de mensajería WhatsApp</p>
+
+  <div style="display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
+    <label style="margin: 0;">Worker URL:</label>
+    <input type="text" id="workerUrl" value="https://app.cpcoat.workers.dev" style="max-width: 400px;">
+    <span id="sseStatusBadge" class="status-badge status-offline">● Desconectado</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- SSE TEST -->
+    <div class="card">
+      <h2>📡 Conexión SSE (Web App)</h2>
+      <p>Testea la conexión Server-Sent Events para notificaciones push.</p>
+      <div>
+        <span class="sse-indicator sse-disconnected" id="sseDot"></span>
+        <span id="sseLabel">Desconectado</span>
+      </div>
+      <div class="row">
+        <button class="btn btn-primary" onclick="connectSSE()">🔌 Conectar</button>
+        <button class="btn btn-danger" onclick="disconnectSSE()">❌ Desconectar</button>
+        <button class="btn btn-secondary" onclick="clearLog('sseLog')">🗑️ Limpiar</button>
+      </div>
+      <div class="log" id="sseLog">Esperando conexión...</div>
+    </div>
+
+    <!-- SIMULATE INCOMING MESSAGE -->
+    <div class="card">
+      <h2>📥 Simular Mensaje de Paciente</h2>
+      <p>Simula un mensaje entrante de un paciente al bot.</p>
+      <label>Número del paciente (remitente):</label>
+      <input type="text" id="incomingPhone" placeholder="5493512279838" value="5493512279838">
+      <label>Mensaje:</label>
+      <textarea id="incomingMsg" placeholder="Hola, quiero agendar un turno...">Hola, quiero agendar un turno</textarea>
+      <label>Nombre (pushName):</label>
+      <input type="text" id="incomingPushName" placeholder="Juan Pérez" value="Juan Pérez">
+      <button class="btn btn-primary" onclick="simulateIncoming()">📤 Enviar al Worker</button>
+      <div class="log" id="incomingLog">Esperando...</div>
+    </div>
+
+    <!-- SIMULATE OUTGOING WHATSAPP WEB -->
+    <div class="card">
+      <h2>📱 Simular Mensaje de WhatsApp Web</h2>
+      <p>Simula un mensaje saliente capturado desde WhatsApp Web.</p>
+      <label>Remitente (número o @lid):</label>
+      <input type="text" id="outgoingPhone" placeholder="5493512279838@s.whatsapp.net" value="5493512279838@s.whatsapp.net">
+      <label>Mensaje:</label>
+      <textarea id="outgoingMsg" placeholder="Respuesta desde WhatsApp Web...">Respuesta desde WhatsApp Web</textarea>
+      <label>Alt Remitente (opcional):</label>
+      <input type="text" id="outgoingAltRemitente" placeholder="205948144619633@lid">
+      <button class="btn btn-warning" onclick="simulateOutgoing()">📤 Enviar al Worker</button>
+      <div class="log" id="outgoingLog">Esperando...</div>
+    </div>
+
+    <!-- SEND MESSAGE FROM WEB APP -->
+    <div class="card">
+      <h2>👩‍⚕️ Enviar Mensaje desde Web App</h2>
+      <p>Simula el envío de un mensaje desde el panel de secretaría.</p>
+      <label>Remitente del paciente:</label>
+      <input type="text" id="sendPhone" placeholder="5493512279838" value="5493512279838">
+      <label>ID de Consulta:</label>
+      <input type="text" id="sendConsultaId" placeholder="abc123">
+      <label>Mensaje:</label>
+      <textarea id="sendMsg" placeholder="Hola, ¿en qué puedo ayudarte?">Hola, ¿en qué puedo ayudarte?</textarea>
+      <label>Usuario:</label>
+      <input type="text" id="sendUsuario" placeholder="Emmanuel" value="Emmanuel">
+      <button class="btn btn-info" onclick="sendMessageFromWeb()">📤 Enviar</button>
+      <div class="log" id="sendLog">Esperando...</div>
+    </div>
+
+    <!-- CLEANUP TEST -->
+    <div class="card">
+      <h2>🧹 Test de Limpieza</h2>
+      <p>Ejecuta y verifica la limpieza automática de datos.</p>
+      <button class="btn btn-secondary" onclick="getCleanupStatus()">📊 Ver Estado</button>
+      <button class="btn btn-danger" onclick="runCleanup()">🧹 Ejecutar Limpieza</button>
+      <div class="log" id="cleanupLog">Esperando...</div>
+    </div>
+
+    <!-- API STATUS -->
+    <div class="card">
+      <h2>🔍 Estado del Sistema</h2>
+      <p>Verifica el estado de los endpoints principales.</p>
+      <button class="btn btn-secondary" onclick="checkAllEndpoints()">🔄 Verificar Todo</button>
+      <div id="endpointsList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      <div class="log" id="statusLog">Esperando...</div>
+    </div>
+
+  </div>
+
+  <script>
+    const BASE = () => document.getElementById('workerUrl').value.replace(/\/$/, '');
+
+    function log(id, msg, type = 'info') {
+      const el = document.getElementById(id);
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.prepend(entry);
+      if (el.children.length > 50) el.removeChild(el.lastChild);
+    }
+
+    function clearLog(id) {
+      document.getElementById(id).innerHTML = '';
+    }
+
+    // ─── SSE ───
+    let eventSource = null;
+
+    function connectSSE() {
+      disconnectSSE();
+      const dot = document.getElementById('sseDot');
+      const label = document.getElementById('sseLabel');
+      const badge = document.getElementById('sseStatusBadge');
+
+      dot.className = 'sse-indicator sse-connecting';
+      label.textContent = 'Conectando...';
+      badge.className = 'status-badge status-pending';
+      badge.textContent = '● Conectando...';
+
+      eventSource = new EventSource(`${BASE()}/sse-webapp?client=test_${Date.now()}`);
+
+      eventSource.onopen = () => {
+        dot.className = 'sse-indicator sse-connected';
+        label.textContent = 'Conectado';
+        badge.className = 'status-badge status-online';
+        badge.textContent = '● Conectado';
+        log('sseLog', 'Conexión SSE establecida', 'success');
+      };
+
+      eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          log('sseLog', `Evento: ${data.type} | ${JSON.stringify(data).substring(0, 120)}`, 'info');
+        } catch(err) {
+          log('sseLog', `RAW: ${e.data}`, 'warn');
+        }
+      };
+
+      eventSource.onerror = () => {
+        dot.className = 'sse-indicator sse-disconnected';
+        label.textContent = 'Error/Desconectado';
+        badge.className = 'status-badge status-offline';
+        badge.textContent = '● Desconectado';
+        log('sseLog', 'Error en conexión SSE', 'error');
+      };
+    }
+
+    function disconnectSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      document.getElementById('sseDot').className = 'sse-indicator sse-disconnected';
+      document.getElementById('sseLabel').textContent = 'Desconectado';
+      const badge = document.getElementById('sseStatusBadge');
+      badge.className = 'status-badge status-offline';
+      badge.textContent = '● Desconectado';
+      log('sseLog', 'Desconectado manualmente', 'warn');
+    }
+
+    // ─── SIMULATE INCOMING ───
+    async function simulateIncoming() {
+      const phone = document.getElementById('incomingPhone').value.trim();
+      const msg = document.getElementById('incomingMsg').value.trim();
+      const pushName = document.getElementById('incomingPushName').value.trim();
+      if (!phone || !msg) { log('incomingLog', 'Faltan campos', 'error'); return; }
+
+      log('incomingLog', `Enviando mensaje de ${phone}: "${msg.substring(0, 50)}..."`, 'info');
+
+      try {
+        const payload = {
+          type: 'message',
+          from: `${phone}@s.whatsapp.net`,
+          pushName: pushName || 'Paciente Test',
+          messages: [{ message: { conversation: msg }, key: { id: `test_${Date.now()}`, fromMe: false, remoteJid: `${phone}@s.whatsapp.net` } }]
+        };
+        const res = await fetch(`${BASE()}/webhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        log('incomingLog', `✅ Respuesta: ${JSON.stringify(data).substring(0, 150)}`, 'success');
+      } catch(e) {
+        log('incomingLog', `❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    // ─── SIMULATE OUTGOING WHATSAPP WEB ───
+    async function simulateOutgoing() {
+      const phone = document.getElementById('outgoingPhone').value.trim();
+      const msg = document.getElementById('outgoingMsg').value.trim();
+      const alt = document.getElementById('outgoingAltRemitente').value.trim();
+      if (!phone || !msg) { log('outgoingLog', 'Faltan campos', 'error'); return; }
+
+      log('outgoingLog', `Enviando outgoing de ${phone}: "${msg.substring(0, 50)}..."`, 'info');
+
+      try {
+        const payload = {
+          type: 'outgoing_whatsapp_web',
+          from: phone,
+          altRemitente: alt || undefined,
+          mensaje: msg,
+          msgId: `wa_test_${Date.now()}`,
+          timestamp: new Date().toISOString()
+        };
+        const res = await fetch(`${BASE()}/webhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        log('outgoingLog', `✅ Respuesta: ${JSON.stringify(data).substring(0, 150)}`, 'success');
+      } catch(e) {
+        log('outgoingLog', `❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    // ─── SEND FROM WEB APP ───
+    async function sendMessageFromWeb() {
+      const phone = document.getElementById('sendPhone').value.trim();
+      const idConsulta = document.getElementById('sendConsultaId').value.trim();
+      const msg = document.getElementById('sendMsg').value.trim();
+      const usuario = document.getElementById('sendUsuario').value.trim();
+      if (!phone || !msg) { log('sendLog', 'Faltan campos', 'error'); return; }
+
+      log('sendLog', `Enviando mensaje a ${phone}...`, 'info');
+
+      try {
+        const res = await fetch(`${BASE()}/api/send-message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente: phone,
+            respuesta: msg,
+            idConsulta: idConsulta || undefined,
+            usuario: usuario || 'Test'
+          })
+        });
+        const data = await res.json();
+        log('sendLog', `✅ Respuesta: ${JSON.stringify(data).substring(0, 150)}`, 'success');
+      } catch(e) {
+        log('sendLog', `❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    // ─── CLEANUP ───
+    async function getCleanupStatus() {
+      try {
+        const res = await fetch(`${BASE()}/api/cleanup-status`);
+        const data = await res.json();
+        log('cleanupLog', `Estado: ${JSON.stringify(data)}`, 'info');
+      } catch(e) {
+        log('cleanupLog', `❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    async function runCleanup() {
+      if (!confirm('¿Ejecutar limpieza ahora?')) return;
+      try {
+        const res = await fetch(`${BASE()}/api/run-cleanup`, { method: 'POST' });
+        const data = await res.json();
+        log('cleanupLog', `Resultado: ${JSON.stringify(data)}`, data.success ? 'success' : 'error');
+      } catch(e) {
+        log('cleanupLog', `❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    // ─── CHECK ENDPOINTS ───
+    async function checkAllEndpoints() {
+      const endpoints = [
+        { name: 'Health', url: '/health' },
+        { name: 'Consultas', url: '/api/consultas' },
+        { name: 'Bot Config', url: '/api/bot-config' },
+        { name: 'SSE Status', url: '/api/sse-status' },
+        { name: 'Cleanup Status', url: '/api/cleanup-status' },
+        { name: 'Tag Config', url: '/api/tag-config' },
+        { name: 'Schedule Config', url: '/api/schedule-config' }
+      ];
+
+      const list = document.getElementById('endpointsList');
+      list.innerHTML = '';
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(`${BASE()}${ep.url}`);
+          const ok = res.ok;
+          list.innerHTML += `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+              <span style="color: ${ok ? '#34d399' : '#f87171'};">${ok ? '✅' : '❌'}</span>
+              <span>${ep.name}</span>
+              <span style="color: var(--muted); font-size: 0.78rem;">${res.status}</span>
+            </div>
+          `;
+          log('statusLog', `${ep.name}: ${res.status} ${ok ? 'OK' : 'ERROR'}`, ok ? 'success' : 'error');
+        } catch(e) {
+          list.innerHTML += `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+              <span style="color: #f87171;">❌</span>
+              <span>${ep.name}</span>
+              <span style="color: var(--muted); font-size: 0.78rem;">Error de red</span>
+            </div>
+          `;
+          log('statusLog', `${ep.name}: Error de red - ${e.message}`, 'error');
+        }
+      }
+    }
+
+    // Auto-check on load
+    checkAllEndpoints();
+  </script>
+</body>
+</html>
