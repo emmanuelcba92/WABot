@@ -1668,12 +1668,82 @@ async function scheduledWatchdog(env: any) {
   }
 }
 
+// ─── CLEANUP: Limpieza automática de datos antiguos ───
+async function runCleanup(env: any, daysOverride?: number): Promise<{ deleted: number; details: string[] }> {
+  const db = DBFactory.createService(env);
+  const config = await db.getBotConfig();
+  const cleanup = config.autoCleanup || {};
+  if (!cleanup.enabled && !daysOverride) return { deleted: 0, details: ['Limpieza deshabilitada'] };
+
+  const days = daysOverride || cleanup.days || 90;
+  const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  let totalDeleted = 0;
+  const details: string[] = [];
+
+  try {
+    // 1. Limpiar consultas finalizadas antiguas
+    if (cleanup.consultas !== false) {
+      const result = await env.DB.prepare("DELETE FROM consultas WHERE estado = 'atendido' AND createdAt < ?").bind(cutoffDate).run();
+      const count = result.meta?.changes || 0;
+      totalDeleted += count;
+      if (count > 0) details.push(`${count} consultas finalizadas`);
+    }
+
+    // 2. Limpiar sesiones antiguas
+    if (cleanup.sessions !== false) {
+      const result = await env.DB.prepare("DELETE FROM bot_config WHERE id LIKE 'session_%' AND updatedAt < ?").bind(cutoffDate).run();
+      const count = result.meta?.changes || 0;
+      totalDeleted += count;
+      if (count > 0) details.push(`${count} sesiones antiguas`);
+    }
+
+    // Guardar estado de la limpieza
+    const status = {
+      lastRun: new Date().toISOString(),
+      lastDeleted: totalDeleted,
+      days,
+      nextRun: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    };
+    await env.DB.prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+      .bind('cleanup_status', JSON.stringify(status), new Date().toISOString(), JSON.stringify(status), new Date().toISOString())
+      .run();
+
+    console.log(`🧹 [CLEANUP] Completado: ${totalDeleted} registros eliminados (${details.join(', ')})`);
+  } catch (e: any) {
+    console.error('Error en cleanup:', e);
+    details.push(`Error: ${e.message}`);
+  }
+
+  return { deleted: totalDeleted, details };
+}
+
+app.get('/api/cleanup-status', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const config = await db.getBotConfig();
+    const status = config.cleanup_status || {};
+    return c.json({ success: true, status });
+  } catch (e: any) {
+    return c.json({ error: e?.message }, 500);
+  }
+});
+
+app.post('/api/run-cleanup', async (c) => {
+  try {
+    const result = await runCleanup(c.env);
+    return c.json({ success: true, deleted: result.deleted, details: result.details });
+  } catch (e: any) {
+    return c.json({ success: false, error: e?.message }, 500);
+  }
+});
+
 export default {
   fetch(request: any, env: any, ctx: any) {
     return app.fetch(request, env, ctx);
   },
   async scheduled(event: any, env: any, ctx: any) {
     ctx.waitUntil(scheduledWatchdog(env));
+    ctx.waitUntil(runCleanup(env));
   }
 };
 

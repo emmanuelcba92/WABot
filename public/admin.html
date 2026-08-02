@@ -602,6 +602,9 @@
       white-space: pre-wrap;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
+    .toggle-switch input:checked + .slider { background: #00a884; }
+    .toggle-switch input:checked + .slider::before { transform: translateX(22px); }
+    .toggle-switch .slider::before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
   </style>
 
   <script>
@@ -805,6 +808,7 @@
         <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
         <button class="sub-nav-btn" id="subTabDbBtn" onclick="switchSettingsSubTab('db')">🗄️ 8. Motor de Base de Datos</button>
         <button class="sub-nav-btn" id="subTabUsersBtn" onclick="switchSettingsSubTab('users')">👥 9. Gestión de Usuarios & Roles</button>
+        <button class="sub-nav-btn" id="subTabMaintBtn" onclick="switchSettingsSubTab('maintenance')">🧹 10. Mantenimiento & Limpieza</button>
       </div>
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
@@ -1077,6 +1081,60 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- SUB-SECCIÓN 10: MANTENIMIENTO & LIMPIEZA -->
+      <div id="subSettingsMaintenance" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">🧹 Mantenimiento & Limpieza Automática</h3>
+          <p style="font-size: 0.86rem; color: var(--muted);">Configura la limpieza automática de datos antiguos. Las consultas, sesiones y mensajes se eliminarán según el período de retención configurado.</p>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+          <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">⚙️ Configuración de Limpieza</h4>
+
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer;">
+              <input type="checkbox" id="cleanupEnabled" style="opacity: 0; width: 0; height: 0;">
+              <span class="slider" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #374151; border-radius: 26px; transition: 0.3s;"></span>
+            </label>
+            <div>
+              <span style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;">Habilitar Limpieza Automática</span>
+              <p style="font-size: 0.78rem; color: var(--muted); margin: 2px 0 0 0;">Elimina automáticamente datos antiguos según el período configurado.</p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 180px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Días de Retención</label>
+              <input type="number" id="cleanupDays" min="7" max="365" value="90" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none;">
+              <p style="font-size: 0.72rem; color: var(--muted); margin: 4px 0 0 0;">Mínimo 7, máximo 365 días.</p>
+            </div>
+            <div style="flex: 1; min-width: 180px;">
+              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Tipos de Datos a Limpiar</label>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: #f8fafc; cursor: pointer;">
+                  <input type="checkbox" id="cleanupConsultas" checked style="accent-color: #00a884;"> Consultas finalizadas
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: #f8fafc; cursor: pointer;">
+                  <input type="checkbox" id="cleanupSessions" checked style="accent-color: #00a884;"> Sesiones antiguas
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn" style="align-self: flex-start; padding: 10px 20px; font-size: 0.9rem; margin-top: 4px;" onclick="saveCleanupConfig()">
+            💾 Guardar Configuración de Limpieza
+          </button>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+          <h4 style="font-size: 0.95rem; color: #f8fafc; font-weight: 700;">📊 Estado de la Limpieza</h4>
+          <div id="cleanupStatus" style="font-size: 0.86rem; color: var(--muted);">Cargando estado...</div>
+          <button class="btn btn-secondary" style="align-self: flex-start; padding: 8px 16px; font-size: 0.85rem;" onclick="runManualCleanup()">
+            🧹 Ejecutar Limpieza Ahora
+          </button>
         </div>
       </div>
 
@@ -1955,6 +2013,81 @@
       }
     }
 
+    // ─── LIMPIEZA AUTOMÁTICA ───
+    async function fetchCleanupConfig() {
+      try {
+        const res = await fetch('/api/bot-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        const cfg = data.config || {};
+        const cleanup = cfg.autoCleanup || {};
+        document.getElementById('cleanupEnabled').checked = !!cleanup.enabled;
+        document.getElementById('cleanupDays').value = cleanup.days || 90;
+        document.getElementById('cleanupConsultas').checked = cleanup.consultas !== false;
+        document.getElementById('cleanupSessions').checked = cleanup.sessions !== false;
+        fetchCleanupStatus();
+      } catch (e) {}
+    }
+
+    async function saveCleanupConfig() {
+      try {
+        const res = await fetch('/api/bot-config');
+        const existing = await res.json();
+        const cfg = existing.config || {};
+        cfg.autoCleanup = {
+          enabled: document.getElementById('cleanupEnabled').checked,
+          days: parseInt(document.getElementById('cleanupDays').value) || 90,
+          consultas: document.getElementById('cleanupConsultas').checked,
+          sessions: document.getElementById('cleanupSessions').checked
+        };
+        const saveRes = await fetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg)
+        });
+        const data = await saveRes.json();
+        if (data.success) {
+          alert('✅ Configuración de limpieza guardada exitosamente.');
+        }
+      } catch (e) {
+        alert('Error al guardar configuración de limpieza.');
+      }
+    }
+
+    async function fetchCleanupStatus() {
+      try {
+        const res = await fetch('/api/cleanup-status');
+        if (!res.ok) { document.getElementById('cleanupStatus').textContent = 'No disponible'; return; }
+        const data = await res.json();
+        const status = data.status || {};
+        document.getElementById('cleanupStatus').innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <span>📅 Última ejecución: <strong>${status.lastRun ? new Date(status.lastRun).toLocaleString('es-AR') : 'Nunca'}</strong></span>
+            <span>🗑️ Registros eliminados (última vez): <strong>${status.lastDeleted || 0}</strong></span>
+            <span>📊 Próxima ejecución: <strong>${status.nextRun ? new Date(status.nextRun).toLocaleString('es-AR') : 'No programada'}</strong></span>
+          </div>
+        `;
+      } catch (e) {
+        document.getElementById('cleanupStatus').textContent = 'Error al cargar estado.';
+      }
+    }
+
+    async function runManualCleanup() {
+      if (!confirm('¿Ejecutar limpieza ahora? Se eliminarán los datos antiguos según la configuración actual.')) return;
+      try {
+        const res = await fetch('/api/run-cleanup', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert(`✅ Limpieza ejecutada. ${data.deleted || 0} registros eliminados.`);
+          fetchCleanupStatus();
+        } else {
+          alert('❌ Error: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('Error de red al ejecutar limpieza.');
+      }
+    }
+
     async function fetchQuickRepliesConfig() {
       try {
         const res = await fetch('/api/quick-replies');
@@ -2121,6 +2254,7 @@
       const secDoc = document.getElementById('subSettingsDoctor');
       const secDb = document.getElementById('subSettingsDb');
       const secUsers = document.getElementById('subSettingsUsers');
+      const secMaint = document.getElementById('subSettingsMaintenance');
 
       const btnSched = document.getElementById('subTabSchedBtn');
       const btnTree = document.getElementById('subTabTreeBtn');
@@ -2131,9 +2265,10 @@
       const btnDoc = document.getElementById('subTabDocBtn');
       const btnDb = document.getElementById('subTabDbBtn');
       const btnUsers = document.getElementById('subTabUsersBtn');
+      const btnMaint = document.getElementById('subTabMaintBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers].filter(Boolean).forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers].filter(Boolean).forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers, btnMaint].filter(Boolean).forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers, secMaint].filter(Boolean).forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -2165,6 +2300,10 @@
         if (secUsers) secUsers.style.display = 'flex';
         if (btnUsers) btnUsers.classList.add('active');
         renderUsersEditor();
+      } else if (subTab === 'maintenance') {
+        if (secMaint) secMaint.style.display = 'flex';
+        if (btnMaint) btnMaint.classList.add('active');
+        fetchCleanupConfig();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
