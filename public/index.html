@@ -1617,9 +1617,63 @@
       fetchMenuTree();
       fetchConsultas();
       checkHeartbeatStatus();
-      setInterval(fetchConsultas, 1500);
-      setInterval(fetchScheduleConfig, 10000);
-      setInterval(checkHeartbeatStatus, 10000);
+      // ─── SMART POLLING ADAPTATIVO ───
+      // Empieza rápido (3s), se reduce si no hay actividad, se acelera al recibir mensajes
+      let _pollInterval = 3000;         // Intervalo actual
+      let _pollTimer = null;             // Referencia al timeout
+      let _lastMsgCount = -1;            // Último total de mensajes conocido
+      let _quietSince = Date.now();      // Desde cuándo no hay mensajes nuevos
+
+      async function smartPoll() {
+        if (document.hidden) {
+          // Pestaña en segundo plano: pausa el polling
+          _pollTimer = setTimeout(smartPoll, 5000);
+          return;
+        }
+
+        const prevCount = _lastMsgCount;
+        await fetchConsultas();
+
+        // Calcular total de mensajes actual
+        const currentCount = allConsultas.reduce((acc, c) => {
+          return acc + 1 + (c.datos?.respuestasPaciente?.length || 0);
+        }, 0);
+
+        if (currentCount !== prevCount && prevCount !== -1) {
+          // Hay actividad: volver al intervalo rápido
+          _pollInterval = 3000;
+          _quietSince = Date.now();
+        } else {
+          // Sin cambios: calcular cuánto tiempo llevamos sin actividad
+          const quietMs = Date.now() - _quietSince;
+          if (quietMs > 120000) {
+            _pollInterval = 15000; // Más de 2 min sin mensajes: polling lento
+          } else if (quietMs > 30000) {
+            _pollInterval = 8000;  // Más de 30s sin mensajes: polling moderado
+          } else {
+            _pollInterval = 3000;  // Activo recientemente: polling rápido
+          }
+        }
+
+        _lastMsgCount = currentCount;
+        _pollTimer = setTimeout(smartPoll, _pollInterval);
+      }
+
+      // Reactivar polling rápido al volver al foco
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          _pollInterval = 3000;
+          _quietSince = Date.now();
+          clearTimeout(_pollTimer);
+          smartPoll();
+        }
+      });
+
+      smartPoll(); // Arrancar el loop
+
+      // Schedule-config cada 5 minutos (era cada 10s)
+      setInterval(fetchScheduleConfig, 300000);
+
 
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {

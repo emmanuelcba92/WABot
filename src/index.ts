@@ -1018,4 +1018,33 @@ app.get('/api/pending-outgoing', async (c) => {
   });
 });
 
-export default app;
+// ─── CRON TRIGGER: Watchdog de heartbeat (ejecutado por Cloudflare cada 2 min) ───
+async function scheduledWatchdog(env: any) {
+  try {
+    const db = DBFactory.createService(env);
+    const lastPing = await db.getHeartbeatPing();
+    const elapsed = lastPing > 0 ? Date.now() - lastPing : 999999999;
+    const elapsedSeconds = Math.floor(elapsed / 1000);
+    const isOnline = lastPing > 0 && elapsed <= 180000; // 3 minutos de tolerancia
+
+    if (!isOnline && elapsedSeconds > 180) {
+      // Solo alerta si no se alertó en los últimos 10 minutos
+      if (Date.now() - lastAlertSentTimestamp > 600000) {
+        lastAlertSentTimestamp = Date.now();
+        await sendDisconnectionAlerts(env, elapsedSeconds);
+      }
+    } else if (isOnline) {
+      // Resetear bandera si volvió a estar online
+      lastAlertSentTimestamp = 0;
+    }
+  } catch (e) {
+    console.error('Error en scheduledWatchdog:', e);
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  async scheduled(event: any, env: any, ctx: any) {
+    ctx.waitUntil(scheduledWatchdog(env));
+  }
+};

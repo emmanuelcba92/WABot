@@ -88,7 +88,8 @@ async function sendHeartbeatPing() {
     // Silencioso si hay corte temporal de red
   }
 }
-setInterval(sendHeartbeatPing, 15000);
+setInterval(sendHeartbeatPing, 60000); // Reducido de 15s a 60s para optimizar requests
+
 
 // 2. MANTENIMIENTO NOCTURNO A LAS 3:30 AM (ELIMINA ARCHIVOS > 60 DÍAS)
 setInterval(() => {
@@ -525,7 +526,8 @@ process.on('unhandledRejection', (reason, promise) => {
     } catch (pollErr) {
       // Ignorar errores temporales de red en el polling saliente
     }
-  }, 3000);
+  }, 5000); // Reducido de 3s a 5s para optimizar requests (ahorra ~11.500 req/día)
+
 }
 
 startWhatsAppGateway().catch((err) => {
