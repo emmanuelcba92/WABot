@@ -732,6 +732,11 @@ app.patch('/api/consultas/:id', async (c) => {
       if (target && target.remitente) {
         await db.saveSesion(target.remitente, 'inicio');
         await db.addPendingOutgoing(target.remitente, closingMsg, id);
+
+        const readCfg = await (db as any).getWhatsappReadConfig?.();
+        if (readCfg?.markReadOnFinish) {
+          await db.addPendingOutgoing(target.remitente, '', id, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
+        }
       }
     }
 
@@ -746,6 +751,29 @@ app.patch('/api/consultas/:id', async (c) => {
     return c.json({ error: 'Error al actualizar estado de consulta', details: err?.message }, 500);
   }
 });
+
+app.get('/api/whatsapp-read-config', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const config = await (db as any).getWhatsappReadConfig?.();
+    return c.json(config || { markReadOnReply: false, markReadOnFinish: false });
+  } catch (e: any) {
+    return c.json({ markReadOnReply: false, markReadOnFinish: false });
+  }
+});
+
+app.post('/api/whatsapp-read-config', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const db = DBFactory.createService(c.env);
+    await (db as any).saveWhatsappReadConfig?.(body);
+    const updated = await (db as any).getWhatsappReadConfig?.();
+    return c.json({ success: true, config: updated });
+  } catch (e: any) {
+    return c.json({ error: 'Error al guardar configuración de lectura en WhatsApp', details: e?.message }, 500);
+  }
+});
+
 
 app.get('/api/clinic-config', async (c) => {
   try {
@@ -979,7 +1007,14 @@ app.post('/api/send-message', async (c) => {
     });
 
     await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, undefined, false, 'send', msgId);
+
+    const readCfg = await (db as any).getWhatsappReadConfig?.();
+    if (readCfg?.markReadOnReply) {
+      await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
+    }
+
     invalidateConsultasCache();
+
 
     return c.json({
       success: true,

@@ -682,6 +682,43 @@ export class D1Service {
     }
   }
 
+  private static whatsappReadConfig = { markReadOnReply: false, markReadOnFinish: false };
+
+  public async getWhatsappReadConfig(): Promise<{ markReadOnReply: boolean; markReadOnFinish: boolean }> {
+    if (this.db) {
+      try {
+        await this.initTables();
+        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind('whatsapp_read_config').first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          D1Service.whatsappReadConfig = {
+            markReadOnReply: !!parsed.markReadOnReply,
+            markReadOnFinish: !!parsed.markReadOnFinish
+          };
+          return D1Service.whatsappReadConfig;
+        }
+      } catch (e) {}
+    }
+    return D1Service.whatsappReadConfig;
+  }
+
+  public async saveWhatsappReadConfig(config: { markReadOnReply?: boolean; markReadOnFinish?: boolean }): Promise<void> {
+    const updated = {
+      markReadOnReply: !!config.markReadOnReply,
+      markReadOnFinish: !!config.markReadOnFinish
+    };
+    D1Service.whatsappReadConfig = updated;
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+        .bind('whatsapp_read_config', JSON.stringify(updated), new Date().toISOString(), JSON.stringify(updated), new Date().toISOString())
+        .run();
+    } catch (e) {}
+  }
+
+
   public async saveSesion(remitente: string, estado: string, datosTemporales?: Record<string, any>): Promise<void> {
     const cleanRem = remitente.toLowerCase().trim();
     let current = D1Service.sessionsMap.get(cleanRem) || {

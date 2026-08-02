@@ -811,7 +811,9 @@
         <button class="sub-nav-btn" id="subTabDocBtn" onclick="switchSettingsSubTab('doctor')">🩺 7. Directorio de Médicos / Telemedicina</button>
         <button class="sub-nav-btn" id="subTabUsersBtn" onclick="switchSettingsSubTab('users')">👥 8. Gestión de Usuarios & Roles</button>
         <button class="sub-nav-btn" id="subTabClinicBtn" onclick="switchSettingsSubTab('clinic')">🏥 9. Configuración de la Clínica</button>
+        <button class="sub-nav-btn" id="subTabWaReadBtn" onclick="switchSettingsSubTab('waread')">✅ 10. Lectura en WhatsApp</button>
       </div>
+
 
       <!-- SUB-SECCIÓN 1: HORARIO CONTROL & MENSAJES AUTOMÁTICOS -->
       <div id="subSettingsSchedule" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
@@ -1034,9 +1036,36 @@
             💾 Guardar Configuración de la Clínica
           </button>
         </div>
+      <!-- SUB-SECCIÓN 10: CONFIGURACIÓN DE LECTURA EN WHATSAPP -->
+      <div id="subSettingsWaRead" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">✅ Marcar Conversación como Leída en WhatsApp</h3>
+          <p style="font-size: 0.86rem; color: var(--muted);">Configura cuándo el sistema debe limpiar automáticamente los globos verdes de mensajes no leídos en la aplicación oficial de WhatsApp del teléfono de la clínica.</p>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 16px;">
+          <label style="display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: #e2e8f0; cursor: pointer;">
+            <input type="checkbox" id="chkMarkReadOnReply" style="width: 18px; height: 18px; accent-color: #38bdf8;">
+            <span><strong>Marcar como leído al responder un mensaje</strong> (Al enviar una respuesta desde la Web App, se quita el globo no leído en WhatsApp).</span>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 12px; font-size: 0.9rem; color: #e2e8f0; cursor: pointer;">
+            <input type="checkbox" id="chkMarkReadOnFinish" style="width: 18px; height: 18px; accent-color: #38bdf8;">
+            <span><strong>Marcar como leído al finalizar la atención</strong> (Al hacer clic en "Marcar como Atendido", se quita el globo no leído en WhatsApp).</span>
+          </label>
+
+          <div style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #94a3b8;">
+            💡 <strong>Nota:</strong> Si ambas casillas están desmarcadas, WhatsApp mantendrá los globos de mensajes no leídos exactamente como hasta ahora.
+          </div>
+
+          <button class="btn" onclick="saveWhatsappReadConfigUI()" style="align-self: flex-start; padding: 10px 22px;">
+            💾 Guardar Opciones de Lectura en WhatsApp
+          </button>
+        </div>
       </div>
 
       <!-- SUB-SECCIÓN 8: GESTIÓN DE USUARIOS Y ROLES (SOLO ADMINS) -->
+
       <div id="subSettingsUsers" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
         <div>
           <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">👥 Gestión de Usuarios y Roles</h3>
@@ -2400,9 +2429,11 @@
       const btnUsers = document.getElementById('subTabUsersBtn');
       const secClinic = document.getElementById('subSettingsClinic');
       const btnClinic = document.getElementById('subTabClinicBtn');
+      const secWaRead = document.getElementById('subSettingsWaRead');
+      const btnWaRead = document.getElementById('subTabWaReadBtn');
 
-      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers, btnClinic].filter(Boolean).forEach(b => b.classList.remove('active'));
-      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers, secClinic].filter(Boolean).forEach(s => s.style.display = 'none');
+      [btnSched, btnTree, btnTags, btnQuick, btnPdf, btnVip, btnDoc, btnDb, btnUsers, btnClinic, btnWaRead].filter(Boolean).forEach(b => b.classList.remove('active'));
+      [secSched, secTree, secTags, secQuick, secPdf, secVip, secDoc, secDb, secUsers, secClinic, secWaRead].filter(Boolean).forEach(s => s.style.display = 'none');
 
       if (subTab === 'tree') {
         secTree.style.display = 'grid';
@@ -2438,11 +2469,48 @@
         if (secClinic) secClinic.style.display = 'flex';
         if (btnClinic) btnClinic.classList.add('active');
         loadClinicConfigEditor();
+      } else if (subTab === 'waread') {
+        if (secWaRead) secWaRead.style.display = 'flex';
+        if (btnWaRead) btnWaRead.classList.add('active');
+        loadWhatsappReadConfigUI();
       } else {
         secSched.style.display = 'flex';
         btnSched.classList.add('active');
       }
     }
+
+    async function loadWhatsappReadConfigUI() {
+      try {
+        const res = await fetch('/api/whatsapp-read-config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        const r1 = document.getElementById('chkMarkReadOnReply');
+        const r2 = document.getElementById('chkMarkReadOnFinish');
+        if (r1) r1.checked = !!cfg.markReadOnReply;
+        if (r2) r2.checked = !!cfg.markReadOnFinish;
+      } catch (e) {}
+    }
+
+    async function saveWhatsappReadConfigUI() {
+      const markReadOnReply = !!document.getElementById('chkMarkReadOnReply')?.checked;
+      const markReadOnFinish = !!document.getElementById('chkMarkReadOnFinish')?.checked;
+      try {
+        const res = await fetch('/api/whatsapp-read-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ markReadOnReply, markReadOnFinish })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert('✅ Configuración de lectura en WhatsApp guardada exitosamente.');
+        } else {
+          alert('⚠️ Error al guardar la configuración: ' + (data.error || 'Desconocido'));
+        }
+      } catch (e) {
+        alert('⚠️ Error de conexión al guardar la configuración.');
+      }
+    }
+
 
     async function loadClinicConfigEditor() {
       try {

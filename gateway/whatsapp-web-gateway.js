@@ -447,6 +447,15 @@ process.on('unhandledRejection', (reason, promise) => {
                   sendSuccess = true;
                   break;
                 }
+              } else if (msg.action === 'mark_read') {
+                try {
+                  await sock.chatModify({ markRead: true }, targetJid);
+                  console.log(`✅ Chat (${targetJid}) marcado como leído en WhatsApp.`);
+                  sendSuccess = true;
+                  break;
+                } catch (errRead) {
+                  console.warn(`⚠️ Error al marcar como leído ${targetJid}:`, errRead?.message || errRead);
+                }
               } else if (msg.action === 'edit') {
                 const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
                 if (targetKey && targetKey.id) {
