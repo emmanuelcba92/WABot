@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - WA Bot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+    
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    
+    header { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { color: #00d9ff; font-size: 1.5rem; }
+    header a { color: #00d9ff; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    
+    .stat-card { background: #16213e; padding: 20px; border-radius: 10px; text-align: center; }
+    .stat-card .value { font-size: 2.5rem; font-weight: bold; color: #00d9ff; }
+    .stat-card .label { color: #888; margin-top: 5px; font-size: 0.9rem; }
+    .stat-card.pendientes .value { color: #ffc107; }
+    .stat-card.atendidas .value { color: #28a745; }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    
+    .panel { background: #16213e; border-radius: 10px; padding: 20px; }
+    .panel h2 { color: #00d9ff; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+    
+    .chart-container { height: 200px; display: flex; align-items: flex-end; gap: 8px; padding: 10px 0; }
+    .chart-bar { flex: 1; display: flex; flex-direction: column; align-items: center; }
+    .chart-bar .bar { width: 100%; background: linear-gradient(180deg, #00d9ff 0%, #0066cc 100%); border-radius: 4px 4px 0 0; min-height: 5px; transition: height 0.3s; }
+    .chart-bar .label { font-size: 0.75rem; color: #888; margin-top: 5px; }
+    .chart-bar .value { font-size: 0.8rem; color: #00d9ff; margin-bottom: 5px; }
+    
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #333; }
+    .list-item:last-child { border-bottom: none; }
+    .list-item .name { color: #eee; }
+    .list-item .count { color: #00d9ff; font-weight: bold; }
+    
+    .progress-bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+    .progress-fill { height: 100%; border-radius: 4px; }
+    .progress-fill.green { background: #28a745; }
+    .progress-fill.yellow { background: #ffc107; }
+    .progress-fill.blue { background: #17a2b8; }
+    
+    .loading { text-align: center; padding: 40px; color: #00d9ff; }
+    .error { text-align: center; padding: 40px; color: #dc3545; }
+    
+    .refresh-btn { padding: 8px 16px; background: #0f3460; color: #00d9ff; border: 1px solid #00d9ff; border-radius: 5px; cursor: pointer; font-size: 0.9rem; }
+    .refresh-btn:hover { background: #1a4a7a; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 Dashboard - Clínica COAT</h1>
+      <div>
+        <button class="refresh-btn" onclick="loadData()">🔄 Actualizar</button>
+        <a href="/admin" style="margin-left: 15px;">← Volver al Panel</a>
+      </div>
+    </header>
+    
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="value" id="statTotal">-</div><div class="label">Total Consultas</div></div>
+      <div class="stat-card pendientes"><div class="value" id="statPendientes">-</div><div class="label">Pendientes</div></div>
+      <div class="stat-card atendidas"><div class="value" id="statAtendidas">-</div><div class="label">Atendidas</div></div>
+      <div class="stat-card"><div class="value" id="statHoy">-</div><div class="label">Mensajes Hoy</div></div>
+      <div class="stat-card"><div class="value" id="statSemana">-</div><div class="label">Esta Semana</div></div>
+      <div class="stat-card"><div class="value" id="statMes">-</div><div class="label">Este Mes</div></div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="panel">
+        <h2>📈 Mensajes (Últimos 7 días)</h2>
+        <div class="chart-container" id="dailyChart">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>🏆 Operadores Activos</h2>
+        <div id="operatorsList">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="grid-2">
+      <div class="panel">
+        <h2>📋 Consultas por Tipo</h2>
+        <div id="typesList">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>📊 Estado de Consultas</h2>
+        <div id="statusChart">
+          <div class="loading">Cargando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function loadData() {
+      try {
+        const [metricsRes, dailyRes] = await Promise.all([
+          fetch(`${API_BASE}/api/dashboard/metrics`),
+          fetch(`${API_BASE}/api/dashboard/daily`)
+        ]);
+
+        const metrics = await metricsRes.json();
+        const daily = await dailyRes.json();
+
+        renderStats(metrics.resumen);
+        renderDailyChart(daily.dias);
+        renderOperators(metrics.operadoresActivos);
+        renderTypes(metrics.tiposFrecuentes);
+        renderStatus(metrics.resumen);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      }
+    }
+
+    function renderStats(resumen) {
+      document.getElementById('statTotal').textContent = resumen.total;
+      document.getElementById('statPendientes').textContent = resumen.pendientes;
+      document.getElementById('statAtendidas').textContent = resumen.atendidas;
+      document.getElementById('statHoy').textContent = resumen.mensajesHoy;
+      document.getElementById('statSemana').textContent = resumen.mensajesSemana;
+      document.getElementById('statMes').textContent = resumen.mensajesMes;
+    }
+
+    function renderDailyChart(dias) {
+      const container = document.getElementById('dailyChart');
+      const maxMsgs = Math.max(...dias.map(d => d.mensajes), 1);
+
+      container.innerHTML = dias.map(dia => `
+        <div class="chart-bar">
+          <div class="value">${dia.mensajes}</div>
+          <div class="bar" style="height: ${(dia.mensajes / maxMsgs) * 150}px;"></div>
+          <div class="label">${dia.dia}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderOperators(operadores) {
+      const container = document.getElementById('operatorsList');
+      
+      if (operadores.length === 0) {
+        container.innerHTML = '<div class="loading">No hay operadores registrados</div>';
+        return;
+      }
+
+      container.innerHTML = operadores.map(op => `
+        <div class="list-item">
+          <span class="name">👩‍⚕️ ${op.nombre}</span>
+          <span class="count">${op.respuestas} respuestas</span>
+        </div>
+      `).join('');
+    }
+
+    function renderTypes(tipos) {
+      const container = document.getElementById('typesList');
+      
+      if (tipos.length === 0) {
+        container.innerHTML = '<div class="loading">No hay tipos registrados</div>';
+        return;
+      }
+
+      const maxCount = Math.max(...tipos.map(t => t.count), 1);
+
+      container.innerHTML = tipos.map(tipo => `
+        <div class="list-item">
+          <span class="name">${tipo.tipo}</span>
+          <span class="count">${tipo.count}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill blue" style="width: ${(tipo.count / maxCount) * 100}%;"></div>
+        </div>
+      `).join('');
+    }
+
+    function renderStatus(resumen) {
+      const container = document.getElementById('statusChart');
+      const total = resumen.total || 1;
+
+      container.innerHTML = `
+        <div class="list-item">
+          <span class="name">🟡 Pendientes</span>
+          <span class="count">${resumen.pendientes}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill yellow" style="width: ${(resumen.pendientes / total) * 100}%;"></div>
+        </div>
+        
+        <div class="list-item">
+          <span class="name">🔵 En Proceso</span>
+          <span class="count">${resumen.enProceso}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill blue" style="width: ${(resumen.enProceso / total) * 100}%;"></div>
+        </div>
+        
+        <div class="list-item">
+          <span class="name">🟢 Atendidas</span>
+          <span class="count">${resumen.atendidas}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill green" style="width: ${(resumen.atendidas / total) * 100}%;"></div>
+        </div>
+      `;
+    }
+
+    // Cargar datos al iniciar
+    loadData();
+    
+    // Actualizar cada 30 segundos
+    setInterval(loadData, 30000);
+  </script>
+</body>
+</html>

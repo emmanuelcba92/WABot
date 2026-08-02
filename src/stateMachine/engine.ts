@@ -84,6 +84,7 @@ export class StateEngine {
     }
 
     const sesion = await firestore.getSesion(remitente, altRemitente);
+    console.log(`🔍 [ENGINE] remitente=${remitente} altRemitente=${altRemitente} estado=${sesion.estado} datos=${JSON.stringify(sesion.datosTemporales || {})}`);
     const msgClean = mensaje.toLowerCase().trim();
 
     // Reset comandos globales explícitos únicamente ("reset", "cancelar", "menu")
@@ -96,10 +97,7 @@ export class StateEngine {
         consultaEncontrada = await firestore.appendPacienteMensajeAConsulta(remitente, mensaje, imagenBase64, pdfBase64, pdfNombre, altRemitente, pushName);
       }
 
-      if (!consultaEncontrada) {
-        console.log(`⚠️ [ENGINE] Estado esperando_atencion_humana pero sin consulta activa para ${remitente}. Reseteando a 'inicio'.`);
-        await firestore.saveSesion(remitente, 'inicio');
-      } else {
+      if (consultaEncontrada) {
         return {
           remitente,
           respuesta: '',
@@ -108,6 +106,36 @@ export class StateEngine {
           timestamp
         };
       }
+
+      // No se encontró la consulta. Verificar si hay otras consultas pendientes para este usuario.
+      // Si las hay, es un race condition con D1 (la consulta existe pero D1 no la muestra aún) → silenciar.
+      // Si NO las hay, el chat fue eliminado sin finalizar → resetear a inicio.
+      const allConsultas = await firestore.getConsultas();
+      const cleanRem = remitente.toLowerCase().trim();
+      const cleanAlt = (altRemitente || '').toLowerCase().trim();
+      const tieneConsultaPendiente = allConsultas.some((c: any) => {
+        const cRem = (c.remitente || '').toLowerCase().trim();
+        const cAlt = (c.datos?.altRemitente || '').toLowerCase().trim();
+        return (cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt)) && c.estado === 'pendiente';
+      });
+
+      if (tieneConsultaPendiente) {
+        // Race condition con D1 - silenciar el mensaje
+        return {
+          remitente,
+          respuesta: '',
+          estadoActual: 'esperando_atencion_humana',
+          enHorario: true,
+          timestamp
+        };
+      }
+
+      // Chat eliminado sin finalizar - resetear a inicio
+      console.log(`⚠️ [ENGINE] Estado esperando_atencion_humana sin consulta activa para ${remitente}. Reseteando a 'inicio'.`);
+      await firestore.saveSesion(remitente, 'inicio');
+      sesion.estado = 'inicio';
+      sesion.datosTemporales = {};
+      // Caer al switch para procesar el mensaje con estado 'inicio'
     }
 
     if (esSaludoExplicit) {

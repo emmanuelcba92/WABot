@@ -917,7 +917,7 @@ export class FirestoreService {
     imagenBase64?: string,
     altRemitente?: string,
     isForwardToDoctor: boolean = false
-  ): Promise<void> {
+  ): Promise<PendingOutgoingMsg> {
     let targetJid = remitente;
     let computedAlt = altRemitente;
 

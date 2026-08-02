@@ -15,12 +15,114 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization']
 }));
 
+// ─── SSE: Mapa de conexiones activas por gatewayId ───
+const sseConnections = new Map<string, WritableStreamDefaultWriter>();
+
+function notifyGateway(gatewayId: string, data: any) {
+  const writer = sseConnections.get(gatewayId);
+  if (writer) {
+    const msg = `data: ${JSON.stringify(data)}\n\n`;
+    writer.write(new TextEncoder().encode(msg)).catch(() => {
+      sseConnections.delete(gatewayId);
+    });
+  }
+}
+
+function broadcastToGateways(data: any) {
+  const msg = `data: ${JSON.stringify(data)}\n\n`;
+  const encoded = new TextEncoder().encode(msg);
+  for (const [id, writer] of sseConnections) {
+    writer.write(encoded).catch(() => sseConnections.delete(id));
+  }
+}
+
+// Helper: agregar a cola de pending y notificar gateways via SSE
+async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit', targetMsgId?: string, targetMsgKey?: any) {
+  const item = await db.addPendingOutgoing(remitente, text, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitente, isForwardToDoctor, action, targetMsgId, targetMsgKey);
+
+  // Notificar a todos los gateways conectados que hay un mensaje pendiente
+  if (sseConnections.size > 0) {
+    broadcastToGateways({
+      type: 'pending_outgoing',
+      message: item
+    });
+  }
+
+  return item;
+}
+
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'WA Bot Clínica Worker'
   });
+});
+
+// ─── SSE: Server-Sent Events para notificar gateways ───
+app.get('/sse', (c) => {
+  const gatewayId = c.req.query('gateway') || 'default';
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  // Guardar conexión
+  sseConnections.set(gatewayId, writer);
+  console.log(`🔌 [SSE] Gateway conectado: ${gatewayId} (total: ${sseConnections.size})`);
+
+  // Enviar keepalive cada 15s para que no se cierre la conexión
+  // IMPORTANTE: usar waitUntil para que el interval no muera ~30s después del return
+  const keepaliveInterval = setInterval(() => {
+    writer.write(new TextEncoder().encode(': keepalive\n\n')).catch(() => {
+      clearInterval(keepaliveInterval);
+      sseConnections.delete(gatewayId);
+    });
+  }, 15000);
+
+  // Mantener vivo el interval aunque el fetch handler ya haya retornado
+  c.executionCtx.waitUntil(new Promise<void>((resolve) => {
+    c.req.raw.signal?.addEventListener('abort', () => {
+      clearInterval(keepaliveInterval);
+      resolve();
+    }, { once: true });
+  }));
+
+  // Enviar mensaje de bienvenida
+  writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'connected', gatewayId, timestamp: Date.now() })}\n\n`));
+
+  // Cleanup cuando se desconecta
+  c.req.raw.signal?.addEventListener('abort', () => {
+    clearInterval(keepaliveInterval);
+    sseConnections.delete(gatewayId);
+    console.log(`🔌 [SSE] Gateway desconectado: ${gatewayId} (total: ${sseConnections.size})`);
+  });
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    }
+  });
+});
+
+// ─── SSE: ACK de mensaje enviado por gateway ───
+app.post('/api/sse-ack', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { msgId, gatewayId, key } = body;
+    console.log(`✅ [SSE-ACK] Mensaje ${msgId} enviado por ${gatewayId}`);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e?.message }, 500);
+  }
+});
+
+// ─── SSE: Estado de conexiones ───
+app.get('/api/sse-status', (c) => {
+  const gateways = Array.from(sseConnections.keys());
+  return c.json({ connected: gateways.length, gateways });
 });
 
 app.get('/api/db-provider', (c) => {
@@ -235,6 +337,24 @@ app.get('/admin', async (c) => {
   return c.text('Admin Panel Assets no disponibles');
 });
 
+app.get('/history', async (c) => {
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    url.pathname = '/history.html';
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  }
+  return c.text('History Assets no disponibles');
+});
+
+app.get('/dashboard', async (c) => {
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    url.pathname = '/dashboard.html';
+    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  }
+  return c.text('Dashboard Assets no disponibles');
+});
+
 app.get('/api/doctors', async (c) => {
   const db = DBFactory.createService(c.env);
   const items = await db.getDoctors();
@@ -446,14 +566,17 @@ app.post('/webhook', async (c) => {
     const body = await c.req.json();
     const remitente = body.remitente;
     const mensaje = body.mensaje ?? '';
+    const altRemitente = body.altRemitente || null;
 
     if (!remitente) {
       return c.json({ error: 'El campo "remitente" es requerido' }, 400);
     }
 
+    console.log(`📥 [WEBHOOK] remitente=${remitente} altRemitente=${altRemitente} msg="${mensaje.substring(0, 50)}"`);
+
     const payload: WebhookPayload = {
       remitente,
-      altRemitente: body.altRemitente,
+      altRemitente,
       pushName: body.pushName,
       mensaje,
       simulatedTime: body.simulatedTime,
@@ -465,6 +588,10 @@ app.post('/webhook', async (c) => {
 
     const db = DBFactory.createService(c.env);
 
+    // Log session state BEFORE processing
+    const sesionPre = await db.getSesion(remitente, altRemitente);
+    console.log(`🔍 [WEBHOOK] Sesión ANTES del engine: estado=${sesionPre.estado} datosTemporales=${JSON.stringify(sesionPre.datosTemporales || {})}`);
+
     // Guardar el mensaje del paciente en el historial
     await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
@@ -472,12 +599,49 @@ app.post('/webhook', async (c) => {
       text: mensaje || '(Imagen/Documento adjunto)',
       timestamp: new Date().toISOString(),
       imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
-    });
+    }, body.altRemitente);
 
     const msgCleanLower = mensaje.toLowerCase().trim();
     const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu';
 
     if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64)) {
+      // Si el paciente ya está en atención humana, intentar agregar a la consulta
+      if (sesionPre.estado === 'esperando_atencion_humana') {
+        const adjuntado = await db.appendPacienteMensajeAConsulta(
+          remitente, mensaje, body.imagenBase64, body.pdfBase64, body.pdfNombre, body.altRemitente, body.pushName
+        );
+
+        if (adjuntado) {
+          const silentResult = {
+            remitente,
+            respuesta: '',
+            estadoActual: 'esperando_atencion_humana',
+            enHorario: true,
+            timestamp: new Date().toISOString()
+          };
+          return c.json(silentResult, 200);
+        }
+
+        // No se encontró la consulta - verificar si hay consultas pendientes para decidir
+        const consultas = await db.getConsultas();
+        const cleanRem = remitente.toLowerCase().trim();
+        const cleanAlt = (body.altRemitente || '').toLowerCase().trim();
+        const tienePendiente = consultas.some((c: any) => {
+          const cRem = (c.remitente || '').toLowerCase().trim();
+          const cAlt = (c.datos?.altRemitente || '').toLowerCase().trim();
+          return (cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt)) && c.estado === 'pendiente';
+        });
+
+        if (tienePendiente) {
+          // Race condition con D1 - silenciar
+          return c.json({ remitente, respuesta: '', estadoActual: 'esperando_atencion_humana', enHorario: true, timestamp: new Date().toISOString() }, 200);
+        }
+
+        // Chat eliminado sin finalizar - dejar que el engine resetee a inicio
+        await db.saveSesion(remitente, 'inicio');
+        sesionPre.estado = 'inicio';
+      }
+
       const adjuntado = await db.appendPacienteMensajeAConsulta(
         remitente,
         mensaje,
@@ -502,6 +666,7 @@ app.post('/webhook', async (c) => {
     }
 
     const result = await StateEngine.processMessage(payload, c.env);
+    console.log(`🤖 [WEBHOOK] Engine resultado: estado=${result.estadoActual} respuesta="${(result.respuesta || '').substring(0, 80)}"`);
 
     await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_bot`,
@@ -510,7 +675,11 @@ app.post('/webhook', async (c) => {
       timestamp: new Date().toISOString(),
       imageUrl: result.imagenSubidaUrl,
       interactive: result.interactive
-    });
+    }, body.altRemitente);
+
+    // Persistir sesión completa (historial + estado) en D1 después del engine
+    const sesionActual = await db.getSesion(remitente, body.altRemitente);
+    await db.saveSesion(remitente, sesionActual.estado, sesionActual.datosTemporales);
 
     invalidateConsultasCache();
     return c.json(result, 200);
@@ -731,11 +900,11 @@ app.patch('/api/consultas/:id', async (c) => {
       const target = consultas.find((item: any) => item.id === id);
       if (target && target.remitente) {
         await db.saveSesion(target.remitente, 'inicio');
-        await db.addPendingOutgoing(target.remitente, closingMsg, id);
+        await addPendingAndNotify(db, target.remitente, closingMsg, id);
 
         const readCfg = await (db as any).getWhatsappReadConfig?.();
         if (readCfg?.markReadOnFinish) {
-          await db.addPendingOutgoing(target.remitente, '', id, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
+          await addPendingAndNotify(db, target.remitente, '', id, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
         }
       }
     }
@@ -881,7 +1050,7 @@ app.post('/api/iniciar-chat', async (c) => {
       timestamp: new Date().toISOString()
     });
 
-    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
+    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
 
     return c.json({
       success: true,
@@ -916,7 +1085,7 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     const headerMsg = `🏥 *DERIVACIÓN PARA TELEMEDICINA - CLÍNICA COAT*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
 
-    await db.addPendingOutgoing(doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    await addPendingAndNotify(db, doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
 
     const respuestasPaciente = datos.respuestasPaciente || [];
     const rawPdfs = [
@@ -936,7 +1105,7 @@ app.post('/api/forward-telemedicina', async (c) => {
       const pdfItem = listPdfs[i];
       if (pdfItem.base64) {
         const label = listPdfs.length > 1 ? `📄 Documento PDF (${i + 1}/${listPdfs.length}): ${pdfItem.nombre || 'estudio.pdf'}` : `📄 Documento PDF: ${pdfItem.nombre || 'estudio.pdf'}`;
-        await db.addPendingOutgoing(doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
+        await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
       }
     }
 
@@ -962,7 +1131,7 @@ app.post('/api/forward-telemedicina', async (c) => {
       const imgSrc = listImagenes[i];
       const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
       const label = listImagenes.length > 1 ? `📷 Foto Adjunta de Pedido Médico (${i + 1} de ${listImagenes.length})` : `📷 Pedido Médico / Foto Adjunta del Paciente`;
-      await db.addPendingOutgoing(doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
+      await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
     }
 
     const regMsg = `🩺 Telemedicina derivada a ${doctorName || 'Médico'} (${doctorPhone}) ${notaSecretaria ? `- "${notaSecretaria}"` : ''}`;
@@ -981,7 +1150,7 @@ app.post('/api/forward-telemedicina', async (c) => {
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
-    const { remitente, respuesta, idConsulta, pdfUrl, pdfNombre, pdfBase64 } = body;
+    const { remitente, respuesta, idConsulta, pdfUrl, pdfNombre, pdfBase64, usuario } = body;
 
     if (!remitente || (!respuesta && !pdfUrl && !pdfBase64)) {
       return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF)' }, 400);
@@ -992,25 +1161,41 @@ app.post('/api/send-message', async (c) => {
 
     const db = DBFactory.createService(c.env);
 
+    // Obtener config para ver si mostrar nombre del operador
+    const botConfig = await db.getBotConfig();
+    const showOperatorName = botConfig.showOperatorName || false;
+    const nombreOperador = showOperatorName ? (usuario || 'Secretaría') : 'Secretaría';
+
     if (idConsulta) {
       const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
-      await db.registrarRespuestaSecretaria(idConsulta, textoReg, msgId);
+      await db.registrarRespuestaSecretaria(idConsulta, textoReg, msgId, usuario);
     }
 
-    const textoFinal = respuesta ? `👩‍⚕️ *[Secretaría]* ${respuesta}` : `👩‍⚕️ *[Secretaría]* Te enviamos el documento adjunto con las indicaciones.`;
+    const textoFinal = respuesta ? `👩‍⚕️ *[${nombreOperador}]* ${respuesta}` : `👩‍⚕️ *[${nombreOperador}]* Te enviamos el documento adjunto con las indicaciones.`;
 
     await db.agregarMensajeHistorial(remitente, {
       id: msgId,
       sender: 'secretaria',
       text: textoFinal,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      operatorName: usuario // Guardamos el nombre real internamente
     });
 
-    await db.addPendingOutgoing(remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, undefined, false, 'send', msgId);
+    // Obtener altRemitente de la consulta para que el gateway pueda enviar al número de teléfono correcto
+    let altRemitenteForSend: string | undefined = undefined;
+    if (idConsulta) {
+      const consultas = await db.getConsultas();
+      const consulta = consultas.find((c: any) => c.id === idConsulta);
+      if (consulta?.datos?.altRemitente) {
+        altRemitenteForSend = consulta.datos.altRemitente;
+      }
+    }
+
+    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, altRemitenteForSend, false, 'send', msgId);
 
     const readCfg = await (db as any).getWhatsappReadConfig?.();
     if (readCfg?.markReadOnReply) {
-      await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
+      await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, altRemitenteForSend, false, 'mark_read');
     }
 
     invalidateConsultasCache();
@@ -1067,7 +1252,7 @@ app.post('/api/delete-message', async (c) => {
     }
     const db = DBFactory.createService(c.env);
     const { key } = await db.deleteMessage(remitente, msgId);
-    await db.addPendingOutgoing(remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId, key);
+    await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId, key);
     invalidateConsultasCache();
     return c.json({ success: true, msgId });
   } catch (e: any) {
@@ -1084,7 +1269,7 @@ app.post('/api/edit-message', async (c) => {
     }
     const db = DBFactory.createService(c.env);
     const { key } = await db.editMessage(remitente, msgId, newText);
-    await db.addPendingOutgoing(remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId, key);
+    await addPendingAndNotify(db, remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId, key);
     invalidateConsultasCache();
     return c.json({ success: true, msgId, newText });
   } catch (e: any) {
@@ -1099,6 +1284,228 @@ app.get('/api/pending-outgoing', async (c) => {
     total: messages.length,
     messages
   });
+});
+
+// ─── HISTORIAL DE PACIENTE ───
+app.get('/api/patient-history/:remitente', async (c) => {
+  try {
+    const remitente = c.req.param('remitente');
+    const db = DBFactory.createService(c.env);
+    
+    // Función para normalizar números de teléfono
+    const normalizePhone = (phone: string) => {
+      return phone.replace(/[^0-9]/g, ''); // Solo dígitos
+    };
+    
+    const searchNormalized = normalizePhone(remitente);
+    
+    // Obtener todas las consultas del paciente
+    const consultas = await db.getConsultas();
+    const pacienteConsultas = consultas.filter((con: any) => {
+      const cleanConRem = normalizePhone(con.remitente || '');
+      const cleanConAlt = normalizePhone(con.datos?.altRemitente || '');
+      return cleanConRem === searchNormalized || cleanConAlt === searchNormalized;
+    });
+
+    // Obtener sesión con historial de mensajes
+    const sesion = await db.getSesion(remitente);
+
+    // Construir historial completo
+    const historial = pacienteConsultas.map((con: any) => ({
+      id: con.id,
+      fecha: con.createdAt,
+      estado: con.estado,
+      tipo: con.opcion,
+      mensajes: {
+        paciente: con.datos?.respuestasPaciente || [],
+        operador: con.datos?.respuestasSecretaria || []
+      },
+      pushName: con.datos?.pushName || null,
+      etiquetas: con.datos?.etiquetas || []
+    }));
+
+    // Ordenar por fecha (más reciente primero)
+    historial.sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+    return c.json({
+      remitente,
+      nombre: sesion?.datosTemporales?.pushName || historial[0]?.pushName || null,
+      totalConsultas: historial.length,
+      historial,
+      mensajesRecientes: sesion?.historialMensajes || []
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al obtener historial', details: e?.message }, 500);
+  }
+});
+
+// ─── BÚSQUEDA DE PACIENTES ───
+app.get('/api/patients/search', async (c) => {
+  try {
+    const query = c.req.query('q') || '';
+    const db = DBFactory.createService(c.env);
+    const consultas = await db.getConsultas();
+    
+    // Función para normalizar números de teléfono
+    const normalizePhone = (phone: string) => {
+      return phone.replace(/[^0-9]/g, ''); // Solo dígitos
+    };
+    
+    const searchNormalized = normalizePhone(query);
+    
+    // Buscar por nombre o teléfono
+    const resultados = consultas.filter((con: any) => {
+      const remitente = (con.remitente || '').toLowerCase();
+      const pushName = (con.datos?.pushName || '').toLowerCase();
+      const searchLower = query.toLowerCase();
+      
+      // Búsqueda por nombre (parcial)
+      const nameMatch = pushName.includes(searchLower);
+      
+      // Búsqueda por teléfono (normalizado)
+      const phoneNormalized = normalizePhone(remitente);
+      const phoneMatch = phoneNormalized.includes(searchNormalized) || searchNormalized.includes(phoneNormalized);
+      
+      return nameMatch || phoneMatch;
+    });
+
+    // Agrupar por paciente (deduplicar)
+    const pacientesMap = new Map();
+    resultados.forEach((con: any) => {
+      const key = con.remitente;
+      if (!pacientesMap.has(key)) {
+        pacientesMap.set(key, {
+          remitente: con.remitente,
+          nombre: con.datos?.pushName || null,
+          ultimaConsulta: con.createdAt,
+          estado: con.estado,
+          totalConsultas: 1
+        });
+      } else {
+        const existing = pacientesMap.get(key);
+        existing.totalConsultas++;
+      }
+    });
+
+    return c.json({
+      query,
+      total: pacientesMap.size,
+      pacientes: Array.from(pacientesMap.values()).slice(0, 50)
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al buscar pacientes', details: e?.message }, 500);
+  }
+});
+
+// ─── DASHBOARD: MÉTRICAS GENERALES ───
+app.get('/api/dashboard/metrics', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const consultas = await db.getConsultas();
+    const users = await db.getUsers();
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Métricas por estado
+    const pendientes = consultas.filter((c: any) => c.estado === 'pendiente').length;
+    const enProceso = consultas.filter((c: any) => c.estado === 'en_proceso').length;
+    const atendidas = consultas.filter((c: any) => c.estado === 'atendido').length;
+
+    // Mensajes hoy
+    const mensajesHoy = consultas.filter((c: any) => {
+      const fecha = new Date(c.createdAt);
+      return fecha.toISOString().split('T')[0] === today;
+    }).length;
+
+    // Mensajes esta semana
+    const mensajesSemana = consultas.filter((c: any) => {
+      const fecha = new Date(c.createdAt);
+      return fecha >= startOfWeek;
+    }).length;
+
+    // Mensajes este mes
+    const mensajesMes = consultas.filter((c: any) => {
+      const fecha = new Date(c.createdAt);
+      return fecha >= startOfMonth;
+    }).length;
+
+    // Tipos de consulta más frecuentes
+    const tiposMap = new Map();
+    consultas.forEach((con: any) => {
+      const tipo = con.opcion || 'Sin tipo';
+      tiposMap.set(tipo, (tiposMap.get(tipo) || 0) + 1);
+    });
+    const tiposFrecuentes = Array.from(tiposMap.entries())
+      .map(([tipo, count]) => ({ tipo, count }))
+      .sort((a: any, b: any) => b.count - a.count)
+      .slice(0, 5);
+
+    // Operadores activos
+    const operadoresMap = new Map();
+    consultas.forEach((con: any) => {
+      const respuestas = con.datos?.respuestasSecretaria || [];
+      respuestas.forEach((r: any) => {
+        const usuario = r.usuario || 'Desconocido';
+        operadoresMap.set(usuario, (operadoresMap.get(usuario) || 0) + 1);
+      });
+    });
+    const operadoresActivos = Array.from(operadoresMap.entries())
+      .map(([nombre, count]) => ({ nombre, respuestas: count }))
+      .sort((a: any, b: any) => b.respuestas - a.respuestas);
+
+    return c.json({
+      resumen: {
+        total: consultas.length,
+        pendientes,
+        enProceso,
+        atendidas,
+        mensajesHoy,
+        mensajesSemana,
+        mensajesMes
+      },
+      tiposFrecuentes,
+      operadoresActivos,
+      usuarios: users.length
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Error al obtener métricas', details: e?.message }, 500);
+  }
+});
+
+// ─── DASHBOARD: MÉTRICAS POR DÍA (últimos 7 días) ───
+app.get('/api/dashboard/daily', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const consultas = await db.getConsultas();
+    
+    const dias = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const fecha = new Date(now);
+      fecha.setDate(now.getDate() - i);
+      const fechaStr = fecha.toISOString().split('T')[0];
+      
+      const mensajesDia = consultas.filter((con: any) => {
+        return new Date(con.createdAt).toISOString().split('T')[0] === fechaStr;
+      }).length;
+
+      const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      dias.push({
+        fecha: fechaStr,
+        dia: diasSemana[fecha.getDay()],
+        mensajes: mensajesDia
+      });
+    }
+
+    return c.json({ dias });
+  } catch (e: any) {
+    return c.json({ error: 'Error al obtener métricas diarias', details: e?.message }, 500);
+  }
 });
 
 // ─── CRON TRIGGER: Watchdog de heartbeat (ejecutado por Cloudflare cada 2 min) ───

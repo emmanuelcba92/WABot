@@ -630,6 +630,7 @@
         window._currentUser = user;
         window._currentUserName = user.displayName || user.username;
         window._currentUserRole = user.role || 'secretaria';
+        currentOperatorName = window._currentUserName;
 
         document.getElementById('authLoadingOverlay').style.display = 'none';
         const nameEl = document.getElementById('currentUserName');
@@ -645,12 +646,24 @@
       const isRoleAdmin = window._currentUserRole === 'admin';
       const tabSettingsBtn = document.getElementById('tabSettingsBtn');
       const nameEl = document.getElementById('currentUserName');
+      const dashboardBtn = document.querySelector('.admin-only');
+      const btnExport = document.getElementById('btnExportExcel');
+      const btnPrueba = document.getElementById('btnCargarPrueba');
+      const btnLimpiar = document.getElementById('btnLimpiarTodo');
 
       if (nameEl) nameEl.textContent = `${window._currentUserName || 'Usuario'} (${isRoleAdmin ? 'Admin' : 'Secr.'})`;
 
       if (tabSettingsBtn) {
         tabSettingsBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
       }
+
+      if (dashboardBtn) {
+        dashboardBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
+      }
+
+      if (btnExport) btnExport.style.display = isRoleAdmin ? 'inline-flex' : 'none';
+      if (btnPrueba) btnPrueba.style.display = isRoleAdmin ? 'inline-flex' : 'none';
+      if (btnLimpiar) btnLimpiar.style.display = isRoleAdmin ? 'inline-flex' : 'none';
 
       if (!isRoleAdmin && window._currentMainTab === 'settings') {
         switchMainTab('consultas');
@@ -697,6 +710,14 @@
       <button class="btn btn-secondary" onclick="openPdfModalGlobal()" style="font-size: 0.8rem; border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Gestionar plantillas PDF de la clínica">
         📄 Plantillas PDF
       </button>
+
+      <a href="/history" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; text-decoration: none; display: inline-flex; align-items: center;" title="Buscar historial de pacientes">
+        📋 Historial
+      </a>
+
+      <a href="/dashboard" target="_blank" class="btn btn-secondary admin-only" style="font-size: 0.8rem; border: 1px solid rgba(168, 85, 247, 0.4); color: #a855f7; text-decoration: none; display: none; align-items: center;" title="Ver dashboard de métricas (solo admin)">
+        📊 Dashboard
+      </a>
 
       <button class="btn btn-secondary" id="btnNotifyPermission" onclick="requestNotificationPermission()" style="font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.2);">
         🔔 Notificaciones
@@ -750,13 +771,13 @@
 
 
 
-          <button class="btn btn-excel" onclick="exportToCsv()">
+          <button id="btnExportExcel" class="btn btn-excel" onclick="exportToCsv()">
             📊 Exportar a Excel (CSV)
           </button>
-          <button class="btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba variadas">
+          <button id="btnCargarPrueba" class="btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba variadas">
             ⚡ Cargar 50 Chats de Prueba
           </button>
-          <button class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
+          <button id="btnLimpiarTodo" class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
             🗑️ Limpiar Todo (Pruebas)
           </button>
         </div>
@@ -849,6 +870,21 @@
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 8px;" onclick="saveScheduleMessagesConfig()">
           💾 Guardar Mensajes de Horario y Cierre
         </button>
+      </div>
+
+      <!-- SUB-SECCIÓN: NOMBRE DEL OPERADOR -->
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
+        <h3 style="font-size: 1.1rem; color: #38bdf8;">👩‍⚕️ Nombre del Operador</h3>
+        <p style="font-size: 0.86rem; color: var(--muted);">Configura si se muestra el nombre del operador al paciente en los mensajes enviados.</p>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
+          <button class="btn btn-secondary" id="operatorNameInternal" onclick="setOperatorNameMode(false)">🔒 Nombre Interno (Paciente ve "Secretaría")</button>
+          <button class="btn btn-secondary" id="operatorNameVisible" onclick="setOperatorNameMode(true)">👁️ Nombre Visible (Paciente ve el nombre real)</button>
+        </div>
+
+        <div id="operatorNameBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
+          Estado Actual: Cargando...
+        </div>
       </div>
 
       <!-- SUB-SECCIÓN 2: NO-CODE MENU BUILDER & LIVE SIMULATOR -->
@@ -2091,7 +2127,43 @@
         const cfg = data.config || {};
         if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
         if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
+        // Actualizar estado del nombre del operador
+        updateOperatorNameBadge(cfg.showOperatorName || false);
       } catch (e) {}
+    }
+
+    function updateOperatorNameBadge(showName) {
+      const badge = document.getElementById('operatorNameBadge');
+      const btnInternal = document.getElementById('operatorNameInternal');
+      const btnVisible = document.getElementById('operatorNameVisible');
+      if (showName) {
+        badge.innerHTML = '👁️ Estado Actual: Nombre VISIBLE para el paciente';
+        badge.style.color = '#34d399';
+        btnVisible.classList.add('active');
+        btnInternal.classList.remove('active');
+      } else {
+        badge.innerHTML = '🔒 Estado Actual: Nombre OCULTO (Paciente ve "Secretaría")';
+        badge.style.color = '#38bdf8';
+        btnInternal.classList.add('active');
+        btnVisible.classList.remove('active');
+      }
+    }
+
+    async function setOperatorNameMode(showName) {
+      try {
+        const res = await fetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ showOperatorName: showName })
+        });
+        const data = await res.json();
+        if (data.success) {
+          updateOperatorNameBadge(showName);
+          alert(showName ? '✅ Ahora los pacientes verán el nombre del operador.' : '✅ Ahora los pacientes verán "Secretaría" en lugar del nombre.');
+        }
+      } catch (e) {
+        alert('Error al guardar configuración.');
+      }
     }
 
     async function saveScheduleMessagesConfig() {
@@ -3339,7 +3411,7 @@
       return html;
     }
 
-    let currentOperatorName = localStorage.getItem('wabot_operator_name') || 'Secretaría';
+    let currentOperatorName = window._currentUserName || localStorage.getItem('wabot_operator_name') || 'Secretaría';
 
     function initOperatorNameUI() {
       const input = document.getElementById('operatorNameInput');
@@ -4036,7 +4108,8 @@
             idConsulta,
             pdfKey: pdfKey !== 'custom' ? pdfKey : undefined,
             pdfNombre: pdfNombreToSend,
-            pdfBase64: pdfBase64ToSend
+            pdfBase64: pdfBase64ToSend,
+            usuario: window._currentUserName || 'Secretaría'
           })
         });
 
@@ -4046,7 +4119,7 @@
           delete customPdfBase64[idConsulta];
           delete customPdfNames[idConsulta];
 
-          fetchConsultas(true);
+          await fetchConsultas(true);
         } else {
           alert('⚠️ Error enviando respuesta: ' + (data.error || 'Desconocido'));
         }
@@ -4054,6 +4127,8 @@
         alert('⚠️ Error de conexión al enviar respuesta.');
       } finally {
         isSendingResponse[idConsulta] = false;
+        const ta = document.getElementById(`replyText_${idConsulta}`);
+        if (ta) ta.focus();
       }
     }
 

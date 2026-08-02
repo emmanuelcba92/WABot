@@ -3623,7 +3623,8 @@
             idConsulta,
             pdfKey: pdfKey !== 'custom' ? pdfKey : undefined,
             pdfNombre: pdfNombreToSend,
-            pdfBase64: pdfBase64ToSend
+            pdfBase64: pdfBase64ToSend,
+            usuario: window._currentUserName || 'Secretaría'
           })
         });
 
@@ -3635,7 +3636,7 @@
           delete customPdfBase64[idConsulta];
           delete customPdfNames[idConsulta];
 
-          fetchConsultas(true);
+          await fetchConsultas(true);
         } else {
           alert('⚠️ Error enviando respuesta: ' + (data.error || 'Desconocido'));
         }
@@ -3643,6 +3644,8 @@
         alert('⚠️ Error de conexión al enviar respuesta.');
       } finally {
         isSendingResponse[idConsulta] = false;
+        const ta = document.getElementById(`replyText_${idConsulta}`);
+        if (ta) ta.focus();
       }
     }
 

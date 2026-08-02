@@ -51,7 +51,7 @@ export class D1Service {
       let query = 'SELECT * FROM consultas ORDER BY timestamp DESC';
       const { results } = await this.db.prepare(query).all();
 
-      const items = (results || []).map((row: any) => {
+      const d1Items = (results || []).map((row: any) => {
         let datosParsed = {};
         try {
           datosParsed = typeof row.datos === 'string' ? JSON.parse(row.datos) : (row.datos || {});
@@ -67,6 +67,18 @@ export class D1Service {
           createdAt: row.createdAt
         };
       });
+
+      // Merge D1 results with in-memory cache to prevent stale reads
+      const mergedMap = new Map<string, any>();
+      for (const item of d1Items) {
+        mergedMap.set(item.id, item);
+      }
+      for (const item of D1Service.inMemoryConsultas) {
+        if (!mergedMap.has(item.id)) {
+          mergedMap.set(item.id, item);
+        }
+      }
+      const items = Array.from(mergedMap.values()).sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
 
       D1Service.inMemoryConsultas = items;
 
@@ -119,6 +131,7 @@ export class D1Service {
       return (cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt)) && c.estado === 'pendiente';
     });
 
+    console.log(`🔍 [APPEND] cleanRem=${cleanRem} cleanAlt=${cleanAlt} consultaEncontrada=${!!actual} consultasPendientes=${consultas.filter((c: any) => c.estado === 'pendiente').length}`);
     if (!actual) return false;
 
     const datos = actual.datos || {};
@@ -278,8 +291,8 @@ export class D1Service {
     return await this.actualizarDatosConsulta(idConsulta, datos);
   }
 
-  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string, msgId?: string): Promise<void> {
-    await this.responderConsulta(idConsulta, respuestaTexto, 'Secretaría', undefined, undefined, msgId);
+  public async registrarRespuestaSecretaria(idConsulta: string, respuestaTexto: string, msgId?: string, usuario?: string): Promise<void> {
+    await this.responderConsulta(idConsulta, respuestaTexto, usuario || 'Secretaría', undefined, undefined, msgId);
   }
 
   public async actualizarEtiquetasConsulta(id: string, etiquetas: string[]): Promise<boolean> {
@@ -298,7 +311,8 @@ export class D1Service {
     if (!target) return false;
 
     const datos = target.datos || {};
-    datos.operadorAsignado = operador;
+    datos.enGestionPor = operador;
+    datos.enGestionAt = operador ? Date.now() : null;
     return await this.actualizarDatosConsulta(id, datos);
   }
 
@@ -742,7 +756,10 @@ export class D1Service {
           .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
           .bind(`session_${cleanRem}`, JSON.stringify(current), current.updatedAt, JSON.stringify(current), current.updatedAt)
           .run();
-      } catch (e) {}
+        console.log(`💾 [SAVE-SESION] Guardada: key=session_${cleanRem} estado=${current.estado}`);
+      } catch (e) {
+        console.error(`❌ [SAVE-SESION] Error guardando sesión ${cleanRem}:`, e);
+      }
     }
   }
 
@@ -760,14 +777,27 @@ export class D1Service {
     if (this.db) {
       try {
         await this.initTables();
-        const row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind(`session_${cleanRem}`).first();
+        // Buscar por remitente principal
+        let row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind(`session_${cleanRem}`).first();
+        // Si no se encuentra y hay altRemitente, buscar también por alt
+        if ((!row || !row.data) && altRemitente) {
+          const cleanAlt = altRemitente.toLowerCase().trim();
+          row = await this.db.prepare('SELECT data FROM bot_config WHERE id = ?').bind(`session_${cleanAlt}`).first();
+        }
         if (row && row.data) {
           const parsed = JSON.parse(row.data);
+          console.log(`✅ [GET-SESION] Encontrada en D1: key=session_${cleanRem} estado=${parsed.estado}`);
           D1Service.sessionsMap.set(cleanRem, parsed);
+          if (altRemitente) {
+            D1Service.sessionsMap.set(altRemitente.toLowerCase().trim(), parsed);
+          }
           return parsed;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('❌ [GET-SESION] Error en D1:', e);
+      }
     }
+    console.log(`⚠️ [GET-SESION] Sesión NO encontrada para ${cleanRem} (altRemitente=${altRemitente || 'null'}). Creando default: inicio`);
     const defSession: UserSession = {
       remitente: cleanRem,
       estado: 'inicio',
@@ -779,15 +809,18 @@ export class D1Service {
     return defSession;
   }
 
-  public async agregarMensajeHistorial(remitente: string, msg: any): Promise<void> {
-    const sesion = await this.getSesion(remitente);
+  public async agregarMensajeHistorial(remitente: string, msg: any, altRemitente?: string): Promise<void> {
+    const sesion = await this.getSesion(remitente, altRemitente);
     if (!sesion.historialMensajes) sesion.historialMensajes = [];
     if (!msg.status && msg.sender === 'secretaria') msg.status = 'sent';
     sesion.historialMensajes.push(msg);
     if (sesion.historialMensajes.length > 50) {
       sesion.historialMensajes = sesion.historialMensajes.slice(-50);
     }
-    await this.saveSesion(remitente, sesion.estado, sesion.datosTemporales);
+    // NO llamar saveSesion aquí para no sobreescribir el estado de sesión
+    // La sesión se persiste en D1 por el engine o por saveSesion explícito
+    const cleanRem = remitente.toLowerCase().trim();
+    D1Service.sessionsMap.set(cleanRem, sesion);
   }
 
   public async updateMessageSentKey(remitente: string, msgId: string, key: any, internalMsgId?: string): Promise<void> {
@@ -895,18 +928,21 @@ export class D1Service {
     action: 'send' | 'delete' | 'edit' = 'send',
     targetMsgId?: string,
     targetMsgKey?: any
-  ): Promise<void> {
+  ): Promise<PendingOutgoingMsg> {
     let targetJid = remitente;
     let computedAlt = altRemitente;
 
     if (idConsulta && !isForwardToDoctor) {
-      const itemMem = D1Service.inMemoryConsultas.find(c => c.id === idConsulta);
+      const consultas = await this.getConsultas();
+      const itemMem = consultas.find(c => c.id === idConsulta);
       if (itemMem && itemMem.datos?.altRemitente) {
         computedAlt = itemMem.datos.altRemitente;
-        if (computedAlt && computedAlt.includes('@lid')) {
-          targetJid = computedAlt;
-        }
       }
+    }
+
+    // Si remitente es @lid y tenemos un número de teléfono, usarlo como targetJid
+    if (targetJid.includes('@lid') && computedAlt && !computedAlt.includes('@lid')) {
+      targetJid = computedAlt;
     }
 
     const item: PendingOutgoingMsg = {
@@ -942,11 +978,12 @@ export class D1Service {
           .prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
           .bind('pending_queue', JSON.stringify(currentQueue), new Date().toISOString(), JSON.stringify(currentQueue), new Date().toISOString())
           .run();
-        return;
+        return item;
       } catch (e) {}
     }
 
     D1Service.pendingOutgoingQueue.push(item);
+    return item;
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {
@@ -986,13 +1023,24 @@ export class D1Service {
 
   public async seedConsultas(): Promise<number> {
     await this.clearAllConsultas();
-    const mockNames = ['Carlos Gómez', 'María Rodríguez', 'Juan Pérez', 'Ana Martínez', 'Lucas Silva'];
+    const mockNames = [
+      'Carlos Gómez', 'María Rodríguez', 'Juan Pérez', 'Ana Martínez', 'Lucas Silva',
+      'Valentina Rossi', 'Santiago Martínez', 'Camila López', 'Mateo Silva', 'Sofía Castro',
+      'Joaquín Romero', 'Lucía Torres', 'Esteban Peralta', 'Mariana Sosa', 'Diego Díaz',
+      'Paula Morales', 'Facundo Suárez', 'Rocío Navarro', 'Martín Giménez', 'Daniela Ruiz',
+      'Claudio Acosta', 'Romina Carrizo', 'Maximiliano Godoy', 'Florencia Herrera', 'Ignacio Medina',
+      'Valeria Ramos', 'Ramiro Benitez', 'Griselda Luna', 'Hernán Ferreyra', 'Gisela Arias',
+      'Pedro Álvarez', 'Laura Castillo', 'Fernando Reyes', 'Carolina Peña', 'Andrés Mendoza',
+      'Gabriela Vargas', 'Roberto Díaz', 'Patricia Luna', 'Miguel Torres', 'Adriana Romero',
+      'Ricardo Medina', 'Silvia Peralta', 'Oscar Fernández', 'Natalia Soto', 'Eduardo Ríos',
+      'Claudia Herrera', 'Alberto Ramos', 'Verónica Cruz', 'Leonardo Vidal', 'Teresa Mora'
+    ];
     const mockOptions = ['Médico ORL (Otorrinolaringología)', 'Estudios Médicos', 'Cirugías', 'Telemedicina'];
 
     for (let i = 0; i < mockNames.length; i++) {
       const name = mockNames[i];
       const option = mockOptions[i % mockOptions.length];
-      const phone = `54935100000${i + 1}`;
+      const phone = `5493510000${String(i + 1).padStart(3, '0')}`;
       await this.crearConsulta(phone, option, {
         pushName: name,
         contenidoMensaje: `Solicitud de prueba #${i + 1} para ${name}`,

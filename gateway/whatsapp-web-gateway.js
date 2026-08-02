@@ -14,6 +14,11 @@ const sharp = require('sharp');
 const WORKER_WEBHOOK_URL = 'https://app.cpcoat.workers.dev/webhook';
 const WORKER_PENDING_URL = 'https://app.cpcoat.workers.dev/api/pending-outgoing';
 const WORKER_HEARTBEAT_URL = 'https://app.cpcoat.workers.dev/api/heartbeat';
+const WORKER_SSE_URL = 'https://app.cpcoat.workers.dev/sse';
+const WORKER_SSE_ACK_URL = 'https://app.cpcoat.workers.dev/api/sse-ack';
+
+// Identificador único de esta PC gateway
+const GATEWAY_ID = require('os').hostname() || `gateway_${Date.now()}`;
 
 const mediaDir = path.join(__dirname, 'media');
 if (!fs.existsSync(mediaDir)) {
@@ -89,6 +94,141 @@ async function sendHeartbeatPing() {
   }
 }
 setInterval(sendHeartbeatPing, 60000); // Reducido de 15s a 60s para optimizar requests
+
+
+// 3. SSE: CONEXIÓN SERVER-SENT EVENTS PARA NOTIFICACIONES INSTANTÁNEAS
+let sseConnection = null;
+let sseReconnectTimeout = null;
+let pendingSseMessages = []; // Cola de mensajes SSE pendientes de procesar
+let sseLastDataTime = 0; // Timestamp del último dato recibido por SSE
+let sseKeepaliveCheck = null; // Interval para verificar conexión
+
+function connectSSE() {
+  const https = require('https');
+  const url = new URL(WORKER_SSE_URL);
+  url.searchParams.set('gateway', GATEWAY_ID);
+
+  console.log(`🔌 [SSE] Conectando a ${url.toString()}...`);
+
+  const req = https.get(url.toString(), {
+    headers: {
+      'Accept': 'text/event-stream',
+      'Cache-Control': 'no-cache'
+    }
+  }, (res) => {
+    if (res.statusCode !== 200) {
+      console.error(`❌ [SSE] Error HTTP ${res.statusCode}`);
+      scheduleReconnect();
+      return;
+    }
+
+    console.log('✅ [SSE] Conexión establecida');
+    sseConnection = req;
+    sseLastDataTime = Date.now();
+
+    // Keepalive check: si no se recibe ningún dato en 30s, forzar reconexión
+    if (sseKeepaliveCheck) clearInterval(sseKeepaliveCheck);
+    sseKeepaliveCheck = setInterval(() => {
+      if (sseConnection && Date.now() - sseLastDataTime > 30000) {
+        console.warn('⚠️ [SSE] Keepalive timeout (30s sin datos), forzando reconexión...');
+        sseConnection = null;
+        if (sseKeepaliveCheck) { clearInterval(sseKeepaliveCheck); sseKeepaliveCheck = null; }
+        scheduleReconnect();
+        // Recoger mensajes pendientes inmediatamente
+        fetchPendingMessagesOnce();
+      }
+    }, 15000);
+
+    let buffer = '';
+
+    res.on('data', (chunk) => {
+      sseLastDataTime = Date.now(); // Actualizar timestamp de último dato
+      buffer += chunk.toString();
+
+      // Procesar eventos completos (separados por doble newline)
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Guardar línea incompleta
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            handleSSEMessage(data);
+          } catch (e) {
+            // Ignorar líneas que no son JSON válido
+          }
+        }
+        // Líneas que empiezan con ':' son keepalive, ignorar
+      }
+    });
+
+    res.on('end', () => {
+      console.log('⚠️ [SSE] Conexión cerrada, reconectando...');
+      sseConnection = null;
+      if (sseKeepaliveCheck) { clearInterval(sseKeepaliveCheck); sseKeepaliveCheck = null; }
+      scheduleReconnect();
+    });
+
+    res.on('error', (err) => {
+      console.error('❌ [SSE] Error de conexión:', err.message);
+      sseConnection = null;
+      if (sseKeepaliveCheck) { clearInterval(sseKeepaliveCheck); sseKeepaliveCheck = null; }
+      scheduleReconnect();
+    });
+  });
+
+  req.on('error', (err) => {
+    console.error('❌ [SSE] Error al conectar:', err.message);
+    sseConnection = null;
+    if (sseKeepaliveCheck) { clearInterval(sseKeepaliveCheck); sseKeepaliveCheck = null; }
+    scheduleReconnect();
+  });
+}
+
+function scheduleReconnect() {
+  if (sseReconnectTimeout) return;
+  console.log('🔄 [SSE] Reconectando en 5 segundos...');
+  sseReconnectTimeout = setTimeout(() => {
+    sseReconnectTimeout = null;
+    connectSSE();
+  }, 5000);
+}
+
+// Referencia global a la función de procesamiento (se asigna dentro de startWhatsAppGateway)
+let _processSsePendingMessage = null;
+
+function handleSSEMessage(data) {
+  if (data.type === 'connected') {
+    console.log(`🔌 [SSE] Conectado al Worker como ${data.gatewayId}`);
+    // Al reconectar, pedir mensajes pendientes una vez
+    fetchPendingMessagesOnce();
+    return;
+  }
+
+  if (data.type === 'pending_outgoing') {
+    console.log(`📩 [SSE] Notificación de mensaje pendiente: ${data.message?.id}`);
+    if (_processSsePendingMessage) {
+      _processSsePendingMessage(data.message);
+    }
+    return;
+  }
+}
+
+async function fetchPendingMessagesOnce() {
+  if (!_processSsePendingMessage) return;
+  try {
+    const res = await fetch(WORKER_PENDING_URL);
+    if (!res.ok) return;
+    const data = await res.json();
+    const messages = data.messages || [];
+    if (messages.length > 0) {
+      console.log(`📩 [SSE] Procesando ${messages.length} mensajes pendientes post-reconexión`);
+      for (const msg of messages) {
+        await _processSsePendingMessage(msg);
+      }
+    }
+  } catch (e) {}
+}
 
 
 // 2. MANTENIMIENTO NOCTURNO A LAS 3:30 AM (ELIMINA ARCHIVOS > 60 DÍAS)
@@ -219,7 +359,9 @@ process.on('unhandledRejection', (reason, promise) => {
     } else if (connection === 'open') {
       console.log('✅ ¡CONEXIÓN ESTABLECIDA CON ÉXITO A WHATSAPP DE LA CLÍNICA!');
       console.log('📡 Escuchando mensajes entrantes en tiempo real y sintonizando mensajes offline...');
+      console.log(`🔌 Gateway ID: ${GATEWAY_ID}`);
       sendHeartbeatPing();
+      connectSSE(); // Conectar SSE para notificaciones instantáneas
     }
   });
 
@@ -390,8 +532,185 @@ const lastIncomingKeysMap = new Map();
     }
   });
 
-  // Polling continuo de respuestas pendientes salientes generadas por la secretaria
+  // ─── FUNCIÓN REUTILIZABLE PARA ENVIAR MENSAJES SALIENTES ───
+  async function sendOutgoingMessage(msg) {
+    let primaryJid = msg.targetJid || msg.remitente;
+    let altJid = msg.altRemitente;
+
+    let phoneJid = null;
+    let lidJid = null;
+
+    if (primaryJid.includes('@lid')) {
+      lidJid = primaryJid;
+    } else {
+      let clean = primaryJid.replace(/[^0-9]/g, '');
+      if (clean.startsWith('0')) clean = clean.substring(1);
+      if (clean.startsWith('15')) clean = clean.substring(2);
+      if (!clean.startsWith('54')) clean = `549${clean}`;
+      else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
+      phoneJid = `${clean}@s.whatsapp.net`;
+    }
+
+    if (altJid) {
+      if (altJid.includes('@lid')) lidJid = altJid;
+      else if (!phoneJid) {
+        let clean = altJid.replace(/[^0-9]/g, '');
+        if (clean.startsWith('0')) clean = clean.substring(1);
+        if (clean.startsWith('15')) clean = clean.substring(2);
+        if (!clean.startsWith('54')) clean = `549${clean}`;
+        else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
+        phoneJid = `${clean}@s.whatsapp.net`;
+      }
+    }
+
+    const targets = [];
+    if (phoneJid) targets.push(phoneJid);
+    if (lidJid && lidJid !== phoneJid) targets.push(lidJid);
+
+    let sendSuccess = false;
+    for (const targetJid of targets) {
+      try {
+        if (msg.action === 'delete') {
+          const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
+          if (targetKey && targetKey.id) {
+            const sendJid = targetKey.remoteJid || targetJid;
+            await sock.sendMessage(sendJid, { delete: targetKey });
+            console.log(`🗑️ Mensaje (${targetKey.id}) eliminado en WhatsApp para ${sendJid}.`);
+            sendSuccess = true;
+            break;
+          }
+        } else if (msg.action === 'mark_read') {
+          try {
+            const keyToRead = lastIncomingKeysMap.get(targetJid) || lastIncomingKeysMap.get(msg.remitente) || { remoteJid: targetJid, fromMe: false, id: msg.targetMsgId || msg.id };
+            if (typeof sock.readMessages === 'function') {
+              await sock.readMessages([keyToRead]);
+            }
+            if (typeof sock.chatModify === 'function') {
+              await sock.chatModify({ markRead: true, lastMessages: [keyToRead] }, targetJid).catch(() => {});
+            }
+            console.log(`✅ Chat (${targetJid}) marcado como leído en WhatsApp.`);
+            sendSuccess = true;
+            break;
+          } catch (errRead) {
+            console.warn(`⚠️ Error al marcar como leído ${targetJid}:`, errRead?.message || errRead);
+          }
+        } else if (msg.action === 'edit') {
+          const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
+          if (targetKey && targetKey.id) {
+            const sendJid = targetKey.remoteJid || targetJid;
+            await sock.sendMessage(sendJid, { edit: targetKey, text: msg.text });
+            console.log(`✏️ Mensaje (${targetKey.id}) editado en WhatsApp para ${sendJid}.`);
+            sendSuccess = true;
+            break;
+          }
+        } else if (msg.pdfBase64 && msg.pdfNombre) {
+          const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          const sentRes = await sock.sendMessage(targetJid, {
+            document: buffer,
+            mimetype: 'application/pdf',
+            fileName: msg.pdfNombre,
+            caption: msg.text || undefined
+          });
+          if (sentRes && sentRes.key) {
+            registerSentKey(msg.id, sentRes.key);
+            if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
+            fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
+            }).catch(() => {});
+          }
+          console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
+          sendSuccess = true;
+          break;
+        } else if (msg.imagenBase64) {
+          const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          const sentRes = await sock.sendMessage(targetJid, {
+            image: buffer,
+            caption: msg.text || undefined
+          });
+          if (sentRes && sentRes.key) {
+            registerSentKey(msg.id, sentRes.key);
+            if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
+            fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
+            }).catch(() => {});
+          }
+          console.log(`📤 Imagen enviada a ${targetJid}.`);
+          sendSuccess = true;
+          break;
+        } else if (msg.text) {
+          const sentRes = await sock.sendMessage(targetJid, { text: msg.text });
+          if (sentRes && sentRes.key) {
+            registerSentKey(msg.id, sentRes.key);
+            if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
+            fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
+            }).catch(() => {});
+          }
+          console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
+          sendSuccess = true;
+          break;
+        }
+      } catch (errJid) {
+        console.warn(`⚠️ Error al enviar a ${targetJid}, intentando siguiente dirección...:`, errJid?.message || errJid);
+      }
+    }
+
+    if (!sendSuccess) {
+      console.error(`❌ No se pudo entregar mensaje a ninguna dirección de ${msg.remitente}`);
+      return false;
+    }
+    return true;
+  }
+
+  // ─── PROCESAMIENTO DE MENSAJES SSE (necesita acceso a sendOutgoingMessage) ───
+  async function processSsePendingMessage(msg) {
+    try {
+      // DEDUPLICADOR
+      const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
+      if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
+        console.warn(`⚠️ [SSE DEDUPE] Omitiendo mensaje ya enviado: ${msgDedupeKey}`);
+        return;
+      }
+
+      // Reusar la lógica de envío del polling
+      const sendResult = await sendOutgoingMessage(msg);
+
+      // SOLO marcar como enviado si el envío fue exitoso
+      if (sendResult !== false) {
+        markMsgAsSent(msgDedupeKey);
+        if (msg.id) markMsgAsSent(msg.id);
+      }
+
+      // ACK al worker
+      fetch(WORKER_SSE_ACK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msgId: msg.id, gatewayId: GATEWAY_ID })
+      }).catch(() => {});
+    } catch (err) {
+      console.error('❌ [SSE] Error procesando mensaje:', err.message);
+    }
+  }
+
+  // Asignar la referencia global para que handleSSEMessage y fetchPendingMessagesOnce la usen
+  _processSsePendingMessage = processSsePendingMessage;
+
+  // Polling adaptativo: cada 5s si SSE caído, cada 30s si SSE conectado (safety net)
+  let lastPollingTime = 0;
   setInterval(async () => {
+    const now = Date.now();
+    const pollInterval = sseConnection ? 30000 : 5000;
+    if (now - lastPollingTime < pollInterval) return;
+    lastPollingTime = now;
+
     try {
       const res = await fetch(WORKER_PENDING_URL);
       if (!res.ok) return;
@@ -404,143 +723,14 @@ const lastIncomingKeysMap = new Map();
           // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
           const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
           if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
-            console.warn(`⚠️ [DEDUPLICADOR GATEWAY] Omitiendo mensaje ya enviado previamente: ${msgDedupeKey}`);
             continue;
           }
-          markMsgAsSent(msgDedupeKey);
-          if (msg.id) markMsgAsSent(msg.id);
 
-          let primaryJid = msg.targetJid || msg.remitente;
-          let altJid = msg.altRemitente;
-
-          let phoneJid = null;
-          let lidJid = null;
-
-          if (primaryJid.includes('@lid')) {
-            lidJid = primaryJid;
-          } else {
-            let clean = primaryJid.replace(/[^0-9]/g, '');
-            if (clean.startsWith('0')) clean = clean.substring(1);
-            if (clean.startsWith('15')) clean = clean.substring(2);
-            if (!clean.startsWith('54')) clean = `549${clean}`;
-            else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
-            phoneJid = `${clean}@s.whatsapp.net`;
-          }
-
-          if (altJid) {
-            if (altJid.includes('@lid')) lidJid = altJid;
-            else if (!phoneJid) {
-              let clean = altJid.replace(/[^0-9]/g, '');
-              if (clean.startsWith('0')) clean = clean.substring(1);
-              if (clean.startsWith('15')) clean = clean.substring(2);
-              if (!clean.startsWith('54')) clean = `549${clean}`;
-              else if (clean.startsWith('54') && !clean.startsWith('549')) clean = `549${clean.substring(2)}`;
-              phoneJid = `${clean}@s.whatsapp.net`;
-            }
-          }
-
-          const targets = [];
-          if (phoneJid) targets.push(phoneJid);
-          if (lidJid && lidJid !== phoneJid) targets.push(lidJid);
-
-          let sendSuccess = false;
-          for (const targetJid of targets) {
-            try {
-              if (msg.action === 'delete') {
-                const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
-                if (targetKey && targetKey.id) {
-                  const sendJid = targetKey.remoteJid || targetJid;
-                  await sock.sendMessage(sendJid, { delete: targetKey });
-                  console.log(`🗑️ Mensaje (${targetKey.id}) eliminado en WhatsApp para ${sendJid}.`);
-                  sendSuccess = true;
-                  break;
-                }
-              } else if (msg.action === 'mark_read') {
-                try {
-                  const keyToRead = lastIncomingKeysMap.get(targetJid) || lastIncomingKeysMap.get(msg.remitente) || { remoteJid: targetJid, fromMe: false, id: msg.targetMsgId || msg.id };
-                  if (typeof sock.readMessages === 'function') {
-                    await sock.readMessages([keyToRead]);
-                  }
-                  if (typeof sock.chatModify === 'function') {
-                    await sock.chatModify({ markRead: true, lastMessages: [keyToRead] }, targetJid).catch(() => {});
-                  }
-                  console.log(`✅ Chat (${targetJid}) marcado como leído en WhatsApp.`);
-                  sendSuccess = true;
-                  break;
-                } catch (errRead) {
-                  console.warn(`⚠️ Error al marcar como leído ${targetJid}:`, errRead?.message || errRead);
-                }
-              } else if (msg.action === 'edit') {
-                const targetKey = msg.targetMsgKey || sentKeysMap.get(msg.targetMsgId) || sentKeysMap.get(msg.id) || (msg.targetMsgId ? { remoteJid: targetJid, fromMe: true, id: msg.targetMsgId } : null);
-                if (targetKey && targetKey.id) {
-                  const sendJid = targetKey.remoteJid || targetJid;
-                  await sock.sendMessage(sendJid, { edit: targetKey, text: msg.text });
-                  console.log(`✏️ Mensaje (${targetKey.id}) editado en WhatsApp para ${sendJid}.`);
-                  sendSuccess = true;
-                  break;
-                }
-              } else if (msg.pdfBase64 && msg.pdfNombre) {
-                const base64Data = msg.pdfBase64.replace(/^data:application\/pdf;base64,/, '');
-                const buffer = Buffer.from(base64Data, 'base64');
-                const sentRes = await sock.sendMessage(targetJid, {
-                  document: buffer,
-                  mimetype: 'application/pdf',
-                  fileName: msg.pdfNombre,
-                  caption: msg.text || undefined
-                });
-                if (sentRes && sentRes.key) {
-                  registerSentKey(msg.id, sentRes.key);
-                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
-                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
-                  }).catch(() => {});
-                }
-                console.log(`📤 Documento PDF "${msg.pdfNombre}" enviado a ${targetJid}.`);
-                sendSuccess = true;
-                break;
-              } else if (msg.imagenBase64) {
-                const base64Data = msg.imagenBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-                const buffer = Buffer.from(base64Data, 'base64');
-                const sentRes = await sock.sendMessage(targetJid, {
-                  image: buffer,
-                  caption: msg.text || undefined
-                });
-                if (sentRes && sentRes.key) {
-                  registerSentKey(msg.id, sentRes.key);
-                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
-                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
-                  }).catch(() => {});
-                }
-                console.log(`📤 Imagen enviada a ${targetJid}.`);
-                sendSuccess = true;
-                break;
-              } else if (msg.text) {
-                const sentRes = await sock.sendMessage(targetJid, { text: msg.text });
-                if (sentRes && sentRes.key) {
-                  registerSentKey(msg.id, sentRes.key);
-                  if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
-                  fetch('https://app.cpcoat.workers.dev/api/message-sent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
-                  }).catch(() => {});
-                }
-                console.log(`📤 Respuesta de secretaria enviada a ${targetJid}: "${msg.text}"`);
-                sendSuccess = true;
-                break;
-              }
-            } catch (errJid) {
-              console.warn(`⚠️ Error al enviar a ${targetJid}, intentando siguiente dirección...:`, errJid?.message || errJid);
-            }
-          }
-
-          if (!sendSuccess) {
-            console.error(`❌ No se pudo entregar mensaje a ninguna dirección de ${msg.remitente}`);
+          console.log(`🔄 [POLLING] Procesando mensaje pendiente: ${msgDedupeKey}`);
+          const sendResult = await sendOutgoingMessage(msg);
+          if (sendResult !== false) {
+            markMsgAsSent(msgDedupeKey);
+            if (msg.id) markMsgAsSent(msg.id);
           }
         } catch (sendErr) {
           console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);
@@ -549,7 +739,7 @@ const lastIncomingKeysMap = new Map();
     } catch (pollErr) {
       // Ignorar errores temporales de red en el polling saliente
     }
-  }, 5000); // Reducido de 3s a 5s para optimizar requests (ahorra ~11.500 req/día)
+  }, 5000); // Cada 5s siempre
 
 }
 

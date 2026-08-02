@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Paciente - WA Bot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+    
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    
+    header { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { color: #00d9ff; font-size: 1.5rem; }
+    header a { color: #00d9ff; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    
+    .search-box { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .search-box input { width: 100%; padding: 12px; border: 1px solid #333; border-radius: 5px; background: #0f0f23; color: #eee; font-size: 1rem; }
+    .search-box input::placeholder { color: #666; }
+    .search-box button { margin-top: 10px; padding: 10px 20px; background: #00d9ff; color: #1a1a2e; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    .search-box button:hover { background: #00b8d4; }
+    
+    .patient-info { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: none; }
+    .patient-info.active { display: block; }
+    .patient-info h2 { color: #00d9ff; margin-bottom: 10px; }
+    .patient-info .meta { color: #888; font-size: 0.9rem; }
+    
+    .history-list { display: flex; flex-direction: column; gap: 15px; }
+    
+    .history-card { background: #16213e; border-radius: 10px; overflow: hidden; }
+    .history-card-header { padding: 15px; background: #0f3460; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .history-card-header:hover { background: #1a4a7a; }
+    .history-card-header h3 { color: #00d9ff; font-size: 1rem; }
+    .history-card-header .date { color: #888; font-size: 0.85rem; }
+    .history-card-header .status { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+    .status-pendiente { background: #ffc107; color: #000; }
+    .status-atendido { background: #28a745; color: #fff; }
+    .status-en_proceso { background: #17a2b8; color: #fff; }
+    
+    .history-card-body { padding: 15px; display: none; }
+    .history-card-body.active { display: block; }
+    
+    .message { margin-bottom: 10px; padding: 10px; border-radius: 8px; max-width: 80%; }
+    .message-cliente { background: #1a4a7a; margin-right: auto; border-bottom-left-radius: 2px; }
+    .message-bot { background: #2d2d44; margin-left: auto; border-bottom-right-radius: 2px; }
+    .message-operador { background: #0f3460; margin-left: auto; border-bottom-right-radius: 2px; border-left: 3px solid #00d9ff; }
+    .message .sender { font-size: 0.75rem; color: #888; margin-bottom: 4px; }
+    .message .text { font-size: 0.9rem; }
+    .message .time { font-size: 0.7rem; color: #666; margin-top: 4px; text-align: right; }
+    
+    .message img { max-width: 200px; border-radius: 5px; margin-top: 5px; }
+    .message .pdf-link { color: #00d9ff; text-decoration: none; }
+    .message .pdf-link:hover { text-decoration: underline; }
+    
+    .no-results { text-align: center; padding: 40px; color: #666; }
+    .loading { text-align: center; padding: 20px; color: #00d9ff; }
+    
+    @media (max-width: 768px) {
+      .message { max-width: 95%; }
+      header { flex-direction: column; gap: 10px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📋 Historial de Paciente</h1>
+      <a href="/admin">← Volver al Panel</a>
+    </header>
+    
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Buscar por nombre o teléfono..." />
+      <button onclick="searchPatient()">Buscar</button>
+    </div>
+    
+    <div class="patient-info" id="patientInfo">
+      <h2 id="patientName">Paciente</h2>
+      <div class="meta">
+        <span>Teléfono: <span id="patientPhone">-</span></span>
+        <span> | </span>
+        <span>Total consultas: <span id="totalConsultas">0</span></span>
+      </div>
+    </div>
+    
+    <div class="history-list" id="historyList">
+      <div class="no-results">Ingrese un nombre o teléfono para buscar el historial</div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let currentPatient = null;
+
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchPatient();
+    });
+
+    async function searchPatient() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) return;
+
+      document.getElementById('historyList').innerHTML = '<div class="loading">Buscando...</div>';
+
+      try {
+        // Primero buscar pacientes
+        const searchRes = await fetch(`${API_BASE}/api/patients/search?q=${encodeURIComponent(query)}`);
+        const searchData = await searchRes.json();
+
+        if (searchData.pacientes.length === 0) {
+          document.getElementById('historyList').innerHTML = '<div class="no-results">No se encontraron pacientes</div>';
+          return;
+        }
+
+        // Tomar el primer resultado
+        const patient = searchData.pacientes[0];
+        currentPatient = patient;
+
+        // Obtener historial completo
+        const historyRes = await fetch(`${API_BASE}/api/patient-history/${patient.remitente}`);
+        const historyData = await historyRes.json();
+
+        // Mostrar info del paciente
+        document.getElementById('patientInfo').classList.add('active');
+        document.getElementById('patientName').textContent = historyData.nombre || 'Sin nombre';
+        document.getElementById('patientPhone').textContent = historyData.remitente;
+        document.getElementById('totalConsultas').textContent = historyData.totalConsultas;
+
+        // Mostrar historial
+        renderHistory(historyData.historial);
+      } catch (error) {
+        document.getElementById('historyList').innerHTML = '<div class="no-results">Error al buscar. Intente nuevamente.</div>';
+      }
+    }
+
+    function renderHistory(historial) {
+      const container = document.getElementById('historyList');
+      
+      if (historial.length === 0) {
+        container.innerHTML = '<div class="no-results">No hay consultas registradas</div>';
+        return;
+      }
+
+      container.innerHTML = historial.map((con, idx) => `
+        <div class="history-card">
+          <div class="history-card-header" onclick="toggleCard(${idx})">
+            <div>
+              <h3>${con.tipo || 'Consulta'}</h3>
+              <span class="date">${formatDate(con.fecha)}</span>
+            </div>
+            <span class="status status-${con.estado}">${con.estado}</span>
+          </div>
+          <div class="history-card-body" id="card-${idx}">
+            ${renderMessages(con.mensajes)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderMessages(mensajes) {
+      let html = '';
+      
+      // Mensajes del paciente
+      if (mensajes.paciente && mensajes.paciente.length > 0) {
+        mensajes.paciente.forEach(msg => {
+          html += `
+            <div class="message message-cliente">
+              <div class="sender">👤 Paciente</div>
+              <div class="text">${msg.texto || '(Sin texto)'}</div>
+              ${msg.imagenBase64 ? '<img src="' + msg.imagenBase64 + '" alt="Imagen" />' : ''}
+              ${msg.pdfBase64 ? '<a class="pdf-link" href="' + msg.pdfBase64 + '" target="_blank">📄 Ver PDF</a>' : ''}
+              <div class="time">${formatDate(msg.timestamp)}</div>
+            </div>
+          `;
+        });
+      }
+
+      // Mensajes del operador
+      if (mensajes.operador && mensajes.operador.length > 0) {
+        mensajes.operador.forEach(msg => {
+          html += `
+            <div class="message message-operador">
+              <div class="sender">👩‍⚕️ ${msg.usuario || 'Operador'}</div>
+              <div class="text">${msg.texto || '(Sin texto)'}</div>
+              <div class="time">${formatDate(msg.timestamp)}</div>
+            </div>
+          `;
+        });
+      }
+
+      return html || '<div class="no-results">Sin mensajes</div>';
+    }
+
+    function toggleCard(idx) {
+      const body = document.getElementById(`card-${idx}`);
+      body.classList.toggle('active');
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('es-AR', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  </script>
+</body>
+</html>

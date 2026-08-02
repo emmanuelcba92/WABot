@@ -1,28 +1,32 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "app",
-  "account_id": "dd870b4185d1c230d6bbf44fe6ce594f",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-02-04",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
-  "vars": {
-    "FIREBASE_PROJECT_ID": "botwa-524e8",
-    "FIREBASE_API_KEY": "AIzaSyAHiCtupbis8HCKfDt14s_DFs8llQ3YAHo",
-    "DB_PROVIDER": "d1",
-    "ALERT_EMAIL": "emmanuel.ag92@gmail.com"
-  },
-  "triggers": {
-    "crons": ["* * * * *"]
-  },
-
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "wabot_coat_db",
-      "database_id": "036c69c1-2dc9-4170-a0e0-0d1102cda64c"
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "app",
+	"account_id": "4bce52406e734e4cf4300b8d41024824",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-02-04",
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"vars": {
+		"FIREBASE_PROJECT_ID": "botwa-524e8",
+		"FIREBASE_API_KEY": "AIzaSyAHiCtupbis8HCKfDt14s_DFs8llQ3YAHo",
+		"DB_PROVIDER": "d1",
+		"ALERT_EMAIL": "emmanuel.ag92@gmail.com",
+		"TELEGRAM_BOT_TOKEN": "8894208204:AAEFlXSM4vhcJTcYqiJ2k1tWO3HyCxljhNU",
+		"TELEGRAM_CHAT_ID": "-5112025915",
+		"GOOGLE_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbx7lhzrgNxv0WSfqWk5wNmXYyActW6bUYqIAKr-oLoG6Nw7WqhEXuynybbpO-Qt1Liq/exec"
+	},
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "wabot_coat_db",
+			"database_id": "fc66df83-cabf-4c06-8cd9-63b4855f1ce0"
+		}
+	]
 }
