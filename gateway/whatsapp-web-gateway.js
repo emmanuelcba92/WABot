@@ -241,6 +241,8 @@ process.on('unhandledRejection', (reason, promise) => {
     }
   });
 
+const lastIncomingKeysMap = new Map();
+
   sock.ev.on('messages.upsert', async (m) => {
     // Procesar mensajes en tiempo real ('notify') y mensajes offline sincronizados al reconectar ('append')
     if (m.type !== 'notify' && m.type !== 'append') return;
@@ -252,11 +254,17 @@ process.on('unhandledRejection', (reason, promise) => {
         const remitente = msg.key.remoteJid;
         if (!remitente || remitente.includes('@g.us')) continue; // Ignorar grupos
 
+        lastIncomingKeysMap.set(remitente, msg.key);
+
         let altRemitente = null;
         if (msg.key.remoteJidAlt) {
           altRemitente = msg.key.remoteJidAlt;
         } else if (msg.key.participant) {
           altRemitente = msg.key.participant;
+        }
+
+        if (altRemitente) {
+          lastIncomingKeysMap.set(altRemitente, msg.key);
         }
 
         const realPhone = resolveRealPhone(remitente) || resolveRealPhone(altRemitente);
@@ -449,7 +457,13 @@ process.on('unhandledRejection', (reason, promise) => {
                 }
               } else if (msg.action === 'mark_read') {
                 try {
-                  await sock.chatModify({ markRead: true }, targetJid);
+                  const keyToRead = lastIncomingKeysMap.get(targetJid) || lastIncomingKeysMap.get(msg.remitente) || { remoteJid: targetJid, fromMe: false, id: msg.targetMsgId || msg.id };
+                  if (typeof sock.readMessages === 'function') {
+                    await sock.readMessages([keyToRead]);
+                  }
+                  if (typeof sock.chatModify === 'function') {
+                    await sock.chatModify({ markRead: true, lastMessages: [keyToRead] }, targetJid).catch(() => {});
+                  }
                   console.log(`✅ Chat (${targetJid}) marcado como leído en WhatsApp.`);
                   sendSuccess = true;
                   break;
