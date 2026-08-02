@@ -583,18 +583,20 @@ let lastGatewayPingTimestamp = Date.now();
 let lastAlertSentTimestamp = 0;
 
 async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
-  const telegramToken = env.TELEGRAM_BOT_TOKEN;
-  const telegramChatId = env.TELEGRAM_CHAT_ID;
-  const alertEmail = env.ALERT_EMAIL || 'admin@coat.com.ar';
-  const resendApiKey = env.RESEND_API_KEY;
+  const telegramToken = (env.TELEGRAM_BOT_TOKEN || '').trim().replace(/^"|"$/g, '');
+  const telegramChatId = (env.TELEGRAM_CHAT_ID || '').trim().replace(/^"|"$/g, '');
+  const alertEmail = (env.ALERT_EMAIL || 'emmanuel.ag92@gmail.com').trim().replace(/^"|"$/g, '');
+  const resendApiKey = (env.RESEND_API_KEY || '').trim().replace(/^"|"$/g, '');
 
   const alertMessage = `🚨 <b>ALERTA CRÍTICA - CLÍNICA COAT</b>\n\n⚠️ Se ha perdido la conexión con WhatsApp en la PC de recepción.\n⏱️ <b>Tiempo sin señal:</b> ${elapsedSeconds} segundos.\n📌 Por favor verifique que la PC esté encendida y conectada a internet.`;
+
+  const results: any = { telegram: null, resend: null };
 
   // 1. Enviar Alerta por Telegram
   if (telegramToken && telegramChatId) {
     try {
       const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
-      await fetch(url, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -603,23 +605,52 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
           parse_mode: 'HTML'
         })
       });
-      console.log('📱 Alerta de desconexión enviada a Telegram con éxito.');
-    } catch (e) {
+      const resData = await res.json().catch(() => ({}));
+      results.telegram = { ok: res.ok, status: res.status, data: resData };
+      console.log('📱 Alerta de desconexión Telegram status:', res.status, resData);
+    } catch (e: any) {
+      results.telegram = { ok: false, error: e?.message || e };
       console.error('⚠️ Error al enviar alerta a Telegram:', e);
     }
+  } else {
+    results.telegram = { ok: false, error: 'Credenciales incompletas (token o chatId vacíos)' };
   }
 
-  // 2. Enviar Alerta por Email (Resend API)
-  if (resendApiKey && alertEmail) {
+  const googleScriptUrl = (env.GOOGLE_SCRIPT_URL || '').trim().replace(/^"|"$/g, '');
+
+  // 2. Enviar Alerta por Email (Google Apps Script o Resend API)
+  if (googleScriptUrl) {
     try {
-      await fetch('https://api.resend.com/emails', {
+      const res = await fetch(googleScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
+          html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
+            <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
+            <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
+            <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
+            <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
+          </div>`
+        })
+      });
+      const resData = await res.json().catch(() => ({}));
+      results.googleEmail = { ok: res.ok, status: res.status, data: resData };
+      console.log(`📧 Alerta Google Apps Script Email status:`, res.status, resData);
+    } catch (e: any) {
+      results.googleEmail = { ok: false, error: e?.message || e };
+      console.error('⚠️ Error al enviar email vía Google Apps Script:', e);
+    }
+  } else if (resendApiKey && alertEmail) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${resendApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Alertas Bot COAT <alertas@resend.dev>',
+          from: 'Alertas Bot COAT <onboarding@resend.dev>',
           to: [alertEmail],
           subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
           html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
@@ -630,12 +661,26 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
           </div>`
         })
       });
-      console.log(`📧 Alerta enviada por Email a ${alertEmail} con éxito.`);
-    } catch (e) {
+      const resData = await res.json().catch(() => ({}));
+      results.resend = { ok: res.ok, status: res.status, data: resData };
+      console.log(`📧 Alerta Email status:`, res.status, resData);
+    } catch (e: any) {
+      results.resend = { ok: false, error: e?.message || e };
       console.error('⚠️ Error al enviar email de alerta:', e);
     }
+  } else {
+    results.resend = { ok: false, error: 'Credenciales incompletas para email' };
   }
+
+
+  return results;
 }
+
+app.get('/api/test-alert', async (c) => {
+  const results = await sendDisconnectionAlerts(c.env, 300);
+  return c.json({ test: true, results });
+});
+
 
 app.post('/api/heartbeat', async (c) => {
   const db = DBFactory.createService(c.env);
@@ -1028,14 +1073,33 @@ async function scheduledWatchdog(env: any) {
     const isOnline = lastPing > 0 && elapsed <= 180000; // 3 minutos de tolerancia
 
     if (!isOnline && elapsedSeconds > 180) {
-      // Solo alerta si no se alertó en los últimos 10 minutos
-      if (Date.now() - lastAlertSentTimestamp > 600000) {
-        lastAlertSentTimestamp = Date.now();
+      // Verificar si ya se envió la alerta de esta caída (para no spamear durante la noche)
+      let alreadyAlerted = false;
+      try {
+        const row = await env.DB.prepare('SELECT data FROM bot_config WHERE id = ?').bind('disconnection_alert_state').first();
+        if (row && row.data) {
+          const parsed = JSON.parse(row.data);
+          alreadyAlerted = !!parsed.alerted;
+        }
+      } catch (e) {}
+
+      if (!alreadyAlerted) {
+        // Guardar en D1 que ya se envió la alerta para esta caída
+        try {
+          await env.DB.prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+            .bind('disconnection_alert_state', JSON.stringify({ alerted: true, timestamp: Date.now() }), new Date().toISOString(), JSON.stringify({ alerted: true, timestamp: Date.now() }), new Date().toISOString())
+            .run();
+        } catch (e) {}
+
         await sendDisconnectionAlerts(env, elapsedSeconds);
       }
     } else if (isOnline) {
-      // Resetear bandera si volvió a estar online
-      lastAlertSentTimestamp = 0;
+      // Resetear estado en D1 al volver a estar online
+      try {
+        await env.DB.prepare('INSERT INTO bot_config (id, data, updatedAt) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updatedAt = ?')
+          .bind('disconnection_alert_state', JSON.stringify({ alerted: false }), new Date().toISOString(), JSON.stringify({ alerted: false }), new Date().toISOString())
+          .run();
+      } catch (e) {}
     }
   } catch (e) {
     console.error('Error en scheduledWatchdog:', e);
