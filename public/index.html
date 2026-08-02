@@ -670,6 +670,20 @@
       }
     }
 
+    function toggleUserMenu() {
+      const dropdown = document.getElementById('userMenuDropdown');
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Cerrar dropdown al hacer clic fuera
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('userMenuDropdown');
+      const userMenu = e.target.closest('[onclick="toggleUserMenu()"]');
+      if (!userMenu && dropdown && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
     function logout() {
       if (confirm('¿Cerrar sesión?')) {
         localStorage.removeItem('coat_token');
@@ -703,37 +717,40 @@
     </div>
 
     <div style="display: flex; align-items: center; gap: 10px;">
-      <button class="btn btn-secondary" onclick="openQuickRepliesModalGlobal()" style="font-size: 0.8rem; border: 1px solid rgba(250, 204, 21, 0.4); color: #facc15;" title="Gestionar respuestas rápidas de la clínica">
-        ⚡ Respuestas Rápidas
-      </button>
-
-      <button class="btn btn-secondary" onclick="openPdfModalGlobal()" style="font-size: 0.8rem; border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Gestionar plantillas PDF de la clínica">
-        📄 Plantillas PDF
-      </button>
-
-      <a href="/history" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; border: 1px solid rgba(52, 211, 153, 0.4); color: #34d399; text-decoration: none; display: inline-flex; align-items: center;" title="Buscar historial de pacientes">
-        📋 Historial
-      </a>
-
-      <a href="/dashboard" target="_blank" class="btn btn-secondary admin-only" style="font-size: 0.8rem; border: 1px solid rgba(168, 85, 247, 0.4); color: #a855f7; text-decoration: none; display: none; align-items: center;" title="Ver dashboard de métricas (solo admin)">
-        📊 Dashboard
-      </a>
-
-      <button class="btn btn-secondary" id="btnNotifyPermission" onclick="requestNotificationPermission()" style="font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.2);">
-        🔔 Notificaciones
-      </button>
-
-      <div id="connectorStatusBadge" style="font-size: 0.8rem; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 5px 12px; border-radius: 20px;">
-        🟢 Conector WhatsApp En Línea
+      <!-- Status de conexión compacto -->
+      <div id="connectorStatusBadge" style="font-size: 0.75rem; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 5px;">
+        <span id="statusDot" style="width: 7px; height: 7px; background: #34d399; border-radius: 50%;"></span>
+        <span id="statusText">Online</span>
       </div>
 
-      <div onclick="openMyProfileModal()" style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; cursor: pointer;" title="Haz clic para modificar tu nombre, email o cambiar tu contraseña">
+      <!-- Usuario con dropdown -->
+      <div onclick="toggleUserMenu()" style="font-size: 0.8rem; font-weight: 600; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 6px; cursor: pointer; position: relative;">
         <span>👤</span>
         <span id="currentUserName" style="color:#fff;">Cargando...</span>
-        <span style="font-size: 0.75rem; opacity: 0.7;">✏️</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="opacity: 0.6;"><path d="M2 4L5 7L8 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <!-- Dropdown Menu -->
+        <div id="userMenuDropdown" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px; min-width: 180px; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+          <div onclick="openQuickRepliesModalGlobal()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>⚡</span> Respuestas Rápidas
+          </div>
+          <div onclick="openPdfModalGlobal()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>📄</span> Plantillas PDF
+          </div>
+          <a href="/history" target="_blank" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>📋</span> Historial
+          </a>
+          <a href="/dashboard" target="_blank" class="admin-only" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: none; align-items: center; gap: 8px; text-decoration: none; color: inherit; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>📊</span> Dashboard
+          </a>
+          <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0;"></div>
+          <div onclick="openMyProfileModal()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>⚙️</span> Mi Perfil
+          </div>
+          <div onclick="logout()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; color: #f87171; transition: background 0.15s;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">
+            <span>🚪</span> Salir
+          </div>
+        </div>
       </div>
-      <button class="btn btn-secondary" onclick="fetchConsultas(true)">🔄 Actualizar</button>
-      <button class="btn btn-secondary" onclick="logout()" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.4);color:#f87171;" title="Cerrar sesión">🚪 Salir</button>
     </div>
   </header>
 
@@ -742,18 +759,21 @@
     <!-- SECCIÓN 1: VISTA DE SOLICITUDES -->
     <div id="viewConsultas">
 
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-title">Pendientes (Bandeja Entrada)</div>
-          <div class="stat-num" id="numPendientes">0</div>
+      <!-- Stats compactos en una sola fila -->
+      <div style="display: flex; gap: 24px; padding: 12px 20px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.8rem; color: var(--muted);">Pendientes:</span>
+          <span id="numPendientes" style="font-size: 1.1rem; font-weight: 700; color: var(--accent);">0</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-title">Atendidas / Archivadas</div>
-          <div class="stat-num" id="numAtendidas" style="color: #60a5fa;">0</div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.8rem; color: var(--muted);">Atendidas:</span>
+          <span id="numAtendidas" style="font-size: 1.1rem; font-weight: 700; color: #60a5fa;">0</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-title">Total Registradas</div>
-          <div class="stat-num" id="numTotal" style="color: #a78bfa;">0</div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.8rem; color: var(--muted);">Total:</span>
+          <span id="numTotal" style="font-size: 1.1rem; font-weight: 700; color: #a78bfa;">0</span>
         </div>
       </div>
 
@@ -764,22 +784,24 @@
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <!-- BOTÓN INICIAR NUEVO CHAT -->
-          <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); font-weight: 700; box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);" onclick="openIniciarChatModal()">
-            💬 Iniciar Nuevo Chat / Escribir a Número
+          <!-- BOTÓN INICIAR NUEVO CHAT - Compacto pero visible -->
+          <button class="btn" style="background: linear-gradient(135deg, #00a884, #059669); font-weight: 600; font-size: 0.85rem; padding: 8px 16px; box-shadow: 0 2px 8px rgba(0, 168, 132, 0.25);" onclick="openIniciarChatModal()">
+            💬 Nuevo Chat
           </button>
 
-
-
-          <button id="btnExportExcel" class="btn btn-excel" onclick="exportToCsv()">
-            📊 Exportar a Excel (CSV)
+          <button id="btnExportExcel" class="btn btn-excel" style="font-size: 0.8rem; padding: 6px 12px;" onclick="exportToCsv()">
+            📊 Excel
           </button>
-          <button id="btnCargarPrueba" class="btn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba variadas">
-            ⚡ Cargar 50 Chats de Prueba
-          </button>
-          <button id="btnLimpiarTodo" class="btn btn-danger" onclick="limpiarTodasConsultas()" title="Borrar solicitudes de prueba para iniciar de 0">
-            🗑️ Limpiar Todo (Pruebas)
-          </button>
+          
+          <!-- Botones de prueba - más discretos -->
+          <div style="display: flex; gap: 6px; margin-left: 8px;">
+            <button id="btnCargarPrueba" class="btn" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.75rem; padding: 5px 10px;" onclick="cargar50ChatsPrueba()" title="Cargar 50 solicitudes de prueba">
+              ⚡ Prueba
+            </button>
+            <button id="btnLimpiarTodo" class="btn" style="background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.75rem; padding: 5px 10px;" onclick="limpiarTodasConsultas()" title="Borrar todo">
+              🗑️ Limpiar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1654,18 +1676,22 @@
         if (!res.ok) return;
         const data = await res.json();
         const badge = document.getElementById('connectorStatusBadge');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
         if (!badge) return;
 
         if (data.online) {
-          badge.innerHTML = '🟢 Conector WhatsApp En Línea';
+          statusDot.style.background = '#34d399';
+          statusText.textContent = 'Online';
           badge.style.background = 'rgba(52, 211, 153, 0.15)';
           badge.style.color = '#34d399';
           badge.style.borderColor = 'rgba(52, 211, 153, 0.3)';
         } else {
-          badge.innerHTML = `🚨 DESCONECTADO (${data.elapsedSeconds}s sin señal) - Revisar PC`;
-          badge.style.background = 'rgba(239, 68, 68, 0.3)';
+          statusDot.style.background = '#ef4444';
+          statusText.textContent = `Offline (${data.elapsedSeconds}s)`;
+          badge.style.background = 'rgba(239, 68, 68, 0.15)';
           badge.style.color = '#ef4444';
-          badge.style.borderColor = '#ef4444';
+          badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
         }
       } catch (e) {}
     }
