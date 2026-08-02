@@ -584,95 +584,101 @@ let lastAlertSentTimestamp = 0;
 
 async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
   const telegramToken = (env.TELEGRAM_BOT_TOKEN || '').trim().replace(/^"|"$/g, '');
-  const telegramChatId = (env.TELEGRAM_CHAT_ID || '').trim().replace(/^"|"$/g, '');
+  const telegramChatIdRaw = (env.TELEGRAM_CHAT_ID || '').trim().replace(/^"|"$/g, '');
+  const telegramChatId = /^-?\d+$/.test(telegramChatIdRaw) ? Number(telegramChatIdRaw) : telegramChatIdRaw;
   const alertEmail = (env.ALERT_EMAIL || 'emmanuel.ag92@gmail.com').trim().replace(/^"|"$/g, '');
   const resendApiKey = (env.RESEND_API_KEY || '').trim().replace(/^"|"$/g, '');
+  const googleScriptUrl = (env.GOOGLE_SCRIPT_URL || '').trim().replace(/^"|"$/g, '');
 
   const alertMessage = `🚨 <b>ALERTA CRÍTICA - CLÍNICA COAT</b>\n\n⚠️ Se ha perdido la conexión con WhatsApp en la PC de recepción.\n⏱️ <b>Tiempo sin señal:</b> ${elapsedSeconds} segundos.\n📌 Por favor verifique que la PC esté encendida y conectada a internet.`;
 
-  const results: any = { telegram: null, resend: null };
+  const results: any = { telegram: null, email: null };
 
-  // 1. Enviar Alerta por Telegram
-  if (telegramToken && telegramChatId) {
-    try {
-      const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: telegramChatId,
-          text: alertMessage,
-          parse_mode: 'HTML'
-        })
-      });
-      const resData = await res.json().catch(() => ({}));
-      results.telegram = { ok: res.ok, status: res.status, data: resData };
-      console.log('📱 Alerta de desconexión Telegram status:', res.status, resData);
-    } catch (e: any) {
-      results.telegram = { ok: false, error: e?.message || e };
-      console.error('⚠️ Error al enviar alerta a Telegram:', e);
+  // Ejecución en paralelo de Telegram y Email (Promise.allSettled)
+  const taskTelegram = async () => {
+    if (!telegramToken || !telegramChatId) {
+      results.telegram = { ok: false, error: 'Credenciales incompletas (token o chatId vacíos)' };
+      return;
     }
-  } else {
-    results.telegram = { ok: false, error: 'Credenciales incompletas (token o chatId vacíos)' };
-  }
-
-  const googleScriptUrl = (env.GOOGLE_SCRIPT_URL || '').trim().replace(/^"|"$/g, '');
-
-  // 2. Enviar Alerta por Email (Google Apps Script o Resend API)
-  if (googleScriptUrl) {
-    try {
-      const res = await fetch(googleScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
-          html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
-            <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
-            <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
-            <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
-            <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
-          </div>`
-        })
-      });
-      const resData = await res.json().catch(() => ({}));
-      results.googleEmail = { ok: res.ok, status: res.status, data: resData };
-      console.log(`📧 Alerta Google Apps Script Email status:`, res.status, resData);
-    } catch (e: any) {
-      results.googleEmail = { ok: false, error: e?.message || e };
-      console.error('⚠️ Error al enviar email vía Google Apps Script:', e);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text: alertMessage,
+            parse_mode: 'HTML'
+          })
+        });
+        const resData = await res.json().catch(() => ({}));
+        results.telegram = { ok: res.ok, status: res.status, data: resData };
+        console.log('📱 Alerta de desconexión Telegram status:', res.status, resData);
+        if (res.ok) break;
+      } catch (e: any) {
+        results.telegram = { ok: false, error: e?.message || e };
+        console.error(`⚠️ Error (intento ${attempt}) al enviar alerta a Telegram:`, e);
+      }
     }
-  } else if (resendApiKey && alertEmail) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'Alertas Bot COAT <onboarding@resend.dev>',
-          to: [alertEmail],
-          subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
-          html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
-            <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
-            <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
-            <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
-            <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
-          </div>`
-        })
-      });
-      const resData = await res.json().catch(() => ({}));
-      results.resend = { ok: res.ok, status: res.status, data: resData };
-      console.log(`📧 Alerta Email status:`, res.status, resData);
-    } catch (e: any) {
-      results.resend = { ok: false, error: e?.message || e };
-      console.error('⚠️ Error al enviar email de alerta:', e);
+  };
+
+  const taskEmail = async () => {
+    if (googleScriptUrl) {
+      try {
+        const res = await fetch(googleScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
+            html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
+              <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
+              <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
+              <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
+              <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
+            </div>`
+          })
+        });
+        const resData = await res.json().catch(() => ({}));
+        results.email = { ok: res.ok, status: res.status, data: resData, provider: 'GoogleAppsScript' };
+        console.log(`📧 Alerta Google Apps Script Email status:`, res.status, resData);
+      } catch (e: any) {
+        results.email = { ok: false, error: e?.message || e, provider: 'GoogleAppsScript' };
+        console.error('⚠️ Error al enviar email vía Google Apps Script:', e);
+      }
+    } else if (resendApiKey && alertEmail) {
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'Alertas Bot COAT <onboarding@resend.dev>',
+            to: [alertEmail],
+            subject: '🚨 ALERTA CRÍTICA: Desconexión de WhatsApp en Clínica COAT',
+            html: `<div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 8px;">
+              <h2 style="color: #ef4444;">🚨 ALERTA CRÍTICA - CLÍNICA COAT</h2>
+              <p>Se ha detectado una pérdida de señal con el conector de WhatsApp en la PC de la clínica.</p>
+              <p><strong>Tiempo transcurrido sin señal:</strong> ${elapsedSeconds} segundos.</p>
+              <p>Por favor verifique que la PC esté encendida y con conexión a internet.</p>
+            </div>`
+          })
+        });
+        const resData = await res.json().catch(() => ({}));
+        results.email = { ok: res.ok, status: res.status, data: resData, provider: 'Resend' };
+        console.log(`📧 Alerta Resend Email status:`, res.status, resData);
+      } catch (e: any) {
+        results.email = { ok: false, error: e?.message || e, provider: 'Resend' };
+        console.error('⚠️ Error al enviar email vía Resend:', e);
+      }
+    } else {
+      results.email = { ok: false, error: 'Credenciales incompletas para email' };
     }
-  } else {
-    results.resend = { ok: false, error: 'Credenciales incompletas para email' };
-  }
+  };
 
-
+  await Promise.allSettled([taskTelegram(), taskEmail()]);
   return results;
 }
 
