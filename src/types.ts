@@ -10,6 +10,11 @@ export interface Env {
   GOOGLE_ACCESS_TOKEN?: string;
   JWT_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
+  RESEND_API_KEY?: string;
+  GOOGLE_SCRIPT_URL?: string;
+  ALERT_EMAIL?: string;
   ASSETS?: Fetcher;
 }
 

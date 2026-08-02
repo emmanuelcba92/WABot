@@ -676,10 +676,7 @@ async function sendDisconnectionAlerts(env: any, elapsedSeconds: number) {
   return results;
 }
 
-app.get('/api/test-alert', async (c) => {
-  const results = await sendDisconnectionAlerts(c.env, 300);
-  return c.json({ test: true, results });
-});
+
 
 
 app.post('/api/heartbeat', async (c) => {
@@ -1107,8 +1104,11 @@ async function scheduledWatchdog(env: any) {
 }
 
 export default {
-  fetch: app.fetch,
+  fetch(request: any, env: any, ctx: any) {
+    return app.fetch(request, env, ctx);
+  },
   async scheduled(event: any, env: any, ctx: any) {
     ctx.waitUntil(scheduledWatchdog(env));
   }
 };
+
