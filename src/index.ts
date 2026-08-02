@@ -18,6 +18,9 @@ app.use('*', cors({
 // ─── SSE: Mapa de conexiones activas por gatewayId ───
 const sseConnections = new Map<string, WritableStreamDefaultWriter>();
 
+// ─── SSE: Mapa de conexiones activas del web app (secretarias) ───
+const webAppConnections = new Map<string, WritableStreamDefaultWriter>();
+
 function notifyGateway(gatewayId: string, data: any) {
   const writer = sseConnections.get(gatewayId);
   if (writer) {
@@ -36,6 +39,14 @@ function broadcastToGateways(data: any) {
   }
 }
 
+function broadcastToWebApp(data: any) {
+  const msg = `data: ${JSON.stringify(data)}\n\n`;
+  const encoded = new TextEncoder().encode(msg);
+  for (const [id, writer] of webAppConnections) {
+    writer.write(encoded).catch(() => webAppConnections.delete(id));
+  }
+}
+
 // Helper: agregar a cola de pending y notificar gateways via SSE
 async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit', targetMsgId?: string, targetMsgKey?: any) {
   const item = await db.addPendingOutgoing(remitente, text, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitente, isForwardToDoctor, action, targetMsgId, targetMsgKey);
@@ -47,6 +58,13 @@ async function addPendingAndNotify(db: any, remitente: string, text: string, idC
       message: item
     });
   }
+
+  // Notificar al web app para actualización en tiempo real
+  broadcastToWebApp({
+    type: 'new_message',
+    remitente,
+    text
+  });
 
   return item;
 }
@@ -95,6 +113,48 @@ app.get('/sse', (c) => {
     clearInterval(keepaliveInterval);
     sseConnections.delete(gatewayId);
     console.log(`🔌 [SSE] Gateway desconectado: ${gatewayId} (total: ${sseConnections.size})`);
+  });
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    }
+  });
+});
+
+// ─── SSE: Server-Sent Events para notificar web app (secretarias) ───
+app.get('/sse-webapp', (c) => {
+  const clientId = c.req.query('client') || `web_${Date.now()}`;
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  webAppConnections.set(clientId, writer);
+  console.log(`🖥️ [SSE-WEB] Cliente conectado: ${clientId} (total: ${webAppConnections.size})`);
+
+  const keepaliveInterval = setInterval(() => {
+    writer.write(new TextEncoder().encode(': keepalive\n\n')).catch(() => {
+      clearInterval(keepaliveInterval);
+      webAppConnections.delete(clientId);
+    });
+  }, 15000);
+
+  c.executionCtx.waitUntil(new Promise<void>((resolve) => {
+    c.req.raw.signal?.addEventListener('abort', () => {
+      clearInterval(keepaliveInterval);
+      resolve();
+    }, { once: true });
+  }));
+
+  writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'connected', clientId, timestamp: Date.now() })}\n\n`));
+
+  c.req.raw.signal?.addEventListener('abort', () => {
+    clearInterval(keepaliveInterval);
+    webAppConnections.delete(clientId);
+    console.log(`🖥️ [SSE-WEB] Cliente desconectado: ${clientId} (total: ${webAppConnections.size})`);
   });
 
   return new Response(readable, {
@@ -584,11 +644,38 @@ app.post('/webhook', async (c) => {
         sender: 'secretaria',
         text: mensaje || '(Mensaje sin texto)',
         timestamp: body.timestamp || new Date().toISOString(),
-        source: 'whatsapp_web'  // Para diferenciar de mensajes enviados desde la web app
+        source: 'whatsapp_web'
       }, altRemitente);
 
-      // Notificar al web app via SSE para que actualice la vista
+      // También guardar en respuestasSecretaria de la consulta (lo que renderiza el web app)
+      try {
+        const consultas = await db.getConsultas();
+        const cleanRem = remitente.toLowerCase().trim();
+        const cleanAlt = (altRemitente || '').toLowerCase().trim();
+        const consulta = consultas.find((c: any) => {
+          const cRem = (c.remitente || '').toLowerCase().trim();
+          const cAlt = (c.datos?.altRemitente || '').toLowerCase().trim();
+          return cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt);
+        });
+        if (consulta) {
+          await db.registrarRespuestaSecretaria(consulta.id, mensaje || '(Mensaje sin texto)', body.msgId, 'WhatsApp Web');
+          console.log(`📤 [WHATSAPP WEB] Guardado en respuestasSecretaria de consulta ${consulta.id}`);
+        } else {
+          console.log(`⚠️ [WHATSAPP WEB] No se encontró consulta para ${remitente}`);
+        }
+      } catch (e) {
+        console.error('Error guardando outgoing_whatsapp_web en respuestasSecretaria:', e);
+      }
+
       broadcastToGateways({
+        type: 'new_message',
+        remitente: remitente,
+        sender: 'secretaria',
+        text: mensaje,
+        source: 'whatsapp_web'
+      });
+
+      broadcastToWebApp({
         type: 'new_message',
         remitente: remitente,
         sender: 'secretaria',

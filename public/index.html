@@ -1790,6 +1790,30 @@
 
       smartPoll(); // Arrancar el loop
 
+      // ─── SSE: Conexión push para actualizaciones en tiempo real ───
+      let webAppSSE = null;
+      function connectWebAppSSE() {
+        try {
+          const clientId = 'web_' + Date.now();
+          webAppSSE = new EventSource(`/sse-webapp?client=${clientId}`);
+          webAppSSE.onmessage = function(e) {
+            try {
+              const data = JSON.parse(e.data);
+              if (data.type === 'new_message') {
+                // Actualización instantánea: recargar consultas sin re-render completo
+                fetchConsultas(false);
+              }
+            } catch(err) {}
+          };
+          webAppSSE.onerror = function() {
+            // Reconectar después de 5s si se cae
+            webAppSSE.close();
+            setTimeout(connectWebAppSSE, 5000);
+          };
+        } catch(e) {}
+      }
+      connectWebAppSSE();
+
       // Schedule-config cada 5 minutos (era cada 10s)
       setInterval(fetchScheduleConfig, 300000);
 
