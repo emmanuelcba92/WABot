@@ -3741,6 +3741,7 @@
                     ${respuestasSecretaria.map(r => `
                       <div style="margin-top: 4px; color: #e2e8f0;">
                         💬 <em>"${r.texto}"</em> <span style="font-size: 0.7rem; color: #94a3b8;">(${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})</span>
+                        ${r.source === 'whatsapp_web' ? '<span style="font-size: 0.65rem; color: #f59e0b; background: rgba(245, 158, 11, 0.15); padding: 2px 6px; border-radius: 4px; margin-left: 4px;">📱 WhatsApp Web</span>' : ''}
                       </div>
                     `).join('')}
                   </div>

@@ -390,12 +390,52 @@ const lastIncomingKeysMap = new Map();
     if (m.type !== 'notify' && m.type !== 'append') return;
 
     for (const msg of m.messages) {
-      if (!msg.message || msg.key.fromMe) continue; // Ignorar respuestas salientes o vacías
+      if (!msg.message) continue; // Ignorar mensajes vacíos
 
       try {
         const remitente = msg.key.remoteJid;
         if (!remitente || remitente.includes('@g.us')) continue; // Ignorar grupos
 
+        // ─── MENSAJES SALIENTES (fromMe) ───
+        // Capturar respuestas enviadas desde WhatsApp Web por otras secretarias
+        if (msg.key.fromMe) {
+          const msgId = msg.key.id;
+          if (msgId && processedMsgIds.has(msgId)) continue;
+          if (msgId) {
+            processedMsgIds.add(msgId);
+            if (processedMsgIds.size > 2000) processedMsgIds.clear();
+          }
+
+          // Extraer texto del mensaje saliente
+          const textoSaliente = msg.message.conversation ||
+            msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            msg.message.documentMessage?.caption ||
+            '';
+
+          if (!textoSaliente && !msg.message.imageMessage && !msg.message.documentMessage) continue;
+
+          // Enviar al Worker para que guarde en el historial
+          try {
+            await fetch(WORKER_WEBHOOK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'outgoing_whatsapp_web',
+                remitente: remitente,
+                mensaje: textoSaliente,
+                msgId: msgId,
+                timestamp: new Date().toISOString()
+              })
+            });
+            console.log(`📤 [WhatsApp Web] Mensaje saliente capturado para ${remitente}: "${textoSaliente.substring(0, 50)}..."`);
+          } catch (fetchErr) {
+            console.error('❌ Error enviando mensaje saliente al Worker:', fetchErr.message);
+          }
+          continue; // No procesar más este mensaje
+        }
+
+        // ─── MENSAJES ENTRANTES (originales) ───
         lastIncomingKeysMap.set(remitente, msg.key);
 
         let altRemitente = null;

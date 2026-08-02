@@ -572,6 +572,33 @@ app.post('/webhook', async (c) => {
       return c.json({ error: 'El campo "remitente" es requerido' }, 400);
     }
 
+    const db = DBFactory.createService(c.env);
+
+    // ─── MENSAJES SALIENTES DESDE WHATSAPP WEB ───
+    // Cuando otra secretaria responde desde WhatsApp Web, capturar en el historial
+    if (body.type === 'outgoing_whatsapp_web') {
+      console.log(`📤 [WHATSAPP WEB] Mensaje saliente de ${remitente}: "${mensaje.substring(0, 50)}"`);
+      
+      await db.agregarMensajeHistorial(remitente, {
+        id: body.msgId || `msg_${Date.now()}_outgoing`,
+        sender: 'secretaria',
+        text: mensaje || '(Mensaje sin texto)',
+        timestamp: body.timestamp || new Date().toISOString(),
+        source: 'whatsapp_web'  // Para diferenciar de mensajes enviados desde la web app
+      }, altRemitente);
+
+      // Notificar al web app via SSE para que actualice la vista
+      broadcastToGateways({
+        type: 'new_message',
+        remitente: remitente,
+        sender: 'secretaria',
+        text: mensaje,
+        source: 'whatsapp_web'
+      });
+
+      return c.json({ success: true, type: 'outgoing_whatsapp_web' }, 200);
+    }
+
     console.log(`📥 [WEBHOOK] remitente=${remitente} altRemitente=${altRemitente} msg="${mensaje.substring(0, 50)}"`);
 
     const payload: WebhookPayload = {
@@ -585,8 +612,6 @@ app.post('/webhook', async (c) => {
       pdfBase64: body.pdfBase64,
       pdfNombre: body.pdfNombre
     };
-
-    const db = DBFactory.createService(c.env);
 
     // Log session state BEFORE processing
     const sesionPre = await db.getSesion(remitente, altRemitente);
