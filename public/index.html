@@ -736,6 +736,9 @@
           <div onclick="openPdfModalGlobal()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
             <span>📄</span> Plantillas PDF
           </div>
+          <div onclick="openTagEditorModal()" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>🏷️</span> Etiquetas
+          </div>
           <a href="/history" target="_blank" style="padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
             <span>📋</span> Historial
           </a>
@@ -1398,6 +1401,28 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- MODAL EDITOR DE ETIQUETAS -->
+  <div id="modalTagEditor" class="lightbox-modal" style="display: none;" onclick="closeTagEditorModal()">
+    <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 92%; max-width: 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <h3 style="font-size: 1.1rem; color: #c084fc; font-weight: 700;">🏷️ Gestión de Etiquetas</h3>
+        <button style="background: transparent; border: none; color: white; font-size: 20px; cursor: pointer;" onclick="closeTagEditorModal()">✕</button>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--muted);">Crea, edita o elimina las etiquetas que usás para clasificar las solicitudes.</p>
+
+      <div id="tagEditorListModal" style="display: flex; flex-direction: column; gap: 10px;"></div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 14px;">
+        <button class="btn btn-secondary" onclick="addNewTagModal()">➕ Crear Etiqueta</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="closeTagEditorModal()">Cancelar</button>
+          <button class="btn" onclick="saveTagConfigModal()">💾 Guardar Etiquetas</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- MODAL PARA EDITAR MENSAJE DE SECRETARÍA -->
   <div id="modalEditMessage" class="lightbox-modal" style="display: none;" onclick="closeEditMsgModal()">
     <div style="background: #1e293b; border: 1px solid var(--border); border-radius: 16px; width: 90%; max-width: 550px; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
@@ -2403,6 +2428,70 @@
     async function savePdfItemsConfigGlobal() {
       await savePdfItemsConfig();
       closePdfModalGlobal();
+    }
+
+    // ─── MODAL EDITOR DE ETIQUETAS (para secretarias) ───
+    function openTagEditorModal() {
+      renderTagEditorModal();
+      document.getElementById('modalTagEditor').style.display = 'flex';
+    }
+
+    function closeTagEditorModal() {
+      document.getElementById('modalTagEditor').style.display = 'none';
+    }
+
+    function renderTagEditorModal() {
+      const container = document.getElementById('tagEditorListModal');
+      if (!container) return;
+      let html = '';
+      Object.entries(tagDefinitions).forEach(([key, tag]) => {
+        html += `
+          <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; align-items: center; gap: 10px;">
+            <input type="color" value="${tag.color}" onchange="updateTagColorModal('${key}', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 6px; cursor: pointer; background: transparent;">
+            <input type="text" value="${tag.label}" onchange="updateTagLabelModal('${key}', this.value)" style="flex: 1; font-weight: 600; font-size: 0.9rem; background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text);">
+            <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeTagModal('${key}')">🗑️</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function addNewTagModal() {
+      const newKey = `tag_${Date.now()}`;
+      tagDefinitions[newKey] = { label: '🏷️ Nueva Etiqueta', color: '#a78bfa' };
+      renderTagEditorModal();
+    }
+
+    function updateTagLabelModal(key, val) {
+      if (tagDefinitions[key]) tagDefinitions[key].label = val.trim();
+    }
+
+    function updateTagColorModal(key, val) {
+      if (tagDefinitions[key]) tagDefinitions[key].color = val;
+    }
+
+    function removeTagModal(key) {
+      delete tagDefinitions[key];
+      renderTagEditorModal();
+    }
+
+    async function saveTagConfigModal() {
+      try {
+        const res = await fetch('/api/tag-config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tags: tagDefinitions })
+        });
+        if (res.ok) {
+          alert('✅ Etiquetas guardadas correctamente');
+          closeTagEditorModal();
+          renderTagFilters();
+        } else {
+          alert('Error al guardar etiquetas');
+        }
+      } catch (e) {
+        alert('Error de conexión al guardar');
+      }
     }
 
     function sendLocationGps(idConsulta, remitente) {
