@@ -899,20 +899,20 @@
         <button class="btn" style="align-self: flex-start; padding: 12px 24px; font-size: 0.95rem; margin-top: 8px;" onclick="saveScheduleMessagesConfig()">
           💾 Guardar Mensajes de Horario y Cierre
         </button>
-      </div>
 
-      <!-- SUB-SECCIÓN: NOMBRE DEL OPERADOR -->
-      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px;">
-        <h3 style="font-size: 1.1rem; color: #38bdf8;">👩‍⚕️ Nombre del Operador</h3>
-        <p style="font-size: 0.86rem; color: var(--muted);">Configura si se muestra el nombre del operador al paciente en los mensajes enviados.</p>
+        <!-- NOMBRE DEL OPERADOR (dentro de Horario) -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px;">
+          <h4 style="font-size: 1rem; color: #38bdf8;">👩‍⚕️ Nombre del Operador</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Configura si se muestra el nombre del operador al paciente en los mensajes enviados.</p>
 
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
-          <button class="btn btn-secondary" id="operatorNameInternal" onclick="setOperatorNameMode(false)">🔒 Nombre Interno (Paciente ve "Secretaría")</button>
-          <button class="btn btn-secondary" id="operatorNameVisible" onclick="setOperatorNameMode(true)">👁️ Nombre Visible (Paciente ve el nombre real)</button>
-        </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
+            <button class="btn btn-secondary" id="operatorNameInternal" onclick="setOperatorNameMode(false)">🔒 Nombre Interno (Paciente ve "Secretaría")</button>
+            <button class="btn btn-secondary" id="operatorNameVisible" onclick="setOperatorNameMode(true)">👁️ Nombre Visible (Paciente ve el nombre real)</button>
+          </div>
 
-        <div id="operatorNameBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
-          Estado Actual: Cargando...
+          <div id="operatorNameBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
+            Estado Actual: Cargando...
+          </div>
         </div>
       </div>
 
