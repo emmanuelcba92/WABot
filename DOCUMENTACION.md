@@ -155,7 +155,6 @@ El Worker mantiene caches en memoria para acceso rápido:
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/` | Panel de Recepción / Secretaría |
-| `GET` | `/admin` | Panel de Administración |
 | `GET` | `/health` | Health check del Worker |
 | `GET` | `/sse` | Server-Sent Events (conexión gateways) |
 

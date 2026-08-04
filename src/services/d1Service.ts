@@ -473,32 +473,32 @@ export class D1Service {
       users = D1Service.inMemoryUsersList;
     }
 
-    // Garantizar que el usuario 'egomez' existe como admin con hash de contraseña
-    let egomez = users.find(u => (u.username || '').toLowerCase() === 'egomez');
+    // Garantizar que existe un usuario admin por defecto
+    let adminUser = users.find(u => (u.username || '').toLowerCase() === 'admin');
     let needsSave = false;
 
-    if (!egomez) {
-      const { hash, salt } = await AuthService.hashPassword('coat2026');
-      egomez = {
-        username: 'egomez',
-        displayName: 'Emmanuel',
-        email: 'secretaria@coat.com.ar',
+    if (!adminUser) {
+      const { hash, salt } = await AuthService.hashPassword('admin546287');
+      adminUser = {
+        username: 'admin',
+        displayName: 'Administrador',
+        email: 'admin@whatsbot.com',
         role: 'admin',
         passwordHash: hash,
         salt: salt,
         createdAt: new Date().toISOString()
       };
-      users.unshift(egomez);
+      users.unshift(adminUser);
       needsSave = true;
     } else {
-      if (egomez.role !== 'admin') {
-        egomez.role = 'admin';
+      if (adminUser.role !== 'admin') {
+        adminUser.role = 'admin';
         needsSave = true;
       }
-      if (!egomez.passwordHash || !egomez.salt) {
-        const { hash, salt } = await AuthService.hashPassword('coat2026');
-        egomez.passwordHash = hash;
-        egomez.salt = salt;
+      if (!adminUser.passwordHash || !adminUser.salt) {
+        const { hash, salt } = await AuthService.hashPassword('admin546287');
+        adminUser.passwordHash = hash;
+        adminUser.salt = salt;
         needsSave = true;
       }
     }

@@ -725,6 +725,26 @@
   </div>
 
   <script>
+    // ─── AUTH HELPER ───
+    async function authFetch(url, options = {}) {
+      const token = sessionStorage.getItem('coat_token');
+      if (!token) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401 });
+      }
+      options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return res;
+      }
+      return res;
+    }
+
     let attachedImageBase64 = null;
     let attachedImageName = null;
     let renderedMsgIds = new Set(); // Evitar duplicar mensajes renderizados
@@ -776,7 +796,7 @@
 
     async function checkStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await authFetch('/api/status');
         const data = await res.json();
         
         const mode = document.getElementById('simulatedTimeSelect').value;
@@ -922,7 +942,7 @@
     async function pollSessionAndMessages() {
       const remitente = document.getElementById('remitenteInput').value.trim() || '+5491112345678';
       try {
-        const res = await fetch(`/api/session/${encodeURIComponent(remitente)}`);
+        const res = await authFetch(`/api/session/${encodeURIComponent(remitente)}`);
         if (!res.ok) return;
         const data = await res.json();
         
@@ -1027,7 +1047,7 @@
 
     async function fetchConsultas() {
       try {
-        const res = await fetch('/api/consultas');
+        const res = await authFetch('/api/consultas');
         if (!res.ok) return;
         const data = await res.json();
         const list = document.getElementById('consultasList');
@@ -1111,7 +1131,7 @@
       }
 
       try {
-        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const res = await authFetch('/api/seed-consultas', { method: 'POST' });
         const data = await res.json();
         fetchConsultas();
         setTimeout(pickRandomPatient, 500);

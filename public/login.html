@@ -365,7 +365,7 @@
 
     // Verificar si ya está autenticado en Cloudflare D1 Auth → redirigir
     async function checkAlreadyLoggedIn() {
-      const token = localStorage.getItem('coat_token');
+      const token = sessionStorage.getItem('coat_token');
       if (!token) return;
       try {
         const res = await fetch('/api/auth/me', {
@@ -374,7 +374,7 @@
         if (res.ok) {
           window.location.replace('/');
         } else {
-          localStorage.removeItem('coat_token');
+          sessionStorage.removeItem('coat_token');
         }
       } catch (e) {}
     }
@@ -404,9 +404,11 @@
         setLoading(false);
 
         if (res.ok && data.token) {
-          localStorage.setItem('coat_token', data.token);
-          localStorage.setItem('coat_user', JSON.stringify(data.user));
-          window.location.replace('/');
+          sessionStorage.setItem('coat_token', data.token);
+          sessionStorage.setItem('coat_user', JSON.stringify(data.user));
+          const params = new URLSearchParams(window.location.search);
+          const returnTo = params.get('returnTo') || '/';
+          window.location.replace(returnTo);
         } else {
           showError(data.error || '❌ Usuario o contraseña incorrectos.');
         }
@@ -432,9 +434,11 @@
         setLoading(false);
 
         if (res.ok && data.token) {
-          localStorage.setItem('coat_token', data.token);
-          localStorage.setItem('coat_user', JSON.stringify(data.user));
-          window.location.replace('/');
+          sessionStorage.setItem('coat_token', data.token);
+          sessionStorage.setItem('coat_user', JSON.stringify(data.user));
+          const params = new URLSearchParams(window.location.search);
+          const returnTo = params.get('returnTo') || '/';
+          window.location.replace(returnTo);
         } else {
           showError(data.error || '❌ No se pudo iniciar sesión con la cuenta de Google.');
         }

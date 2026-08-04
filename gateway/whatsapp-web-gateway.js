@@ -126,18 +126,18 @@ function connectSSE() {
     sseConnection = req;
     sseLastDataTime = Date.now();
 
-    // Keepalive check: si no se recibe ningún dato en 30s, forzar reconexión
+    // Keepalive check: si no se recibe ningún dato en 20s, forzar reconexión
     if (sseKeepaliveCheck) clearInterval(sseKeepaliveCheck);
     sseKeepaliveCheck = setInterval(() => {
-      if (sseConnection && Date.now() - sseLastDataTime > 30000) {
-        console.warn('⚠️ [SSE] Keepalive timeout (30s sin datos), forzando reconexión...');
+      if (sseConnection && Date.now() - sseLastDataTime > 20000) {
+        console.warn('⚠️ [SSE] Keepalive timeout (20s sin datos), forzando reconexión...');
         sseConnection = null;
         if (sseKeepaliveCheck) { clearInterval(sseKeepaliveCheck); sseKeepaliveCheck = null; }
         scheduleReconnect();
         // Recoger mensajes pendientes inmediatamente
         fetchPendingMessagesOnce();
       }
-    }, 15000);
+    }, 10000);
 
     let buffer = '';
 
@@ -743,12 +743,22 @@ const lastIncomingKeysMap = new Map();
   // Asignar la referencia global para que handleSSEMessage y fetchPendingMessagesOnce la usen
   _processSsePendingMessage = processSsePendingMessage;
 
-  // Polling adaptativo: cada 5s si SSE caído, cada 30s si SSE conectado (safety net)
+  // Polling adaptativo: solo cuando SSE está caído, con backoff exponencial
+  // Cuando hay tráfico, SSE se mantiene solo. El polling es solo respaldo.
   let lastPollingTime = 0;
+  let pollingInterval = 30000; // Empezar con 30s
+  const MAX_POLL_INTERVAL = 300000; // Máximo 5 minutos
+
   setInterval(async () => {
     const now = Date.now();
-    const pollInterval = sseConnection ? 30000 : 5000;
-    if (now - lastPollingTime < pollInterval) return;
+
+    // Si SSE está conectado y activo, no hacer polling (ahorrar requests)
+    if (sseConnection && (now - sseLastDataTime < 25000)) {
+      pollingInterval = 30000; // Resetear a 30s cuando SSE vuelve
+      return;
+    }
+
+    if (now - lastPollingTime < pollingInterval) return;
     lastPollingTime = now;
 
     try {
@@ -758,9 +768,12 @@ const lastIncomingKeysMap = new Map();
       const data = await res.json();
       const messages = data.messages || [];
 
-      for (const msg of messages) {
-        try {
-          // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
+      if (messages.length > 0) {
+        // Si hay mensajes, procesar y resetear intervalo
+        pollingInterval = 30000;
+        for (const msg of messages) {
+          try {
+            // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
           const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
           if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
             continue;
@@ -776,10 +789,15 @@ const lastIncomingKeysMap = new Map();
           console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);
         }
       }
+      } else {
+        // Sin mensajes: aumentar intervalo progresivamente (ahorrar requests)
+        pollingInterval = Math.min(pollingInterval * 2, MAX_POLL_INTERVAL);
+      }
     } catch (pollErr) {
       // Ignorar errores temporales de red en el polling saliente
+      pollingInterval = Math.min(pollingInterval * 2, MAX_POLL_INTERVAL);
     }
-  }, 5000); // Cada 5s siempre
+  }, 10000); // Tick cada 10s, pero el intervalo real lo controla pollingInterval
 
 }
 

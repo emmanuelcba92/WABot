@@ -201,6 +201,16 @@
   <script>
     const BASE = () => document.getElementById('workerUrl').value.replace(/\/$/, '');
 
+    // ─── AUTH HELPER ───
+    async function authFetch(url, options = {}) {
+      const token = sessionStorage.getItem('coat_token');
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'No autenticado - hacé login primero' }), { status: 401 });
+      }
+      options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+      return await fetch(url, options);
+    }
+
     function log(id, msg, type = 'info') {
       const el = document.getElementById(id);
       const entry = document.createElement('div');
@@ -338,7 +348,7 @@
       log('sendLog', `Enviando mensaje a ${phone}...`, 'info');
 
       try {
-        const res = await fetch(`${BASE()}/api/send-message`, {
+        const res = await authFetch(`${BASE()}/api/send-message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -358,7 +368,7 @@
     // ─── CLEANUP ───
     async function getCleanupStatus() {
       try {
-        const res = await fetch(`${BASE()}/api/cleanup-status`);
+        const res = await authFetch(`${BASE()}/api/cleanup-status`);
         const data = await res.json();
         log('cleanupLog', `Estado: ${JSON.stringify(data)}`, 'info');
       } catch(e) {
@@ -369,7 +379,7 @@
     async function runCleanup() {
       if (!confirm('¿Ejecutar limpieza ahora?')) return;
       try {
-        const res = await fetch(`${BASE()}/api/run-cleanup`, { method: 'POST' });
+        const res = await authFetch(`${BASE()}/api/run-cleanup`, { method: 'POST' });
         const data = await res.json();
         log('cleanupLog', `Resultado: ${JSON.stringify(data)}`, data.success ? 'success' : 'error');
       } catch(e) {
@@ -394,7 +404,9 @@
 
       for (const ep of endpoints) {
         try {
-          const res = await fetch(`${BASE()}${ep.url}`);
+          const res = ep.url.startsWith('/api/')
+            ? await authFetch(`${BASE()}${ep.url}`)
+            : await fetch(`${BASE()}${ep.url}`);
           const ok = res.ok;
           list.innerHTML += `
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">

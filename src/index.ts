@@ -6,8 +6,13 @@ import { MESSAGES } from './templates/messages';
 import { DEFAULT_MENU_TREE } from './services/firestoreService';
 import { DBFactory, DBProviderType } from './services/dbFactory';
 import { AuthService } from './services/authService';
+export { SseBroker } from './durable/sse-broker';
 
-const app = new Hono<{ Bindings: Env }>();
+type AuthEnv = Env & {
+  Auth: { username: string; role: string; displayName?: string; email?: string } | null;
+};
+
+const app = new Hono<{ Bindings: AuthEnv }>();
 
 app.use('*', cors({
   origin: '*',
@@ -15,56 +20,142 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ─── SSE: Mapa de conexiones activas por gatewayId ───
-const sseConnections = new Map<string, WritableStreamDefaultWriter>();
+// ─── AUTH MIDDLEWARE ───
+// Extrae y verifica el JWT del header Authorization.
+// Si es válido, inyecta c.set('Auth', payload) para que los endpoints lo usen.
+// Excluye rutas públicas (login, register, etc.)
+const PUBLIC_API_ROUTES = [
+  '/api/auth/login',
+  '/api/auth/google',
+  '/api/pending-outgoing',
+  '/api/heartbeat',
+  '/api/heartbeat-status',
+  '/api/sse-ack',
+  '/api/sse-status',
+  '/api/message-sent',
+  '/api/message-receipt',
+];
 
-// ─── SSE: Mapa de conexiones activas del web app (secretarias) ───
-const webAppConnections = new Map<string, WritableStreamDefaultWriter>();
+async function authMiddleware(c: any, next: any) {
+  const path = new URL(c.req.url).pathname;
 
-function notifyGateway(gatewayId: string, data: any) {
-  const writer = sseConnections.get(gatewayId);
-  if (writer) {
-    const msg = `data: ${JSON.stringify(data)}\n\n`;
-    writer.write(new TextEncoder().encode(msg)).catch(() => {
-      sseConnections.delete(gatewayId);
-    });
+  // Saltar auth para rutas públicas
+  if (PUBLIC_API_ROUTES.includes(path)) {
+    c.set('Auth', null);
+    return await next();
+  }
+
+  const authHeader = c.req.header('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  if (!token) {
+    c.set('Auth', null);
+    return c.json({ error: 'Token de autenticación requerido' }, 401);
+  }
+
+  const payload = await AuthService.verifyJWT(token, c.env.JWT_SECRET);
+  if (!payload || !payload.username) {
+    c.set('Auth', null);
+    return c.json({ error: 'Token inválido o expirado' }, 401);
+  }
+
+  c.set('Auth', {
+    username: payload.username,
+    role: payload.role || 'secretaria',
+    displayName: payload.displayName || payload.username,
+    email: payload.email || ''
+  });
+
+  await next();
+}
+
+// Middleware que requiere rol de administrador
+async function requireAdmin(c: any, next: any) {
+  const auth = c.get('Auth');
+  if (!auth || auth.role !== 'admin') {
+    return c.json({ error: 'Se requieren permisos de administrador' }, 403);
+  }
+  await next();
+}
+
+// ─── PROTECCIÓN DE ENDPOINTS ───
+// Todas las rutas /api/* requieren autenticación
+app.use('/api/*', authMiddleware);
+
+// Rutas admin-only: requieren auth + rol admin
+const adminRoutes = [
+  'POST /api/clear-consultas',
+  'POST /api/seed-consultas',
+  'POST /api/doctors',
+  'POST /api/vip-contacts',
+  'POST /api/quick-replies',
+  'POST /api/pdf-config',
+  'POST /api/pdf-config/backup-template',
+  'POST /api/tag-config',
+  'POST /api/schedule-config',
+  'POST /api/menu-tree',
+  'POST /api/bot-config',
+  'POST /api/users',
+  'DELETE /api/users/*',
+  'POST /api/auth/admin-reset-password',
+  'POST /api/db-provider',
+  'POST /api/clinic-config',
+  'POST /api/whatsapp-read-config',
+];
+
+for (const route of adminRoutes) {
+  const [method, path] = route.split(' ');
+  if (method === 'DELETE') {
+    app.delete(path, requireAdmin);
+  } else {
+    app.post(path, requireAdmin);
   }
 }
 
-function broadcastToGateways(data: any) {
-  const msg = `data: ${JSON.stringify(data)}\n\n`;
-  const encoded = new TextEncoder().encode(msg);
-  for (const [id, writer] of sseConnections) {
-    writer.write(encoded).catch(() => sseConnections.delete(id));
+// ─── SSE: Durable Object para conexiones (eliminado maps en memoria) ───
+// Las conexiones ahora viven en el Durable Object SseBroker
+
+function getSseBroker(env: Env) {
+  return env.SSE_BROKER.getByName('sse-broker');
+}
+
+async function broadcastToGateways(env: Env, data: any) {
+  try {
+    const stub = getSseBroker(env);
+    console.log(`📢 [SSE-DO] broadcastToGateways called: type=${data?.type}`);
+    await stub.broadcastToGateways(data);
+  } catch (e) {
+    console.error('[SSE-DO] Error broadcasting to gateways:', e);
   }
 }
 
-function broadcastToWebApp(data: any) {
-  const msg = `data: ${JSON.stringify(data)}\n\n`;
-  const encoded = new TextEncoder().encode(msg);
-  for (const [id, writer] of webAppConnections) {
-    writer.write(encoded).catch(() => webAppConnections.delete(id));
+async function broadcastToWebApp(env: Env, data: any) {
+  try {
+    const stub = getSseBroker(env);
+    console.log(`📢 [SSE-DO] broadcastToWebApp called: type=${data?.type}, remitente=${data?.remitente}`);
+    await stub.broadcastToWebApps(data);
+  } catch (e) {
+    console.error('[SSE-DO] Error broadcasting to webapps:', e);
   }
 }
 
 // Helper: agregar a cola de pending y notificar gateways via SSE
-async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit', targetMsgId?: string, targetMsgKey?: any) {
+async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit' | 'mark_read', targetMsgId?: string, targetMsgKey?: any, env?: Env) {
   const item = await db.addPendingOutgoing(remitente, text, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitente, isForwardToDoctor, action, targetMsgId, targetMsgKey);
 
-  // Notificar a todos los gateways conectados que hay un mensaje pendiente
-  if (sseConnections.size > 0) {
-    broadcastToGateways({
+  // Notificar via Durable Object (fire-and-forget)
+  if (env?.SSE_BROKER) {
+    broadcastToGateways(env, {
       type: 'pending_outgoing',
       message: item
-    });
-  }
+    }).catch(() => {});
 
-  // Notificar al web app para actualización en tiempo real
-  broadcastToWebApp({
-    type: 'new_message',
-    remitente,
-    text
-  });
+    broadcastToWebApp(env, {
+      type: 'new_message',
+      remitente,
+      text
+    }).catch(() => {});
+  }
 
   return item;
 }
@@ -77,94 +168,19 @@ app.get('/health', (c) => {
   });
 });
 
-// ─── SSE: Server-Sent Events para notificar gateways ───
-app.get('/sse', (c) => {
+// ─── SSE: Server-Sent Events via Durable Object ───
+app.get('/sse', async (c) => {
   const gatewayId = c.req.query('gateway') || 'default';
-
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-
-  // Guardar conexión
-  sseConnections.set(gatewayId, writer);
-  console.log(`🔌 [SSE] Gateway conectado: ${gatewayId} (total: ${sseConnections.size})`);
-
-  // Enviar keepalive cada 15s para que no se cierre la conexión
-  // IMPORTANTE: usar waitUntil para que el interval no muera ~30s después del return
-  const keepaliveInterval = setInterval(() => {
-    writer.write(new TextEncoder().encode(': keepalive\n\n')).catch(() => {
-      clearInterval(keepaliveInterval);
-      sseConnections.delete(gatewayId);
-    });
-  }, 15000);
-
-  // Mantener vivo el interval aunque el fetch handler ya haya retornado
-  c.executionCtx.waitUntil(new Promise<void>((resolve) => {
-    c.req.raw.signal?.addEventListener('abort', () => {
-      clearInterval(keepaliveInterval);
-      resolve();
-    }, { once: true });
-  }));
-
-  // Enviar mensaje de bienvenida
-  writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'connected', gatewayId, timestamp: Date.now() })}\n\n`));
-
-  // Cleanup cuando se desconecta
-  c.req.raw.signal?.addEventListener('abort', () => {
-    clearInterval(keepaliveInterval);
-    sseConnections.delete(gatewayId);
-    console.log(`🔌 [SSE] Gateway desconectado: ${gatewayId} (total: ${sseConnections.size})`);
-  });
-
-  return new Response(readable, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no'
-    }
-  });
+  const stub = getSseBroker(c.env);
+  const doRequest = new Request(`https://sse-worker/sse?type=gateway&client=${gatewayId}`);
+  return stub.fetch(doRequest);
 });
 
-// ─── SSE: Server-Sent Events para notificar web app (secretarias) ───
-app.get('/sse-webapp', (c) => {
+app.get('/sse-webapp', async (c) => {
   const clientId = c.req.query('client') || `web_${Date.now()}`;
-
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-
-  webAppConnections.set(clientId, writer);
-  console.log(`🖥️ [SSE-WEB] Cliente conectado: ${clientId} (total: ${webAppConnections.size})`);
-
-  const keepaliveInterval = setInterval(() => {
-    writer.write(new TextEncoder().encode(': keepalive\n\n')).catch(() => {
-      clearInterval(keepaliveInterval);
-      webAppConnections.delete(clientId);
-    });
-  }, 15000);
-
-  c.executionCtx.waitUntil(new Promise<void>((resolve) => {
-    c.req.raw.signal?.addEventListener('abort', () => {
-      clearInterval(keepaliveInterval);
-      resolve();
-    }, { once: true });
-  }));
-
-  writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'connected', clientId, timestamp: Date.now() })}\n\n`));
-
-  c.req.raw.signal?.addEventListener('abort', () => {
-    clearInterval(keepaliveInterval);
-    webAppConnections.delete(clientId);
-    console.log(`🖥️ [SSE-WEB] Cliente desconectado: ${clientId} (total: ${webAppConnections.size})`);
-  });
-
-  return new Response(readable, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no'
-    }
-  });
+  const stub = getSseBroker(c.env);
+  const doRequest = new Request(`https://sse-worker/sse?type=webapp&client=${clientId}`);
+  return stub.fetch(doRequest);
 });
 
 // ─── SSE: ACK de mensaje enviado por gateway ───
@@ -180,9 +196,24 @@ app.post('/api/sse-ack', async (c) => {
 });
 
 // ─── SSE: Estado de conexiones ───
-app.get('/api/sse-status', (c) => {
-  const gateways = Array.from(sseConnections.keys());
-  return c.json({ connected: gateways.length, gateways });
+app.get('/api/sse-status', async (c) => {
+  try {
+    const stub = getSseBroker(c.env);
+    const stats = await stub.getConnections();
+    return c.json(stats);
+  } catch (e) {
+    return c.json({ total: 0, gateways: 0, webapps: 0 });
+  }
+});
+
+app.get('/api/sse-debug', async (c) => {
+  try {
+    const stub = getSseBroker(c.env);
+    const debug = await stub.debugConnections();
+    return c.json(debug);
+  } catch (e) {
+    return c.json({ error: 'Error getting debug info', connections: [], stats: { total: 0, gateways: 0, webapps: 0 } });
+  }
 });
 
 app.get('/api/db-provider', (c) => {
@@ -386,15 +417,6 @@ app.get('/test', async (c) => {
     return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
   }
   return c.text('Test Simulator Assets no disponibles');
-});
-
-app.get('/admin', async (c) => {
-  if (c.env.ASSETS) {
-    const url = new URL(c.req.url);
-    url.pathname = '/index.html';
-    return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
-  }
-  return c.text('Admin Panel Assets no disponibles');
 });
 
 app.get('/history', async (c) => {
@@ -667,21 +689,21 @@ app.post('/webhook', async (c) => {
         console.error('Error guardando outgoing_whatsapp_web en respuestasSecretaria:', e);
       }
 
-      broadcastToGateways({
+      broadcastToGateways(c.env, {
         type: 'new_message',
         remitente: remitente,
         sender: 'secretaria',
         text: mensaje,
         source: 'whatsapp_web'
-      });
+      }).catch(() => {});
 
-      broadcastToWebApp({
+      broadcastToWebApp(c.env, {
         type: 'new_message',
         remitente: remitente,
         sender: 'secretaria',
         text: mensaje,
         source: 'whatsapp_web'
-      });
+      }).catch(() => {});
 
       return c.json({ success: true, type: 'outgoing_whatsapp_web' }, 200);
     }
@@ -699,6 +721,16 @@ app.post('/webhook', async (c) => {
       pdfBase64: body.pdfBase64,
       pdfNombre: body.pdfNombre
     };
+
+    // Notificar al web app INMEDIATAMENTE que llegó un mensaje del paciente (push via DO)
+    // Esto se hace ANTES de las queries de D1 para que el web app muestre el mensaje al instante
+    broadcastToWebApp(c.env, {
+      type: 'new_message',
+      remitente,
+      text: mensaje || '(Imagen/Documento)',
+      sender: 'paciente',
+      pushName: body.pushName
+    }).catch(() => {});
 
     // Log session state BEFORE processing
     const sesionPre = await db.getSesion(remitente, altRemitente);
@@ -724,6 +756,16 @@ app.post('/webhook', async (c) => {
         );
 
         if (adjuntado) {
+          // Segundo broadcast DESPUÉS de que el mensaje se guardó en D1
+          // para que el web app refresque con los datos actualizados
+          broadcastToWebApp(c.env, {
+            type: 'new_message',
+            remitente,
+            text: mensaje || '(Imagen/Documento)',
+            sender: 'paciente',
+            pushName: body.pushName
+          }).catch(() => {});
+
           const silentResult = {
             remitente,
             respuesta: '',
@@ -765,6 +807,14 @@ app.post('/webhook', async (c) => {
       );
 
       if (adjuntado) {
+        broadcastToWebApp(c.env, {
+          type: 'new_message',
+          remitente,
+          text: mensaje || '(Imagen/Documento)',
+          sender: 'paciente',
+          pushName: body.pushName
+        }).catch(() => {});
+
         const silentResult = {
           remitente,
           respuesta: '',
@@ -792,6 +842,15 @@ app.post('/webhook', async (c) => {
     // Persistir sesión completa (historial + estado) en D1 después del engine
     const sesionActual = await db.getSesion(remitente, body.altRemitente);
     await db.saveSesion(remitente, sesionActual.estado, sesionActual.datosTemporales);
+
+    // Notificar al web app que hay nuevo mensaje (push via DO)
+    broadcastToWebApp(c.env, {
+      type: 'new_message',
+      remitente,
+      text: result.respuesta || '',
+      sender: 'bot',
+      estado: result.estadoActual
+    }).catch(() => {});
 
     invalidateConsultasCache();
     return c.json(result, 200);
@@ -1016,11 +1075,11 @@ app.patch('/api/consultas/:id', async (c) => {
         if (target.datos?.altRemitente) {
           await db.saveSesion(target.datos.altRemitente, 'inicio');
         }
-        await addPendingAndNotify(db, target.remitente, closingMsg, id);
+        await addPendingAndNotify(db, target.remitente, closingMsg, id, undefined, undefined, undefined, undefined, undefined, false, undefined, undefined, undefined, c.env);
 
         const readCfg = await (db as any).getWhatsappReadConfig?.();
         if (readCfg?.markReadOnFinish) {
-          await addPendingAndNotify(db, target.remitente, '', id, undefined, undefined, undefined, undefined, undefined, false, 'mark_read');
+          await addPendingAndNotify(db, target.remitente, '', id, undefined, undefined, undefined, undefined, undefined, false, 'mark_read', undefined, undefined, c.env);
         }
       }
     }
@@ -1166,7 +1225,7 @@ app.post('/api/iniciar-chat', async (c) => {
       timestamp: new Date().toISOString()
     });
 
-    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64);
+    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, undefined, pdfNombre, pdfBase64, undefined, undefined, false, undefined, undefined, undefined, c.env);
 
     return c.json({
       success: true,
@@ -1201,7 +1260,7 @@ app.post('/api/forward-telemedicina', async (c) => {
 
     const headerMsg = `🏥 *DERIVACIÓN PARA TELEMEDICINA - CLÍNICA COAT*\n👤 *Paciente:* ${patientName}\n📋 *Solicitud:* ${target.opcion || 'Telemedicina'}\n${notaSecretaria ? `📝 *Nota de Secretaría:* "${notaSecretaria}"\n` : ''}📄 *Documentos Adjuntos:* (Se reenvían a continuación fotos y archivos PDF del paciente)`;
 
-    await addPendingAndNotify(db, doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    await addPendingAndNotify(db, doctorPhone, headerMsg, undefined, undefined, undefined, undefined, undefined, undefined, true, undefined, undefined, undefined, c.env);
 
     const respuestasPaciente = datos.respuestasPaciente || [];
     const rawPdfs = [
@@ -1221,7 +1280,7 @@ app.post('/api/forward-telemedicina', async (c) => {
       const pdfItem = listPdfs[i];
       if (pdfItem.base64) {
         const label = listPdfs.length > 1 ? `📄 Documento PDF (${i + 1}/${listPdfs.length}): ${pdfItem.nombre || 'estudio.pdf'}` : `📄 Documento PDF: ${pdfItem.nombre || 'estudio.pdf'}`;
-        await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true);
+        await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, pdfItem.nombre || 'estudio.pdf', pdfItem.base64, undefined, undefined, true, undefined, undefined, undefined, c.env);
       }
     }
 
@@ -1247,7 +1306,7 @@ app.post('/api/forward-telemedicina', async (c) => {
       const imgSrc = listImagenes[i];
       const formattedImg = imgSrc.startsWith('data:image') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
       const label = listImagenes.length > 1 ? `📷 Foto Adjunta de Pedido Médico (${i + 1} de ${listImagenes.length})` : `📷 Pedido Médico / Foto Adjunta del Paciente`;
-      await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true);
+      await addPendingAndNotify(db, doctorPhone, label, undefined, undefined, undefined, undefined, formattedImg, undefined, true, undefined, undefined, undefined, c.env);
     }
 
     const regMsg = `🩺 Telemedicina derivada a ${doctorName || 'Médico'} (${doctorPhone}) ${notaSecretaria ? `- "${notaSecretaria}"` : ''}`;
@@ -1307,11 +1366,11 @@ app.post('/api/send-message', async (c) => {
       }
     }
 
-    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, altRemitenteForSend, false, 'send', msgId);
+    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, altRemitenteForSend, false, 'send', msgId, undefined, c.env);
 
     const readCfg = await (db as any).getWhatsappReadConfig?.();
     if (readCfg?.markReadOnReply) {
-      await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, altRemitenteForSend, false, 'mark_read');
+      await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, altRemitenteForSend, false, 'mark_read', undefined, undefined, c.env);
     }
 
     invalidateConsultasCache();
@@ -1368,7 +1427,7 @@ app.post('/api/delete-message', async (c) => {
     }
     const db = DBFactory.createService(c.env);
     const { key } = await db.deleteMessage(remitente, msgId);
-    await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId, key);
+    await addPendingAndNotify(db, remitente, '', idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'delete', msgId, key, c.env);
     invalidateConsultasCache();
     return c.json({ success: true, msgId });
   } catch (e: any) {
@@ -1385,7 +1444,7 @@ app.post('/api/edit-message', async (c) => {
     }
     const db = DBFactory.createService(c.env);
     const { key } = await db.editMessage(remitente, msgId, newText);
-    await addPendingAndNotify(db, remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId, key);
+    await addPendingAndNotify(db, remitente, newText, idConsulta, undefined, undefined, undefined, undefined, undefined, false, 'edit', msgId, key, c.env);
     invalidateConsultasCache();
     return c.json({ success: true, msgId, newText });
   } catch (e: any) {
@@ -1469,29 +1528,33 @@ app.get('/api/patients/search', async (c) => {
     
     const searchNormalized = normalizePhone(query);
     
-    // Buscar por nombre o teléfono
+    // Buscar por nombre, teléfono o altRemitente
     const resultados = consultas.filter((con: any) => {
       const remitente = (con.remitente || '').toLowerCase();
+      const altRemitente = (con.datos?.altRemitente || '').toLowerCase();
       const pushName = (con.datos?.pushName || '').toLowerCase();
       const searchLower = query.toLowerCase();
       
       // Búsqueda por nombre (parcial)
       const nameMatch = pushName.includes(searchLower);
       
-      // Búsqueda por teléfono (normalizado)
+      // Búsqueda por teléfono (normalizado) - incluye remitente y altRemitente
       const phoneNormalized = normalizePhone(remitente);
-      const phoneMatch = phoneNormalized.includes(searchNormalized) || searchNormalized.includes(phoneNormalized);
+      const altNormalized = normalizePhone(altRemitente);
+      const phoneMatch = phoneNormalized.includes(searchNormalized) || searchNormalized.includes(phoneNormalized)
+        || altNormalized.includes(searchNormalized) || searchNormalized.includes(altNormalized);
       
       return nameMatch || phoneMatch;
     });
 
-    // Agrupar por paciente (deduplicar)
+    // Agrupar por paciente (deduplicar por altRemitente o remitente)
     const pacientesMap = new Map();
     resultados.forEach((con: any) => {
-      const key = con.remitente;
+      const key = con.datos?.altRemitente || con.remitente;
       if (!pacientesMap.has(key)) {
         pacientesMap.set(key, {
           remitente: con.remitente,
+          altRemitente: con.datos?.altRemitente || null,
           nombre: con.datos?.pushName || null,
           ultimaConsulta: con.createdAt,
           estado: con.estado,

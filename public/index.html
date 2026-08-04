@@ -81,6 +81,11 @@
       transition: all 0.2s;
     }
 
+    .nav-tab-btn:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
     .nav-tab-btn.active {
       background: var(--accent);
       color: #fff;
@@ -608,23 +613,44 @@
   </style>
 
   <script>
+    // ─── AUTH HELPER ───
+    // Wrapper de fetch que agrega automáticamente el token JWT y maneja 401
+    async function authFetch(url, options = {}) {
+      const token = sessionStorage.getItem('coat_token');
+      if (!token) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401 });
+      }
+      options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return res;
+      }
+      return res;
+    }
+
     window._currentUserRole = 'secretaria';
 
     (async function() {
       try {
-        const token = localStorage.getItem('coat_token');
+        const token = sessionStorage.getItem('coat_token');
         if (!token) {
-          window.location.replace('/login.html');
+          window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
           return;
         }
 
-        const res = await fetch('/api/auth/me', {
+        const res = await authFetch('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (!res.ok) {
-          localStorage.removeItem('coat_token');
-          window.location.replace('/login.html');
+          sessionStorage.removeItem('coat_token');
+          window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
           return;
         }
 
@@ -648,6 +674,7 @@
     function applyRolePermissions() {
       const isRoleAdmin = window._currentUserRole === 'admin';
       const tabSettingsBtn = document.getElementById('tabSettingsBtn');
+      const tabDashboardBtn = document.getElementById('tabDashboardBtn');
       const nameEl = document.getElementById('currentUserName');
       const dashboardBtn = document.querySelector('.admin-only');
       const btnExport = document.getElementById('btnExportExcel');
@@ -658,6 +685,9 @@
 
       if (tabSettingsBtn) {
         tabSettingsBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
+      }
+      if (tabDashboardBtn) {
+        tabDashboardBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
       }
 
       if (dashboardBtn) {
@@ -689,9 +719,9 @@
 
     function logout() {
       if (confirm('¿Cerrar sesión?')) {
-        localStorage.removeItem('coat_token');
-        localStorage.removeItem('coat_user');
-        window.location.replace('/login.html');
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
       }
     }
   </script>
@@ -716,6 +746,8 @@
 
     <div class="nav-tabs">
       <button class="nav-tab-btn active" id="tabMainBtn" onclick="switchMainTab('consultas')">📥 Solicitudes (<span id="countBadge">0</span>)</button>
+      <button class="nav-tab-btn" id="tabHistoryBtn" onclick="switchMainTab('history')">📋 Historial</button>
+      <button class="nav-tab-btn" id="tabDashboardBtn" onclick="switchMainTab('dashboard')" style="display: none;">📊 Dashboard</button>
       <button class="nav-tab-btn" id="tabSettingsBtn" onclick="switchMainTab('settings')" style="display: none;">⚙️ Configuración del Bot & Horarios</button>
     </div>
 
@@ -842,6 +874,88 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- SECCIÓN HISTORIAL DE PACIENTES -->
+    <div id="viewHistory" style="display: none;">
+      <div style="max-width: 1200px; margin: 0 auto;">
+        <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border);">
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="histSearchInput" placeholder="Buscar por nombre o teléfono del paciente..." style="flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 0.95rem;" />
+            <button onclick="histSearchPatient()" style="padding: 12px 24px; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 700;">🔍 Buscar</button>
+          </div>
+        </div>
+
+        <div id="histPatientInfo" style="display: none; background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border);">
+          <h2 id="histPatientName" style="color: var(--accent); font-size: 1.2rem; margin-bottom: 8px;"></h2>
+          <div style="color: var(--text-muted); font-size: 0.85rem;">
+            📞 <span id="histPatientPhone">-</span> &nbsp;|&nbsp; 📋 <span id="histTotalConsultas">0</span> consultas
+          </div>
+        </div>
+
+        <div id="histHistoryList" style="display: flex; flex-direction: column; gap: 15px;">
+          <div style="text-align: center; padding: 40px; color: var(--text-muted);">Ingrese un nombre o teléfono para buscar el historial</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN DASHBOARD (Solo Admin) -->
+    <div id="viewDashboard" style="display: none;">
+      <div style="max-width: 1400px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text);">📊 Dashboard - Clínica COAT</h2>
+          <button onclick="dashLoadData()" style="padding: 8px 16px; background: var(--card-bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; cursor: pointer; font-size: 0.85rem;">🔄 Actualizar</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatTotal" style="font-size: 2.2rem; font-weight: bold; color: var(--accent);">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Total Consultas</div>
+          </div>
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatPendientes" style="font-size: 2.2rem; font-weight: bold; color: #fbbf24;">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Pendientes</div>
+          </div>
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatAtendidas" style="font-size: 2.2rem; font-weight: bold; color: #34d399;">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Atendidas</div>
+          </div>
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatHoy" style="font-size: 2.2rem; font-weight: bold; color: var(--accent);">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Mensajes Hoy</div>
+          </div>
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatSemana" style="font-size: 2.2rem; font-weight: bold; color: var(--accent);">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Esta Semana</div>
+          </div>
+          <div style="background: var(--card-bg); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid var(--border);">
+            <div id="dashStatMes" style="font-size: 2.2rem; font-weight: bold; color: var(--accent);">-</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Este Mes</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <div style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
+            <h3 style="color: var(--accent); font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border);">📈 Mensajes (Últimos 7 días)</h3>
+            <div id="dashDailyChart" style="height: 200px; display: flex; align-items: flex-end; gap: 8px;"><div style="text-align:center;width:100%;color:var(--text-muted);">Cargando...</div></div>
+          </div>
+          <div style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
+            <h3 style="color: var(--accent); font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border);">🏆 Operadores Activos</h3>
+            <div id="dashOperatorsList"><div style="text-align:center;padding:20px;color:var(--text-muted);">Cargando...</div></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
+            <h3 style="color: var(--accent); font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border);">📋 Consultas por Tipo</h3>
+            <div id="dashTypesList"><div style="text-align:center;padding:20px;color:var(--text-muted);">Cargando...</div></div>
+          </div>
+          <div style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
+            <h3 style="color: var(--accent); font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border);">📊 Estado de Consultas</h3>
+            <div id="dashStatusChart"><div style="text-align:center;padding:20px;color:var(--text-muted);">Cargando...</div></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- SECCIÓN 2: PANEL DE CONFIGURACIÓN CON SUB-MENÚS MODULARES -->
@@ -1526,7 +1640,7 @@
 
     async function checkDbProvider() {
       try {
-        const res = await fetch('/api/db-provider');
+        const res = await authFetch('/api/db-provider');
         const data = await res.json();
         if (data.provider) {
           currentDbProvider = data.provider.toLowerCase();
@@ -1568,7 +1682,7 @@
 
     async function selectDbProvider(targetProvider) {
       try {
-        const res = await fetch('/api/db-provider', {
+        const res = await authFetch('/api/db-provider', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ provider: targetProvider })
@@ -1755,7 +1869,7 @@
 
     async function checkHeartbeatStatus() {
       try {
-        const res = await fetch('/api/heartbeat-status');
+        const res = await authFetch('/api/heartbeat-status');
         if (!res.ok) return;
         const data = await res.json();
         const badge = document.getElementById('connectorStatusBadge');
@@ -1850,25 +1964,45 @@
 
       // ─── SSE: Conexión push para actualizaciones en tiempo real ───
       let webAppSSE = null;
+      let sseReconnectTimer = null;
       function connectWebAppSSE() {
+        if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null; }
         try {
           const clientId = 'web_' + Date.now();
+          console.log(`[SSE] Conectando... (clientId: ${clientId})`);
           webAppSSE = new EventSource(`/sse-webapp?client=${clientId}`);
+          webAppSSE.onopen = function() {
+            console.log('[SSE] ✅ Conectado');
+            updateSSEStatus('connected');
+          };
           webAppSSE.onmessage = function(e) {
             try {
               const data = JSON.parse(e.data);
               if (data.type === 'new_message') {
-                // Actualización instantánea: recargar consultas sin re-render completo
+                console.log('[SSE] 📩 new_message recibido, recargando...');
                 fetchConsultas(false);
               }
-            } catch(err) {}
+            } catch(err) { console.warn('[SSE] Error parseando:', err); }
           };
           webAppSSE.onerror = function() {
-            // Reconectar después de 5s si se cae
+            console.warn('[SSE] ❌ Error/conexión perdida, reconectando en 5s...');
+            updateSSEStatus('disconnected');
             webAppSSE.close();
-            setTimeout(connectWebAppSSE, 5000);
+            sseReconnectTimer = setTimeout(connectWebAppSSE, 5000);
           };
-        } catch(e) {}
+        } catch(e) { console.error('[SSE] Excepción:', e); }
+      }
+      function updateSSEStatus(status) {
+        const el = document.getElementById('connectionStatus');
+        if (el) {
+          if (status === 'connected') {
+            el.textContent = '🟢 Conectado';
+            el.className = 'status-badge online';
+          } else {
+            el.textContent = '🔴 Desconectado';
+            el.className = 'status-badge offline';
+          }
+        }
       }
       connectWebAppSSE();
 
@@ -1977,7 +2111,7 @@
       }
 
       try {
-        const res = await fetch('/api/iniciar-chat', {
+        const res = await authFetch('/api/iniciar-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2005,7 +2139,7 @@
 
     async function fetchDoctorsConfig() {
       try {
-        const res = await fetch('/api/doctors');
+        const res = await authFetch('/api/doctors');
         if (!res.ok) return;
         const data = await res.json();
         if (data.items && Array.isArray(data.items)) {
@@ -2053,7 +2187,7 @@
 
     async function saveDoctorsConfig() {
       try {
-        const res = await fetch('/api/doctors', {
+        const res = await authFetch('/api/doctors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: doctorList })
@@ -2121,7 +2255,7 @@
       const notaSecretaria = document.getElementById('telemedNotaSecretaria').value.trim();
 
       try {
-        const res = await fetch('/api/forward-telemedicina', {
+        const res = await authFetch('/api/forward-telemedicina', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2146,7 +2280,7 @@
 
     async function fetchVipContactsConfig() {
       try {
-        const res = await fetch('/api/vip-contacts');
+        const res = await authFetch('/api/vip-contacts');
         if (!res.ok) return;
         const data = await res.json();
         if (data.items && Array.isArray(data.items)) {
@@ -2200,7 +2334,7 @@
 
     async function saveVipContactsConfig() {
       try {
-        const res = await fetch('/api/vip-contacts', {
+        const res = await authFetch('/api/vip-contacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: vipContactsList })
@@ -2218,7 +2352,7 @@
     async function limpiarTodasConsultas() {
       if (confirm('⚠️ ¿Estás seguro/a de eliminar TODAS las solicitudes de prueba? Esta acción vaciará la bandeja de entrada para iniciar de 0.')) {
         try {
-          const res = await fetch('/api/clear-consultas', { method: 'POST' });
+          const res = await authFetch('/api/clear-consultas', { method: 'POST' });
           const data = await res.json();
           if (data.success) {
             allConsultas = [];
@@ -2239,7 +2373,7 @@
     async function cargar50ChatsPrueba() {
       if (!confirm('⚡ ¿Deseas generar 50 solicitudes de prueba variadas (ORL, Estudios, Cirugías, PAMI, etc.) con estado PENDIENTE?')) return;
       try {
-        const res = await fetch('/api/seed-consultas', { method: 'POST' });
+        const res = await authFetch('/api/seed-consultas', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           alert(`✅ Se cargaron ${data.count || 50} chats de prueba exitosamente.`);
@@ -2254,7 +2388,7 @@
 
     async function fetchBotConfig() {
       try {
-        const res = await fetch('/api/bot-config');
+        const res = await authFetch('/api/bot-config');
         if (!res.ok) return;
         const data = await res.json();
         const cfg = data.config || {};
@@ -2284,7 +2418,7 @@
 
     async function setOperatorNameMode(showName) {
       try {
-        const res = await fetch('/api/bot-config', {
+        const res = await authFetch('/api/bot-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ showOperatorName: showName })
@@ -2304,7 +2438,7 @@
         const fuera = document.getElementById('cfgFueraDeHorario').value;
         const cierre = document.getElementById('cfgConfirmacionCierre').value;
 
-        const res = await fetch('/api/bot-config', {
+        const res = await authFetch('/api/bot-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2324,7 +2458,7 @@
     // ─── LIMPIEZA AUTOMÁTICA ───
     async function fetchCleanupConfig() {
       try {
-        const res = await fetch('/api/bot-config');
+        const res = await authFetch('/api/bot-config');
         if (!res.ok) return;
         const data = await res.json();
         const cfg = data.config || {};
@@ -2339,7 +2473,7 @@
 
     async function saveCleanupConfig() {
       try {
-        const res = await fetch('/api/bot-config');
+        const res = await authFetch('/api/bot-config');
         const existing = await res.json();
         const cfg = existing.config || {};
         cfg.autoCleanup = {
@@ -2348,7 +2482,7 @@
           consultas: document.getElementById('cleanupConsultas').checked,
           sessions: document.getElementById('cleanupSessions').checked
         };
-        const saveRes = await fetch('/api/bot-config', {
+        const saveRes = await authFetch('/api/bot-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg)
@@ -2364,7 +2498,7 @@
 
     async function fetchCleanupStatus() {
       try {
-        const res = await fetch('/api/cleanup-status');
+        const res = await authFetch('/api/cleanup-status');
         if (!res.ok) { document.getElementById('cleanupStatus').textContent = 'No disponible'; return; }
         const data = await res.json();
         const status = data.status || {};
@@ -2383,7 +2517,7 @@
     async function runManualCleanup() {
       if (!confirm('¿Ejecutar limpieza ahora? Se eliminarán los datos antiguos según la configuración actual.')) return;
       try {
-        const res = await fetch('/api/run-cleanup', { method: 'POST' });
+        const res = await authFetch('/api/run-cleanup', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           alert(`✅ Limpieza ejecutada. ${data.deleted || 0} registros eliminados.`);
@@ -2398,7 +2532,7 @@
 
     async function fetchQuickRepliesConfig() {
       try {
-        const res = await fetch('/api/quick-replies');
+        const res = await authFetch('/api/quick-replies');
         if (!res.ok) return;
         const data = await res.json();
         if (data.items) {
@@ -2434,7 +2568,7 @@
 
     async function saveQuickRepliesConfig() {
       try {
-        const res = await fetch('/api/quick-replies', {
+        const res = await authFetch('/api/quick-replies', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: quickRepliesList })
@@ -2449,7 +2583,7 @@
 
     async function fetchPdfItemsConfig() {
       try {
-        const res = await fetch('/api/pdf-config');
+        const res = await authFetch('/api/pdf-config');
         if (!res.ok) return;
         const data = await res.json();
         if (data.items) {
@@ -2486,7 +2620,7 @@
 
     async function savePdfItemsConfig() {
       try {
-        const res = await fetch('/api/pdf-config', {
+        const res = await authFetch('/api/pdf-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: predefinedPdfsList })
@@ -2634,7 +2768,7 @@
 
     async function saveTagConfigModal() {
       try {
-        const res = await fetch('/api/tag-config', {
+        const res = await authFetch('/api/tag-config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tags: tagDefinitions })
@@ -2652,7 +2786,7 @@
     }
 
     function sendLocationGps(idConsulta, remitente) {
-      fetch('/api/clinic-config').then(r => r.json()).then(cfg => {
+      authFetch('/api/clinic-config').then(r => r.json()).then(cfg => {
         const nombre = cfg.nombre || 'Clínica COAT';
         const dir = cfg.direccion || 'Av. Vélez Sarsfield 468, Córdoba';
         const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat || -31.416667},${cfg.lng || -64.183333}`;
@@ -2696,7 +2830,7 @@
       if (!newText) return alert('El mensaje no puede estar vacío.');
 
       try {
-        const res = await fetch('/api/edit-message', {
+        const res = await authFetch('/api/edit-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2719,7 +2853,7 @@
     async function deleteMsgFromWeb(remitente, msgId, idConsulta) {
       if (confirm('🗑️ ¿Estás seguro/a de eliminar este mensaje para todos en WhatsApp?')) {
         try {
-          const res = await fetch('/api/delete-message', {
+          const res = await authFetch('/api/delete-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ remitente, msgId, idConsulta })
@@ -2737,19 +2871,38 @@
     function switchMainTab(tab) {
       const viewC = document.getElementById('viewConsultas');
       const viewS = document.getElementById('viewSettings');
+      const viewH = document.getElementById('viewHistory');
+      const viewD = document.getElementById('viewDashboard');
       const btnC = document.getElementById('tabMainBtn');
       const btnS = document.getElementById('tabSettingsBtn');
+      const btnH = document.getElementById('tabHistoryBtn');
+      const btnD = document.getElementById('tabDashboardBtn');
+
+      // Ocultar todas las vistas
+      viewC.style.display = 'none';
+      viewS.style.display = 'none';
+      viewH.style.display = 'none';
+      viewD.style.display = 'none';
+
+      // Remover active de todos los botones
+      btnC.classList.remove('active');
+      btnS.classList.remove('active');
+      btnH.classList.remove('active');
+      btnD.classList.remove('active');
 
       if (tab === 'settings') {
-        viewC.style.display = 'none';
         viewS.style.display = 'flex';
-        btnC.classList.remove('active');
         btnS.classList.add('active');
+      } else if (tab === 'history') {
+        viewH.style.display = 'block';
+        btnH.classList.add('active');
+      } else if (tab === 'dashboard') {
+        viewD.style.display = 'block';
+        btnD.classList.add('active');
+        dashLoadData();
       } else {
         viewC.style.display = 'block';
-        viewS.style.display = 'none';
         btnC.classList.add('active');
-        btnS.classList.remove('active');
       }
     }
 
@@ -2834,7 +2987,7 @@
 
     async function loadWhatsappReadConfigUI() {
       try {
-        const res = await fetch('/api/whatsapp-read-config');
+        const res = await authFetch('/api/whatsapp-read-config');
         if (!res.ok) return;
         const cfg = await res.json();
         const r1 = document.getElementById('chkMarkReadOnReply');
@@ -2848,7 +3001,7 @@
       const markReadOnReply = !!document.getElementById('chkMarkReadOnReply')?.checked;
       const markReadOnFinish = !!document.getElementById('chkMarkReadOnFinish')?.checked;
       try {
-        const res = await fetch('/api/whatsapp-read-config', {
+        const res = await authFetch('/api/whatsapp-read-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ markReadOnReply, markReadOnFinish })
@@ -2867,7 +3020,7 @@
 
     async function loadClinicConfigEditor() {
       try {
-        const res = await fetch('/api/clinic-config');
+        const res = await authFetch('/api/clinic-config');
         if (!res.ok) return;
         const cfg = await res.json();
         const n = document.getElementById('clinicNombre');
@@ -2905,7 +3058,7 @@
       }
 
       try {
-        const res = await fetch('/api/clinic-config', {
+        const res = await authFetch('/api/clinic-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, direccion, lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng })
@@ -2924,7 +3077,7 @@
 
     async function fetchTagConfig() {
       try {
-        const res = await fetch('/api/tag-config');
+        const res = await authFetch('/api/tag-config');
         if (!res.ok) return;
         const data = await res.json();
         if (data.tags) {
@@ -2993,7 +3146,7 @@
 
     async function saveTagsConfig() {
       try {
-        const res = await fetch('/api/tag-config', {
+        const res = await authFetch('/api/tag-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tags: tagDefinitions })
@@ -3011,7 +3164,7 @@
 
     async function fetchScheduleConfig() {
       try {
-        const res = await fetch('/api/schedule-config');
+        const res = await authFetch('/api/schedule-config');
         if (!res.ok) return;
         const data = await res.json();
         currentScheduleMode = data.mode || 'auto';
@@ -3021,7 +3174,7 @@
 
     async function setScheduleMode(mode) {
       try {
-        const res = await fetch('/api/schedule-config', {
+        const res = await authFetch('/api/schedule-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode })
@@ -3061,7 +3214,7 @@
 
     async function fetchMenuTree() {
       try {
-        const res = await fetch('/api/menu-tree');
+        const res = await authFetch('/api/menu-tree');
         if (!res.ok) return;
         const data = await res.json();
         if (data.tree && data.tree.items) {
@@ -3232,7 +3385,7 @@
     async function saveMenuTree() {
       try {
         currentMenuTree.welcomeMessage = document.getElementById('menuWelcomeMsg').value;
-        const res = await fetch('/api/menu-tree', {
+        const res = await authFetch('/api/menu-tree', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tree: currentMenuTree })
@@ -3251,7 +3404,7 @@
       if (!tbody) return;
 
       try {
-        const res = await fetch('/api/users');
+        const res = await authFetch('/api/users');
         const data = await res.json();
         const users = data.users || [];
 
@@ -3296,8 +3449,8 @@
         return;
       }
       try {
-        const token = localStorage.getItem('coat_token');
-        const res = await fetch('/api/auth/admin-reset-password', {
+        const token = sessionStorage.getItem('coat_token');
+        const res = await authFetch('/api/auth/admin-reset-password', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3354,7 +3507,7 @@
       }
 
       try {
-        const resSave = await fetch('/api/users', {
+        const resSave = await authFetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3371,7 +3524,7 @@
           if (!window._currentUser) window._currentUser = {};
           window._currentUser.displayName = displayName || username;
           window._currentUser.email = email;
-          localStorage.setItem('coat_user', JSON.stringify(window._currentUser));
+          sessionStorage.setItem('coat_user', JSON.stringify(window._currentUser));
 
           const nameEl = document.getElementById('currentUserName');
           if (nameEl) nameEl.textContent = `${window._currentUserName} (${window._currentUserRole === 'admin' ? 'Admin' : 'Secr.'})`;
@@ -3405,7 +3558,7 @@
       }
 
       try {
-        const resSave = await fetch('/api/users', {
+        const resSave = await authFetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, displayName: displayName || username, email, role })
@@ -3424,7 +3577,7 @@
         const code = err.code || '';
         if (code === 'auth/email-already-in-use') {
           alert(`ℹ️ El usuario "${username}" ya existe en Firebase. Actualizando perfil a ${role.toUpperCase()}...`);
-          await fetch('/api/users', {
+          await authFetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, displayName: displayName || username, email, role })
@@ -3440,7 +3593,7 @@
       if (!confirm(`¿Estás seguro de eliminar al usuario "${username}"?`)) return;
 
       try {
-        const res = await fetch(`/api/users/${username}`, { method: 'DELETE' });
+        const res = await authFetch(`/api/users/${username}`, { method: 'DELETE' });
         if (res.ok) {
           alert(`✅ Usuario "${username}" eliminado.`);
           renderUsersEditor();
@@ -3453,7 +3606,7 @@
     async function fetchConsultas(forceRedraw = false) {
       try {
         checkDbProvider();
-        const res = await fetch('/api/consultas');
+        const res = await authFetch('/api/consultas');
         if (!res.ok) return;
         const data = await res.json();
         allConsultas = data.consultas || [];
@@ -3556,7 +3709,7 @@
       renderConsultas(true);
 
       try {
-        await fetch(`/api/consultas/${cardId}/etiquetas`, {
+        await authFetch(`/api/consultas/${cardId}/etiquetas`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ etiquetas: tags })
@@ -4378,7 +4531,7 @@
       delete draftResponses[idConsulta];
 
       try {
-        const res = await fetch('/api/send-message', {
+        const res = await authFetch('/api/send-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -4413,7 +4566,7 @@
 
     async function marcarEstado(id, nuevoEstado) {
       try {
-        const res = await fetch(`/api/consultas/${id}`, {
+        const res = await authFetch(`/api/consultas/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado: nuevoEstado })
@@ -4472,6 +4625,149 @@
       const modal = document.getElementById('lightboxModal');
       if (modal) {
         modal.style.display = 'none';
+      }
+    }
+
+    // ─── HISTORIAL DE PACIENTES ───
+    let histCurrentPatient = null;
+
+    document.getElementById('histSearchInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') histSearchPatient();
+    });
+
+    async function histSearchPatient() {
+      const query = document.getElementById('histSearchInput').value.trim();
+      if (!query) return;
+      document.getElementById('histHistoryList').innerHTML = '<div style="text-align:center;padding:20px;color:var(--accent);">Buscando...</div>';
+      try {
+        const searchRes = await authFetch(`/api/patients/search?q=${encodeURIComponent(query)}`);
+        const searchData = await searchRes.json();
+        if (!searchData.pacientes || searchData.pacientes.length === 0) {
+          document.getElementById('histHistoryList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">No se encontraron pacientes</div>';
+          return;
+        }
+        const patient = searchData.pacientes[0];
+        histCurrentPatient = patient;
+        const searchId = patient.altRemitente || patient.remitente;
+        const historyRes = await authFetch(`/api/patient-history/${encodeURIComponent(searchId)}`);
+        const historyData = await historyRes.json();
+        document.getElementById('histPatientInfo').style.display = 'block';
+        document.getElementById('histPatientName').textContent = historyData.nombre || 'Sin nombre';
+        const displayPhone = historyData.remitente.replace(/@lid$/, '').replace(/@s\.whatsapp\.net$/, '');
+        document.getElementById('histPatientPhone').textContent = historyData.remitente.includes('@lid') && historyData.remitente.length > 15 ? searchId : displayPhone;
+        document.getElementById('histTotalConsultas').textContent = historyData.totalConsultas;
+        histRenderHistory(historyData.historial);
+      } catch (error) {
+        document.getElementById('histHistoryList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Error al buscar. Intente nuevamente.</div>';
+      }
+    }
+
+    function histRenderHistory(historial) {
+      const container = document.getElementById('histHistoryList');
+      if (!historial || historial.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">No hay consultas registradas</div>';
+        return;
+      }
+      container.innerHTML = historial.map((con, idx) => `
+        <div style="background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border);">
+          <div onclick="histToggleCard(${idx})" style="padding: 15px; background: rgba(0,168,132,0.08); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <div>
+              <div style="font-weight: 700; color: var(--text);">${con.tipo || 'Consulta'}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">${histFormatDate(con.fecha)}</div>
+            </div>
+            <span style="padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: ${con.estado === 'atendido' ? 'rgba(52,211,153,0.2)' : con.estado === 'pendiente' ? 'rgba(251,191,36,0.2)' : 'rgba(59,130,246,0.2)'}; color: ${con.estado === 'atendido' ? '#34d399' : con.estado === 'pendiente' ? '#fbbf24' : '#60a5fa'};">${con.estado}</span>
+          </div>
+          <div id="histCard-${idx}" style="display: none; padding: 15px;">
+            ${histRenderMessages(con.mensajes)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function histRenderMessages(mensajes) {
+      let html = '';
+      if (mensajes && mensajes.paciente && mensajes.paciente.length > 0) {
+        mensajes.paciente.forEach(msg => {
+          html += `<div style="margin-bottom: 10px; padding: 10px; border-radius: 8px; background: rgba(59,130,246,0.1); max-width: 80%; margin-right: auto;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">👤 Paciente</div>
+            <div style="font-size: 0.9rem; color: var(--text);">${msg.texto || '(Sin texto)'}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; text-align: right;">${histFormatDate(msg.timestamp)}</div>
+          </div>`;
+        });
+      }
+      if (mensajes && mensajes.operador && mensajes.operador.length > 0) {
+        mensajes.operador.forEach(msg => {
+          html += `<div style="margin-bottom: 10px; padding: 10px; border-radius: 8px; background: rgba(0,168,132,0.1); max-width: 80%; margin-left: auto; border-left: 3px solid var(--accent);">
+            <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 4px;">👩‍⚕️ ${msg.usuario || 'Operador'}</div>
+            <div style="font-size: 0.9rem; color: var(--text);">${msg.texto || '(Sin texto)'}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; text-align: right;">${histFormatDate(msg.timestamp)}</div>
+          </div>`;
+        });
+      }
+      return html || '<div style="text-align:center;padding:10px;color:var(--text-muted);">Sin mensajes</div>';
+    }
+
+    function histToggleCard(idx) {
+      const body = document.getElementById(`histCard-${idx}`);
+      if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function histFormatDate(dateStr) {
+      if (!dateStr) return '-';
+      return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ─── DASHBOARD (Solo Admin) ───
+    async function dashLoadData() {
+      try {
+        const [metricsRes, dailyRes] = await Promise.all([
+          authFetch('/api/dashboard/metrics'),
+          authFetch('/api/dashboard/daily')
+        ]);
+        const metrics = await metricsRes.json();
+        const daily = await dailyRes.json();
+        if (metrics.resumen) {
+          document.getElementById('dashStatTotal').textContent = metrics.resumen.total;
+          document.getElementById('dashStatPendientes').textContent = metrics.resumen.pendientes;
+          document.getElementById('dashStatAtendidas').textContent = metrics.resumen.atendidas;
+          document.getElementById('dashStatHoy').textContent = metrics.resumen.mensajesHoy;
+          document.getElementById('dashStatSemana').textContent = metrics.resumen.mensajesSemana;
+          document.getElementById('dashStatMes').textContent = metrics.resumen.mensajesMes;
+        }
+        if (daily.dias) {
+          const maxMsgs = Math.max(...daily.dias.map(d => d.mensajes), 1);
+          document.getElementById('dashDailyChart').innerHTML = daily.dias.map(dia => `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+              <div style="font-size:0.8rem;color:var(--accent);margin-bottom:5px;">${dia.mensajes}</div>
+              <div style="width:100%;background:linear-gradient(180deg, var(--accent) 0%, #0066cc 100%);border-radius:4px 4px 0 0;min-height:5px;height:${(dia.mensajes / maxMsgs) * 150}px;"></div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:5px;">${dia.dia}</div>
+            </div>
+          `).join('');
+        }
+        if (metrics.operadoresActivos) {
+          document.getElementById('dashOperatorsList').innerHTML = metrics.operadoresActivos.length === 0
+            ? '<div style="text-align:center;padding:20px;color:var(--text-muted);">No hay operadores</div>'
+            : metrics.operadoresActivos.map(op => `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text);">👩‍⚕️ ${op.nombre}</span><span style="color:var(--accent);font-weight:700;">${op.respuestas} respuestas</span></div>`).join('');
+        }
+        if (metrics.tiposFrecuentes) {
+          const maxCount = Math.max(...metrics.tiposFrecuentes.map(t => t.count), 1);
+          document.getElementById('dashTypesList').innerHTML = metrics.tiposFrecuentes.length === 0
+            ? '<div style="text-align:center;padding:20px;color:var(--text-muted);">No hay tipos</div>'
+            : metrics.tiposFrecuentes.map(t => `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text);">${t.tipo}</span><span style="color:var(--accent);font-weight:700;">${t.count}</span></div><div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:5px;"><div style="height:100%;background:var(--accent);border-radius:4px;width:${(t.count / maxCount) * 100}%;"></div></div>`).join('');
+        }
+        if (metrics.resumen) {
+          const total = metrics.resumen.total || 1;
+          document.getElementById('dashStatusChart').innerHTML = `
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text);">🟡 Pendientes</span><span style="color:#fbbf24;font-weight:700;">${metrics.resumen.pendientes}</span></div>
+            <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:5px;"><div style="height:100%;background:#fbbf24;border-radius:4px;width:${(metrics.resumen.pendientes / total) * 100}%;"></div></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text);">🔵 En Proceso</span><span style="color:#60a5fa;font-weight:700;">${metrics.resumen.enProceso}</span></div>
+            <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:5px;"><div style="height:100%;background:#60a5fa;border-radius:4px;width:${(metrics.resumen.enProceso / total) * 100}%;"></div></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text);">🟢 Atendidas</span><span style="color:#34d399;font-weight:700;">${metrics.resumen.atendidas}</span></div>
+            <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:5px;"><div style="height:100%;background:#34d399;border-radius:4px;width:${(metrics.resumen.atendidas / total) * 100}%;"></div></div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
       }
     }
   </script>

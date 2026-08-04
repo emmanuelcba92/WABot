@@ -1,3 +1,5 @@
+import { SseBroker } from './durable/sse-broker';
+
 export interface Env {
   FIREBASE_PROJECT_ID?: string;
   FIREBASE_API_KEY?: string;
@@ -16,6 +18,7 @@ export interface Env {
   GOOGLE_SCRIPT_URL?: string;
   ALERT_EMAIL?: string;
   ASSETS?: Fetcher;
+  SSE_BROKER: DurableObjectNamespace<SseBroker>;
 }
 
 export interface AppUser {

@@ -62,7 +62,7 @@
       <h1>📊 Dashboard - Clínica COAT</h1>
       <div>
         <button class="refresh-btn" onclick="loadData()">🔄 Actualizar</button>
-        <a href="/admin" style="margin-left: 15px;">← Volver al Panel</a>
+        <a href="/" style="margin-left: 15px;">← Volver al Panel</a>
       </div>
     </header>
     
@@ -111,11 +111,31 @@
   <script>
     const API_BASE = window.location.origin;
 
+    // ─── AUTH HELPER ───
+    async function authFetch(url, options = {}) {
+      const token = sessionStorage.getItem('coat_token');
+      if (!token) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401 });
+      }
+      options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return res;
+      }
+      return res;
+    }
+
     async function loadData() {
       try {
         const [metricsRes, dailyRes] = await Promise.all([
-          fetch(`${API_BASE}/api/dashboard/metrics`),
-          fetch(`${API_BASE}/api/dashboard/daily`)
+          authFetch(`${API_BASE}/api/dashboard/metrics`),
+          authFetch(`${API_BASE}/api/dashboard/daily`)
         ]);
 
         const metrics = await metricsRes.json();

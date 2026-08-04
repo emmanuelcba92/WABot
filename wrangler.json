@@ -28,5 +28,19 @@
 			"database_name": "wabot_coat_db",
 			"database_id": "fc66df83-cabf-4c06-8cd9-63b4855f1ce0"
 		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SSE_BROKER",
+				"class_name": "SseBroker"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["SseBroker"]
+		}
 	]
 }

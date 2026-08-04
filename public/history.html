@@ -66,7 +66,7 @@
   <div class="container">
     <header>
       <h1>📋 Historial de Paciente</h1>
-      <a href="/admin">← Volver al Panel</a>
+      <a href="/">← Volver al Panel</a>
     </header>
     
     <div class="search-box">
@@ -92,6 +92,26 @@
     const API_BASE = window.location.origin;
     let currentPatient = null;
 
+    // ─── AUTH HELPER ───
+    async function authFetch(url, options = {}) {
+      const token = sessionStorage.getItem('coat_token');
+      if (!token) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401 });
+      }
+      options.headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
+      const res = await fetch(url, options);
+      if (res.status === 401) {
+        sessionStorage.removeItem('coat_token');
+        sessionStorage.removeItem('coat_user');
+        window.location.replace('/login.html?returnTo=' + encodeURIComponent(window.location.pathname));
+        return res;
+      }
+      return res;
+    }
+
     document.getElementById('searchInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') searchPatient();
     });
@@ -104,7 +124,7 @@
 
       try {
         // Primero buscar pacientes
-        const searchRes = await fetch(`${API_BASE}/api/patients/search?q=${encodeURIComponent(query)}`);
+        const searchRes = await authFetch(`${API_BASE}/api/patients/search?q=${encodeURIComponent(query)}`);
         const searchData = await searchRes.json();
 
         if (searchData.pacientes.length === 0) {
@@ -117,7 +137,7 @@
         currentPatient = patient;
 
         // Obtener historial completo
-        const historyRes = await fetch(`${API_BASE}/api/patient-history/${patient.remitente}`);
+        const historyRes = await authFetch(`${API_BASE}/api/patient-history/${patient.remitente}`);
         const historyData = await historyRes.json();
 
         // Mostrar info del paciente
