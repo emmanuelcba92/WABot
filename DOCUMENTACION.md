@@ -168,11 +168,14 @@ El Worker mantiene caches en memoria para acceso rápido:
 | `GET` | `/api/patient-history/:remitente` | Historial de un paciente |
 | `GET` | `/api/patients/search` | Buscar pacientes |
 
-### API de Mensajería
+### API de Mensajería & Auditoría
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `POST` | `/api/send-message` | Enviar mensaje a paciente |
+| `POST` | `/api/send-location` | Enviar ubicación GPS nativa a paciente |
+| `GET` | `/api/audit-logs` | Obtener registros de auditoría (Admin) |
+| `POST` | `/api/audit-logs` | Registrar evento en auditoría |
 | `GET` | `/api/pending-outgoing` | Obtener mensajes pendientes |
 | `POST` | `/api/sse-ack` | ACK de mensaje enviado por gateway |
 
@@ -224,9 +227,11 @@ El Worker mantiene caches en memoria para acceso rápido:
 
 1. **Cache en memoria**: Reduce lecturas a D1
 2. **Merge D1 + memoria**: Previene stale reads
-3. **Polling adaptativo**: 5s cuando SSE caído, 30s cuando SSE vivo
-4. **Deduplicación**: Evita procesar mensajes dos veces
-5. **SSE push**: Notificaciones instantáneas cuando SSE está conectado
+3. **Polling adaptativo**: 3s con actividad, 8s moderado, 15s inactivo, 5s minimizado
+4. **Auto-logout por inactividad**: Tras 2 horas sin interacción del operador (movimiento de mouse/teclas), la sesión se cierra automáticamente deteniendo todas las peticiones a Cloudflare.
+5. **Notificaciones Sonoras & Alertas PWA**: Avisos multinota de audio sutil (Web Audio API) y alertas emergentes del sistema operativo (Web Notifications API) para enterarse sin mantener la ventana en primer plano.
+6. **Deduplicación**: Evita procesar mensajes dos veces
+7. **SSE push**: Notificaciones instantáneas cuando SSE está conectado
 
 ### Umbrales de Alerta
 

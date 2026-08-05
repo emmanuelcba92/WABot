@@ -61,3 +61,14 @@ CREATE TABLE IF NOT EXISTS provider_config (
   id TEXT PRIMARY KEY DEFAULT 'current',
   provider TEXT NOT NULL DEFAULT 'd1'
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  userRole TEXT NOT NULL,
+  action TEXT NOT NULL,
+  details TEXT,
+  targetRemitente TEXT,
+  timestamp INTEGER NOT NULL,
+  createdAt TEXT NOT NULL
+);

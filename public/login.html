@@ -454,6 +454,11 @@
     }
 
     // Al cargar la página
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reason') === 'inactivity') {
+      showError('🔒 Tu sesión se cerró automáticamente por inactividad (2 horas sin uso).');
+    }
+
     checkAlreadyLoggedIn();
   </script>
 </body>

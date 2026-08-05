@@ -28,7 +28,8 @@ export class D1Service {
       `CREATE TABLE IF NOT EXISTS quick_replies (id TEXT PRIMARY KEY DEFAULT 'replies', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS pdf_config (id TEXT PRIMARY KEY DEFAULT 'pdfs', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS tag_config (id TEXT PRIMARY KEY DEFAULT 'tags', data TEXT NOT NULL, updatedAt TEXT NOT NULL)`,
-      `CREATE TABLE IF NOT EXISTS heartbeat (id TEXT PRIMARY KEY DEFAULT 'ping', lastPing INTEGER NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS heartbeat (id TEXT PRIMARY KEY DEFAULT 'ping', lastPing INTEGER NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, username TEXT NOT NULL, userRole TEXT NOT NULL, action TEXT NOT NULL, details TEXT, targetRemitente TEXT, timestamp INTEGER NOT NULL, createdAt TEXT NOT NULL)`
     ];
 
     for (const q of queries) {
@@ -927,7 +928,11 @@ export class D1Service {
     isForwardToDoctor: boolean = false,
     action: 'send' | 'delete' | 'edit' = 'send',
     targetMsgId?: string,
-    targetMsgKey?: any
+    targetMsgKey?: any,
+    latitude?: number,
+    longitude?: number,
+    locationName?: string,
+    locationAddress?: string
   ): Promise<PendingOutgoingMsg> {
     let targetJid = remitente;
     let computedAlt = altRemitente;
@@ -955,6 +960,10 @@ export class D1Service {
       pdfNombre,
       pdfBase64,
       imagenBase64,
+      latitude,
+      longitude,
+      locationName,
+      locationAddress,
       timestamp: new Date().toISOString(),
       action,
       targetMsgId,
@@ -1050,5 +1059,55 @@ export class D1Service {
       });
     }
     return mockNames.length;
+  }
+
+  // ─── AUDIT LOGS (REGISTRO DE AUDITORÍA) ───
+  private static inMemoryAuditLogs: Array<Record<string, any>> = [];
+
+  public async addAuditLog(
+    username: string,
+    userRole: string,
+    action: string,
+    details?: string,
+    targetRemitente?: string
+  ): Promise<void> {
+    const logItem = {
+      id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      username,
+      userRole,
+      action,
+      details: details || '',
+      targetRemitente: targetRemitente || '',
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString()
+    };
+
+    D1Service.inMemoryAuditLogs.unshift(logItem);
+    if (D1Service.inMemoryAuditLogs.length > 500) {
+      D1Service.inMemoryAuditLogs = D1Service.inMemoryAuditLogs.slice(0, 500);
+    }
+
+    if (!this.db) return;
+    try {
+      await this.initTables();
+      await this.db
+        .prepare('INSERT INTO audit_logs (id, username, userRole, action, details, targetRemitente, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(logItem.id, logItem.username, logItem.userRole, logItem.action, logItem.details, logItem.targetRemitente, logItem.timestamp, logItem.createdAt)
+        .run();
+    } catch (e) {
+      console.error('Error inserting audit log in D1:', e);
+    }
+  }
+
+  public async getAuditLogs(): Promise<Array<Record<string, any>>> {
+    if (!this.db) return D1Service.inMemoryAuditLogs;
+    await this.initTables();
+    try {
+      const { results } = await this.db.prepare('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 200').all();
+      return results || D1Service.inMemoryAuditLogs;
+    } catch (e) {
+      console.error('Error reading audit logs from D1:', e);
+      return D1Service.inMemoryAuditLogs;
+    }
   }
 }

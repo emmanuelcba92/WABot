@@ -140,8 +140,8 @@ async function broadcastToWebApp(env: Env, data: any) {
 }
 
 // Helper: agregar a cola de pending y notificar gateways via SSE
-async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit' | 'mark_read', targetMsgId?: string, targetMsgKey?: any, env?: Env) {
-  const item = await db.addPendingOutgoing(remitente, text, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitente, isForwardToDoctor, action, targetMsgId, targetMsgKey);
+async function addPendingAndNotify(db: any, remitente: string, text: string, idConsulta?: string, pdfUrl?: string, pdfNombre?: string, pdfBase64?: string, imagenBase64?: string, altRemitente?: string, isForwardToDoctor?: boolean, action?: 'send' | 'delete' | 'edit' | 'mark_read', targetMsgId?: string, targetMsgKey?: any, env?: Env, latitude?: number, longitude?: number, locationName?: string, locationAddress?: string) {
+  const item = await db.addPendingOutgoing(remitente, text, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitente, isForwardToDoctor, action, targetMsgId, targetMsgKey, latitude, longitude, locationName, locationAddress);
 
   // Notificar via Durable Object (fire-and-forget)
   if (env?.SSE_BROKER) {
@@ -1797,6 +1797,94 @@ app.post('/api/run-cleanup', async (c) => {
     return c.json({ success: true, deleted: result.deleted, details: result.details });
   } catch (e: any) {
     return c.json({ success: false, error: e?.message }, 500);
+  }
+});
+
+// ─── ENDPOINT: ENVÍO DE UBICACIÓN GPS NATIVA (DISPONIBLE PARA TODOS LOS OPERADORES) ───
+app.post('/api/send-location', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { remitente, idConsulta, usuario, userRole, latitude, longitude, locationName, locationAddress } = body;
+
+    if (!remitente) {
+      return c.json({ error: 'Falta remitente' }, 400);
+    }
+
+    const lat = latitude || -31.4201; // Coordenadas por defecto (Clínica COAT / Córdoba)
+    const lng = longitude || -64.1888;
+    const name = locationName || 'Clínica COAT';
+    const address = locationAddress || 'Córdoba, Argentina';
+
+    const msgId = `msg_loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const db = DBFactory.createService(c.env);
+
+    const botConfig = await db.getBotConfig();
+    const showOperatorName = botConfig.showOperatorName || false;
+    const nombreOperador = showOperatorName ? (usuario || 'Secretaría') : 'Secretaría';
+
+    const textoLoc = `📍 *[${nombreOperador}]* Ubicación de la Clínica: ${name} (${address})`;
+
+    if (idConsulta) {
+      await db.registrarRespuestaSecretaria(idConsulta, `📍 Ubicación enviada: ${name}`, msgId, usuario);
+    }
+
+    await db.agregarMensajeHistorial(remitente, {
+      id: msgId,
+      sender: 'secretaria',
+      text: textoLoc,
+      timestamp: new Date().toISOString(),
+      operatorName: usuario
+    });
+
+    let altRemitenteForSend: string | undefined = undefined;
+    if (idConsulta) {
+      const consultas = await db.getConsultas();
+      const consulta = consultas.find((c: any) => c.id === idConsulta);
+      if (consulta?.datos?.altRemitente) {
+        altRemitenteForSend = consulta.datos.altRemitente;
+      }
+    }
+
+    await addPendingAndNotify(
+      db, remitente, textoLoc, idConsulta, undefined, undefined, undefined, undefined,
+      altRemitenteForSend, false, 'send', msgId, undefined, c.env, lat, lng, name, address
+    );
+
+    // Registrar en auditoría
+    await db.addAuditLog(
+      usuario || 'Secretaría',
+      userRole || 'secretaria',
+      'ENVIO_UBICACION',
+      `Ubicación enviada a ${remitente}: ${name}`,
+      remitente
+    );
+
+    return c.json({ success: true, msgId });
+  } catch (e: any) {
+    return c.json({ error: 'Error al enviar ubicación', details: e?.message }, 500);
+  }
+});
+
+// ─── ENDPOINTS DE REGISTRO DE AUDITORÍA (AUDIT LOGS - SÓLO ADMINS EN FRONTEND) ───
+app.get('/api/audit-logs', async (c) => {
+  try {
+    const db = DBFactory.createService(c.env);
+    const logs = await db.getAuditLogs();
+    return c.json({ success: true, logs });
+  } catch (e: any) {
+    return c.json({ error: 'Error al obtener registros de auditoría', details: e?.message }, 500);
+  }
+});
+
+app.post('/api/audit-logs', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { username, userRole, action, details, targetRemitente } = body;
+    const db = DBFactory.createService(c.env);
+    await db.addAuditLog(username || 'Sistema', userRole || 'secretaria', action || 'ACCION', details, targetRemitente);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: 'Error al registrar auditoría', details: e?.message }, 500);
   }
 });
 

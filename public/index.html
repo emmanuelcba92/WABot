@@ -675,6 +675,7 @@
       const isRoleAdmin = window._currentUserRole === 'admin';
       const tabSettingsBtn = document.getElementById('tabSettingsBtn');
       const tabDashboardBtn = document.getElementById('tabDashboardBtn');
+      const tabAuditBtn = document.getElementById('tabAuditBtn');
       const nameEl = document.getElementById('currentUserName');
       const dashboardBtn = document.querySelector('.admin-only');
       const btnExport = document.getElementById('btnExportExcel');
@@ -688,6 +689,9 @@
       }
       if (tabDashboardBtn) {
         tabDashboardBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
+      }
+      if (tabAuditBtn) {
+        tabAuditBtn.style.display = isRoleAdmin ? 'inline-flex' : 'none';
       }
 
       if (dashboardBtn) {
@@ -747,11 +751,20 @@
     <div class="nav-tabs">
       <button class="nav-tab-btn active" id="tabMainBtn" onclick="switchMainTab('consultas')">📥 Solicitudes (<span id="countBadge">0</span>)</button>
       <button class="nav-tab-btn" id="tabHistoryBtn" onclick="switchMainTab('history')">📋 Historial</button>
+      <button class="nav-tab-btn" id="tabAuditBtn" onclick="switchMainTab('audit')" style="display: none;">📜 Registro Auditoría</button>
       <button class="nav-tab-btn" id="tabDashboardBtn" onclick="switchMainTab('dashboard')" style="display: none;">📊 Dashboard</button>
       <button class="nav-tab-btn" id="tabSettingsBtn" onclick="switchMainTab('settings')" style="display: none;">⚙️ Configuración del Bot & Horarios</button>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <!-- Controles de Sonido y Alertas de Escritorio -->
+      <button id="soundToggleBtn" onclick="toggleSoundNotifications()" style="font-size: 0.75rem; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 4px 10px; border-radius: 16px; cursor: pointer; outline: none; transition: all 0.2s;">
+        🔔 Sonido Activado
+      </button>
+      <button id="desktopNotifBtn" onclick="requestDesktopNotificationPermission()" style="font-size: 0.75rem; font-weight: 600; color: #facc15; background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.3); padding: 4px 10px; border-radius: 16px; cursor: pointer; outline: none; transition: all 0.2s;">
+        🔔 Activar Alertas Escritorio
+      </button>
+
       <!-- Status de conexión compacto -->
       <div id="connectorStatusBadge" style="font-size: 0.75rem; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 5px;">
         <span id="statusDot" style="width: 7px; height: 7px; background: #34d399; border-radius: 50%;"></span>
@@ -952,8 +965,36 @@
           </div>
           <div style="background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
             <h3 style="color: var(--accent); font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border);">📊 Estado de Consultas</h3>
-            <div id="dashStatusChart"><div style="text-align:center;padding:20px;color:var(--text-muted);">Cargando...</div></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN REGISTRO DE AUDITORÍA (SÓLO ACCESIBLE PARA ADMINISTRADORES) -->
+    <div id="viewAudit" style="display: none; padding: 20px;">
+      <div style="background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border); padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h2 style="font-size: 1.3rem; font-weight: 700; color: #a78bfa;">📜 Registro de Auditoría del Sistema</h2>
+            <p style="font-size: 0.85rem; color: var(--muted);">Historial de acciones de secretarias y administradores (solo visible para administradores).</p>
           </div>
+          <button class="btn btn-secondary" onclick="fetchAuditLogsUI()" style="font-size: 0.85rem;">🔄 Actualizar Registro</button>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.05); text-align: left; color: var(--muted); border-bottom: 1px solid var(--border);">
+                <th style="padding: 12px;">Fecha / Hora</th>
+                <th style="padding: 12px;">Usuario</th>
+                <th style="padding: 12px;">Rol</th>
+                <th style="padding: 12px;">Acción</th>
+                <th style="padding: 12px;">Detalles</th>
+                <th style="padding: 12px;">Paciente</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogsTableBody">
+              <tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--muted);">Cargando registros...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1633,6 +1674,7 @@
     let activeSubEdit = { parentIndex: -1, subIndex: -1 };
     let previousConsultaIds = new Set();
     let processedVipMsgIds = new Set();
+    let processedNormalMsgIds = new Set();
     let openTagDropdowns = new Set();
     let lastRenderedChatId = null;
     let lastRenderedChatJson = '';
@@ -1850,7 +1892,97 @@
       return false;
     }
 
+    // ─── SISTEMA DE NOTIFICACIONES SONORAS Y ALERTAS DE ESCRITORIO ───
+    let isSoundEnabled = localStorage.getItem('coat_sound_enabled') !== 'false';
+
+    function toggleSoundNotifications() {
+      isSoundEnabled = !isSoundEnabled;
+      localStorage.setItem('coat_sound_enabled', isSoundEnabled ? 'true' : 'false');
+      updateNotificationControlUI();
+      if (isSoundEnabled) {
+        playIncomingMsgSound();
+      }
+    }
+
+    function requestDesktopNotificationPermission() {
+      if (!('Notification' in window)) {
+        alert('⚠️ Este navegador no soporta notificaciones de escritorio.');
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        updateNotificationControlUI();
+        if (permission === 'granted') {
+          try {
+            new Notification('🔔 Notificaciones de Clínica COAT activadas', {
+              body: 'Recibirás avisos en tiempo real cuando ingresen mensajes de pacientes.',
+              icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828884.png'
+            });
+          } catch(e) {}
+        }
+      });
+    }
+
+    function updateNotificationControlUI() {
+      const soundBtn = document.getElementById('soundToggleBtn');
+      const notifBtn = document.getElementById('desktopNotifBtn');
+
+      if (soundBtn) {
+        soundBtn.textContent = isSoundEnabled ? '🔔 Sonido Activado' : '🔕 Sonido Mutado';
+        soundBtn.style.background = isSoundEnabled ? 'rgba(52, 211, 153, 0.15)' : 'rgba(148, 163, 184, 0.15)';
+        soundBtn.style.color = isSoundEnabled ? '#34d399' : '#94a3b8';
+        soundBtn.style.borderColor = isSoundEnabled ? 'rgba(52, 211, 153, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+      }
+
+      if (notifBtn && 'Notification' in window) {
+        const perm = Notification.permission;
+        if (perm === 'granted') {
+          notifBtn.textContent = '🖥️ Alertas Escritorio ON';
+          notifBtn.style.background = 'rgba(56, 189, 248, 0.15)';
+          notifBtn.style.color = '#38bdf8';
+          notifBtn.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+        } else if (perm === 'denied') {
+          notifBtn.textContent = '🚫 Alertas Bloqueadas';
+          notifBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+          notifBtn.style.color = '#ef4444';
+          notifBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        } else {
+          notifBtn.textContent = '🔔 Activar Alertas Escritorio';
+          notifBtn.style.background = 'rgba(250, 204, 21, 0.15)';
+          notifBtn.style.color = '#facc15';
+          notifBtn.style.borderColor = 'rgba(250, 204, 21, 0.3)';
+        }
+      }
+    }
+
+    // Tono sutil multinota para mensajes normales de pacientes
+    function playIncomingMsgSound() {
+      if (!isSoundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Tono suave (C5 -> E5)
+        const playNote = (freq, startTime, duration) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0.15, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+
+        const now = ctx.currentTime;
+        playNote(523.25, now, 0.15);       // Do (C5)
+        playNote(659.25, now + 0.1, 0.25); // Mi (E5)
+      } catch (e) {}
+    }
+
+    // Tono especial distintivo para pacientes VIP / Urgentes
     function playVipChimeSound() {
+      if (!isSoundEnabled) return;
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
@@ -1896,7 +2028,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       initOperatorNameUI();
       autoPromptNotifications();
-      updateNotificationBtn();
+      updateNotificationControlUI();
       setViewMode(currentViewMode);
       fetchScheduleConfig();
       fetchBotConfig();
@@ -1908,6 +2040,31 @@
       fetchMenuTree();
       fetchConsultas();
       checkHeartbeatStatus();
+      // ─── AUTO-LOGOUT POR INACTIVIDAD (2 HORAS) ───
+      const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas
+      let _lastUserActivity = Date.now();
+
+      function updateInactivityTimer() {
+        _lastUserActivity = Date.now();
+      }
+
+      // Escuchar interacciones del usuario en la pantalla
+      ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+        window.addEventListener(evt, updateInactivityTimer, { passive: true });
+      });
+
+      function checkInactivity() {
+        const inactiveTime = Date.now() - _lastUserActivity;
+        if (inactiveTime >= INACTIVITY_LIMIT_MS) {
+          console.warn('[AutoLogout] 🔒 2 horas sin actividad de usuario. Cerrando sesión...');
+          sessionStorage.removeItem('coat_token');
+          sessionStorage.removeItem('coat_user');
+          window.location.replace('/login.html?reason=inactivity');
+          return true;
+        }
+        return false;
+      }
+
       // ─── SMART POLLING ADAPTATIVO ───
       // Empieza rápido (3s), se reduce si no hay actividad, se acelera al recibir mensajes
       let _pollInterval = 3000;         // Intervalo actual
@@ -1916,6 +2073,9 @@
       let _quietSince = Date.now();      // Desde cuándo no hay mensajes nuevos
 
       async function smartPoll() {
+        // Si superó las 2 hs de inactividad del operador, cerrar sesión y cancelar polling
+        if (checkInactivity()) return;
+
         if (document.hidden) {
           // Pestaña en segundo plano: pausa el polling
           _pollTimer = setTimeout(smartPoll, 5000);
@@ -1950,9 +2110,10 @@
         _pollTimer = setTimeout(smartPoll, _pollInterval);
       }
 
-      // Reactivar polling rápido al volver al foco
+      // Reactivar polling rápido al volver al foco (si no expiró por inactividad)
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
+          if (checkInactivity()) return;
           _pollInterval = 3000;
           _quietSince = Date.now();
           clearTimeout(_pollTimer);
@@ -2873,36 +3034,106 @@
       const viewS = document.getElementById('viewSettings');
       const viewH = document.getElementById('viewHistory');
       const viewD = document.getElementById('viewDashboard');
+      const viewA = document.getElementById('viewAudit');
       const btnC = document.getElementById('tabMainBtn');
       const btnS = document.getElementById('tabSettingsBtn');
       const btnH = document.getElementById('tabHistoryBtn');
       const btnD = document.getElementById('tabDashboardBtn');
+      const btnA = document.getElementById('tabAuditBtn');
 
       // Ocultar todas las vistas
-      viewC.style.display = 'none';
-      viewS.style.display = 'none';
-      viewH.style.display = 'none';
-      viewD.style.display = 'none';
+      if (viewC) viewC.style.display = 'none';
+      if (viewS) viewS.style.display = 'none';
+      if (viewH) viewH.style.display = 'none';
+      if (viewD) viewD.style.display = 'none';
+      if (viewA) viewA.style.display = 'none';
 
       // Remover active de todos los botones
-      btnC.classList.remove('active');
-      btnS.classList.remove('active');
-      btnH.classList.remove('active');
-      btnD.classList.remove('active');
+      if (btnC) btnC.classList.remove('active');
+      if (btnS) btnS.classList.remove('active');
+      if (btnH) btnH.classList.remove('active');
+      if (btnD) btnD.classList.remove('active');
+      if (btnA) btnA.classList.remove('active');
 
       if (tab === 'settings') {
-        viewS.style.display = 'flex';
-        btnS.classList.add('active');
+        if (viewS) viewS.style.display = 'flex';
+        if (btnS) btnS.classList.add('active');
       } else if (tab === 'history') {
-        viewH.style.display = 'block';
-        btnH.classList.add('active');
+        if (viewH) viewH.style.display = 'block';
+        if (btnH) btnH.classList.add('active');
       } else if (tab === 'dashboard') {
-        viewD.style.display = 'block';
-        btnD.classList.add('active');
+        if (viewD) viewD.style.display = 'block';
+        if (btnD) btnD.classList.add('active');
         dashLoadData();
+      } else if (tab === 'audit') {
+        if (viewA) viewA.style.display = 'block';
+        if (btnA) btnA.classList.add('active');
+        fetchAuditLogsUI();
       } else {
-        viewC.style.display = 'block';
-        btnC.classList.add('active');
+        if (viewC) viewC.style.display = 'block';
+        if (btnC) btnC.classList.add('active');
+      }
+    }
+
+    // ─── ENVÍO DE UBICACIÓN GPS NATIVA ───
+    async function sendLocationGps(cardId, remitente) {
+      if (!confirm('📍 ¿Enviar la ubicación GPS nativa de la Clínica COAT a este paciente?')) return;
+      try {
+        const res = await authFetch('/api/send-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            remitente,
+            idConsulta: cardId,
+            usuario: currentOperatorName || window._currentUserName || 'Secretaría',
+            userRole: window._currentUserRole || 'secretaria',
+            locationName: 'Clínica COAT',
+            locationAddress: 'Córdoba, Argentina'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert('📍 Ubicación GPS enviada exitosamente por WhatsApp.');
+          fetchConsultas(true);
+        } else {
+          alert('❌ Error enviando ubicación: ' + (data.error || 'Intente nuevamente'));
+        }
+      } catch (e) {
+        alert('⚠️ Error de conexión al enviar ubicación.');
+      }
+    }
+
+    // ─── AUDIT LOGS (REGISTRO DE AUDITORÍA - SÓLO ADMINS) ───
+    async function fetchAuditLogsUI() {
+      const tbody = document.getElementById('auditLogsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--muted);">Cargando registros...</td></tr>';
+      try {
+        const res = await authFetch('/api/audit-logs');
+        const data = await res.json();
+        if (res.ok && data.logs) {
+          if (data.logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--muted);">No hay registros de auditoría aún.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = data.logs.map(log => {
+            const fechaStr = new Date(log.timestamp || log.createdAt).toLocaleString();
+            return `
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 10px; color: var(--muted); font-size: 0.8rem;">${fechaStr}</td>
+                <td style="padding: 10px; font-weight: 700; color: var(--accent);">${log.username}</td>
+                <td style="padding: 10px;"><span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: ${log.userRole === 'admin' ? 'rgba(167, 139, 250, 0.2)' : 'rgba(56, 189, 248, 0.2)'}; color: ${log.userRole === 'admin' ? '#a78bfa' : '#38bdf8'}; font-weight: 700;">${log.userRole === 'admin' ? 'Admin' : 'Secr.'}</span></td>
+                <td style="padding: 10px; font-weight: 600; color: #facc15;">${log.action}</td>
+                <td style="padding: 10px; color: #cbd5e1;">${log.details || '-'}</td>
+                <td style="padding: 10px; color: var(--muted); font-size: 0.8rem;">${log.targetRemitente || '-'}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #ef4444;">Error al cargar auditoría.</td></tr>';
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #ef4444;">Error de red.</td></tr>';
       }
     }
 
@@ -3611,18 +3842,20 @@
         const data = await res.json();
         allConsultas = data.consultas || [];
 
-        // Detectar si ingresó un mensaje de un número Prioritario/VIP configurado (NO por etiqueta urgente)
+        // Detectar si ingresó un mensaje de un paciente (normal o VIP)
         let hasNewVip = false;
-        allConsultas.forEach(c => {
-          const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
-          if (vipMatch) {
-            const respuestasPaciente = c.datos?.respuestasPaciente || [];
-            const msgCount = 1 + respuestasPaciente.length;
-            const msgKey = `${c.id}_${msgCount}`;
+        let hasNewNormal = false;
 
+        allConsultas.forEach(c => {
+          const respuestasPaciente = c.datos?.respuestasPaciente || [];
+          const msgCount = 1 + respuestasPaciente.length;
+          const msgKey = `${c.id}_${msgCount}`;
+
+          const vipMatch = vipContactsList.find(v => isVipMatch(c, v));
+
+          if (vipMatch) {
             if (!processedVipMsgIds.has(msgKey)) {
               processedVipMsgIds.add(msgKey);
-
               if (previousConsultaIds.size > 0) {
                 hasNewVip = true;
 
@@ -3643,12 +3876,36 @@
                 }
               }
             }
+          } else {
+            // Mensaje de paciente estándar
+            if (!processedNormalMsgIds.has(msgKey)) {
+              processedNormalMsgIds.add(msgKey);
+              if (previousConsultaIds.size > 0) {
+                hasNewNormal = true;
+
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  const contactName = c.datos?.pushName ? `${c.datos.pushName} (${getPhoneDisplay(c)})` : getPhoneDisplay(c);
+                  const lastMsg = respuestasPaciente.length > 0
+                    ? respuestasPaciente[respuestasPaciente.length - 1].texto
+                    : (c.datos?.contenidoMensaje || 'Nuevo mensaje recibido');
+
+                  try {
+                    new Notification(`💬 Nuevo mensaje de ${contactName}`, {
+                      body: lastMsg,
+                      icon: 'https://cdn-icons-png.flaticon.com/512/733/733585.png'
+                    });
+                  } catch (nErr) {}
+                }
+              }
+            }
           }
         });
 
         previousConsultaIds = new Set(allConsultas.map(c => c.id));
         if (hasNewVip) {
           playVipChimeSound();
+        } else if (hasNewNormal) {
+          playIncomingMsgSound();
         }
 
         updateStats(allConsultas);
@@ -4126,8 +4383,11 @@
                 <div class="reply-box">
                   <label style="font-size: 0.82rem; font-weight: 700; color: var(--muted);">💬 Responder al Paciente por WhatsApp:</label>
 
-                  <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS -->
-                  <div class="quick-reply-chips">
+                  <!-- BOTONES DINÁMICOS DE RESPUESTAS RÁPIDAS Y UBICACIÓN GPS -->
+                  <div class="quick-reply-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px;">
+                    <button class="chip-btn" style="background: rgba(0, 168, 132, 0.2); color: #34d399; border: 1px solid #34d399; font-weight: 700;" onclick="sendLocationGps('${c.id}', '${c.remitente}')">
+                      📍 Enviar Ubicación GPS
+                    </button>
                     ${quickRepliesList.map(qr => `
                       <button class="chip-btn" onclick="insertTemplate('${c.id}', \`${qr.text.replace(/`/g, '\\`')}\`)">${qr.title}</button>
                     `).join('')}

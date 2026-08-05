@@ -683,6 +683,27 @@ const lastIncomingKeysMap = new Map();
           console.log(`📤 Imagen enviada a ${targetJid}.`);
           sendSuccess = true;
           break;
+        } else if (msg.latitude && msg.longitude) {
+          const sentRes = await sock.sendMessage(targetJid, {
+            location: {
+              degreesLatitude: Number(msg.latitude),
+              degreesLongitude: Number(msg.longitude),
+              name: msg.locationName || 'Clínica COAT',
+              address: msg.locationAddress || 'Córdoba, Argentina'
+            }
+          });
+          if (sentRes && sentRes.key) {
+            registerSentKey(msg.id, sentRes.key);
+            if (msg.targetMsgId) registerSentKey(msg.targetMsgId, sentRes.key);
+            fetch('https://app.cpcoat.workers.dev/api/message-sent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ remitente: msg.remitente, msgId: msg.id, internalMsgId: msg.internalMsgId, key: sentRes.key })
+            }).catch(() => {});
+          }
+          console.log(`📍 Ubicación GPS nativa enviada a ${targetJid} (${msg.locationName || 'Clínica COAT'})`);
+          sendSuccess = true;
+          break;
         } else if (msg.text) {
           const sentRes = await sock.sendMessage(targetJid, { text: msg.text });
           if (sentRes && sentRes.key) {

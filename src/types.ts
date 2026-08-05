@@ -76,6 +76,10 @@ export interface PendingOutgoingMsg {
   pdfNombre?: string;
   pdfBase64?: string;
   imagenBase64?: string;
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  locationAddress?: string;
   timestamp: string;
   action?: 'send' | 'delete' | 'edit';
   targetMsgId?: string;
