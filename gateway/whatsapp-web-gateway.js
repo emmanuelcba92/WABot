@@ -765,9 +765,9 @@ const lastIncomingKeysMap = new Map();
   _processSsePendingMessage = processSsePendingMessage;
 
   // Polling adaptativo de seguridad (Safety Net)
-  // Revisa la cola de mensajes salientes pendientes periódicamente
+  // Revisa la cola de mensajes salientes pendientes periódicamente cada 5 segundos
   let lastPollingTime = 0;
-  let pollingInterval = 5000; // Polling rápido de respaldo de 5 segundos
+  const pollingInterval = 5000;
 
   setInterval(async () => {
     const now = Date.now();
@@ -783,35 +783,29 @@ const lastIncomingKeysMap = new Map();
       const messages = data.messages || [];
 
       if (messages.length > 0) {
-        // Si hay mensajes, procesar y resetear intervalo
-        pollingInterval = 30000;
         for (const msg of messages) {
           try {
             // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
-          const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
-          if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
-            continue;
-          }
+            const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
+            if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
+              continue;
+            }
 
-          console.log(`🔄 [POLLING] Procesando mensaje pendiente: ${msgDedupeKey}`);
-          const sendResult = await sendOutgoingMessage(msg);
-          if (sendResult !== false) {
-            markMsgAsSent(msgDedupeKey);
-            if (msg.id) markMsgAsSent(msg.id);
+            console.log(`🔄 [POLLING] Procesando mensaje pendiente: ${msgDedupeKey}`);
+            const sendResult = await sendOutgoingMessage(msg);
+            if (sendResult !== false) {
+              markMsgAsSent(msgDedupeKey);
+              if (msg.id) markMsgAsSent(msg.id);
+            }
+          } catch (sendErr) {
+            console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);
           }
-        } catch (sendErr) {
-          console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);
         }
-      }
-      } else {
-        // Sin mensajes: aumentar intervalo progresivamente (ahorrar requests)
-        pollingInterval = Math.min(pollingInterval * 2, MAX_POLL_INTERVAL);
       }
     } catch (pollErr) {
       // Ignorar errores temporales de red en el polling saliente
-      pollingInterval = Math.min(pollingInterval * 2, MAX_POLL_INTERVAL);
     }
-  }, 10000); // Tick cada 10s, pero el intervalo real lo controla pollingInterval
+  }, 5000);
 
 }
 
