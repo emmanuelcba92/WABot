@@ -3030,6 +3030,7 @@
     }
 
     function switchMainTab(tab) {
+      window._currentMainTab = tab;
       const viewC = document.getElementById('viewConsultas');
       const viewS = document.getElementById('viewSettings');
       const viewH = document.getElementById('viewHistory');
@@ -3075,32 +3076,22 @@
       }
     }
 
-    // ─── ENVÍO DE UBICACIÓN GPS NATIVA ───
-    async function sendLocationGps(cardId, remitente) {
-      if (!confirm('📍 ¿Enviar la ubicación GPS nativa de la Clínica COAT a este paciente?')) return;
-      try {
-        const res = await authFetch('/api/send-location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            remitente,
-            idConsulta: cardId,
-            usuario: currentOperatorName || window._currentUserName || 'Secretaría',
-            userRole: window._currentUserRole || 'secretaria',
-            locationName: 'Clínica COAT',
-            locationAddress: 'Córdoba, Argentina'
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          alert('📍 Ubicación GPS enviada exitosamente por WhatsApp.');
-          fetchConsultas(true);
-        } else {
-          alert('❌ Error enviando ubicación: ' + (data.error || 'Intente nuevamente'));
-        }
-      } catch (e) {
-        alert('⚠️ Error de conexión al enviar ubicación.');
-      }
+    // ─── ENVÍO DE UBICACIÓN DESDE CONFIGURACIÓN ───
+    function sendLocationGps(idConsulta, remitente) {
+      authFetch('/api/clinic-config').then(r => r.json()).then(cfg => {
+        const nombre = cfg.nombre || 'Clínica COAT';
+        const dir = cfg.direccion || 'Av. Vélez Sarsfield 468, Córdoba';
+        const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat || -31.416667},${cfg.lng || -64.183333}`;
+        const text = `📍 *Ubicación de ${nombre}:*\n${dir}.\n🗺️ Abrir en GPS / Google Maps: ${url}`;
+        const textarea = document.getElementById(`replyText_${idConsulta}`);
+        if (textarea) textarea.value = text;
+        responderViaApi(idConsulta, remitente);
+      }).catch(() => {
+        const text = "📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 468, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333";
+        const textarea = document.getElementById(`replyText_${idConsulta}`);
+        if (textarea) textarea.value = text;
+        responderViaApi(idConsulta, remitente);
+      });
     }
 
     // ─── AUDIT LOGS (REGISTRO DE AUDITORÍA - SÓLO ADMINS) ───
@@ -3842,9 +3833,8 @@
         const data = await res.json();
         allConsultas = data.consultas || [];
 
-        // Detectar si ingresó un mensaje de un paciente (normal o VIP)
+        // Detectar si ingresó un mensaje de un contacto Prioritario / VIP
         let hasNewVip = false;
-        let hasNewNormal = false;
 
         allConsultas.forEach(c => {
           const respuestasPaciente = c.datos?.respuestasPaciente || [];
@@ -3876,36 +3866,12 @@
                 }
               }
             }
-          } else {
-            // Mensaje de paciente estándar
-            if (!processedNormalMsgIds.has(msgKey)) {
-              processedNormalMsgIds.add(msgKey);
-              if (previousConsultaIds.has(c.id)) {
-                hasNewNormal = true;
-
-                if ('Notification' in window && Notification.permission === 'granted') {
-                  const contactName = c.datos?.pushName ? `${c.datos.pushName} (${getPhoneDisplay(c)})` : getPhoneDisplay(c);
-                  const lastMsg = respuestasPaciente.length > 0
-                    ? respuestasPaciente[respuestasPaciente.length - 1].texto
-                    : (c.datos?.contenidoMensaje || 'Nuevo mensaje recibido');
-
-                  try {
-                    new Notification(`💬 Nuevo mensaje de ${contactName}`, {
-                      body: lastMsg,
-                      icon: 'https://cdn-icons-png.flaticon.com/512/733/733585.png'
-                    });
-                  } catch (nErr) {}
-                }
-              }
-            }
           }
         });
 
         previousConsultaIds = new Set(allConsultas.map(c => c.id));
         if (hasNewVip) {
           playVipChimeSound();
-        } else if (hasNewNormal) {
-          playIncomingMsgSound();
         }
 
         updateStats(allConsultas);
