@@ -2085,21 +2085,11 @@
         }, 0);
 
         if (currentCount !== prevCount && prevCount !== -1) {
-          // Hay actividad: volver al intervalo rápido
-          _pollInterval = 3000;
           _quietSince = Date.now();
-        } else {
-          // Sin cambios: calcular cuánto tiempo llevamos sin actividad
-          const quietMs = Date.now() - _quietSince;
-          if (quietMs > 120000) {
-            _pollInterval = 15000; // Más de 2 min sin mensajes: polling lento
-          } else if (quietMs > 30000) {
-            _pollInterval = 8000;  // Más de 30s sin mensajes: polling moderado
-          } else {
-            _pollInterval = 3000;  // Activo recientemente: polling rápido
-          }
         }
 
+        // Mantener intervalo ágil de 3 segundos mientras la pestaña esté en uso
+        _pollInterval = 3000;
         _lastMsgCount = currentCount;
         _pollTimer = setTimeout(smartPoll, _pollInterval);
       }
