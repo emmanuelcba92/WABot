@@ -4673,25 +4673,13 @@
             </div>
           `;
 
-          const isUserInteracting = document.activeElement &&
-                                    containerChatMain &&
-                                    containerChatMain.contains(document.activeElement) &&
-                                    ['SELECT', 'TEXTAREA', 'INPUT'].includes(document.activeElement.tagName);
-
-          const chatJson = JSON.stringify({
-            id: c.id,
-            opcion: c.opcion,
-            estado: c.estado,
-            remitente: c.remitente,
-            respuestasSecretaria: c.datos?.respuestasSecretaria,
-            respuestasPaciente: c.datos?.respuestasPaciente,
-            etiquetas: c.datos?.etiquetas,
-            enGestionPor: c.datos?.enGestionPor
-          });
+          const isTypingInTextarea = document.activeElement &&
+                                     document.activeElement.id === `replyText_${c.id}` &&
+                                     document.activeElement.value.trim().length > 0;
 
           const chatChanged = (lastRenderedChatId !== c.id) || (lastRenderedChatJson !== chatJson);
 
-          if (forceRedraw || (chatChanged && !isUserInteracting)) {
+          if (forceRedraw || (chatChanged && !isTypingInTextarea)) {
             lastRenderedChatId = c.id;
             lastRenderedChatJson = chatJson;
             containerChatMain.innerHTML = mainHtml;
