@@ -764,20 +764,13 @@ const lastIncomingKeysMap = new Map();
   // Asignar la referencia global para que handleSSEMessage y fetchPendingMessagesOnce la usen
   _processSsePendingMessage = processSsePendingMessage;
 
-  // Polling adaptativo: solo cuando SSE está caído, con backoff exponencial
-  // Cuando hay tráfico, SSE se mantiene solo. El polling es solo respaldo.
+  // Polling adaptativo de seguridad (Safety Net)
+  // Revisa la cola de mensajes salientes pendientes periódicamente
   let lastPollingTime = 0;
-  let pollingInterval = 30000; // Empezar con 30s
-  const MAX_POLL_INTERVAL = 300000; // Máximo 5 minutos
+  let pollingInterval = 5000; // Polling rápido de respaldo de 5 segundos
 
   setInterval(async () => {
     const now = Date.now();
-
-    // Si SSE está conectado y activo, no hacer polling (ahorrar requests)
-    if (sseConnection && (now - sseLastDataTime < 25000)) {
-      pollingInterval = 30000; // Resetear a 30s cuando SSE vuelve
-      return;
-    }
 
     if (now - lastPollingTime < pollingInterval) return;
     lastPollingTime = now;
