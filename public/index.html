@@ -4673,6 +4673,17 @@
             </div>
           `;
 
+          const chatJson = JSON.stringify({
+            id: c.id,
+            opcion: c.opcion,
+            estado: c.estado,
+            remitente: c.remitente,
+            respuestasSecretaria: c.datos?.respuestasSecretaria,
+            respuestasPaciente: c.datos?.respuestasPaciente,
+            etiquetas: c.datos?.etiquetas,
+            enGestionPor: c.datos?.enGestionPor
+          });
+
           const isTypingInTextarea = document.activeElement &&
                                      document.activeElement.id === `replyText_${c.id}` &&
                                      document.activeElement.value.trim().length > 0;
