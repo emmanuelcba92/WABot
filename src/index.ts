@@ -749,53 +749,7 @@ app.post('/webhook', async (c) => {
     const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu';
 
     if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64)) {
-      // Si el paciente ya está en atención humana, intentar agregar a la consulta
-      if (sesionPre.estado === 'esperando_atencion_humana') {
-        const adjuntado = await db.appendPacienteMensajeAConsulta(
-          remitente, mensaje, body.imagenBase64, body.pdfBase64, body.pdfNombre, body.altRemitente, body.pushName
-        );
-
-        if (adjuntado) {
-          // Segundo broadcast DESPUÉS de que el mensaje se guardó en D1
-          // para que el web app refresque con los datos actualizados
-          broadcastToWebApp(c.env, {
-            type: 'new_message',
-            remitente,
-            text: mensaje || '(Imagen/Documento)',
-            sender: 'paciente',
-            pushName: body.pushName
-          }).catch(() => {});
-
-          const silentResult = {
-            remitente,
-            respuesta: '',
-            estadoActual: 'esperando_atencion_humana',
-            enHorario: true,
-            timestamp: new Date().toISOString()
-          };
-          return c.json(silentResult, 200);
-        }
-
-        // No se encontró la consulta - verificar si hay consultas pendientes para decidir
-        const consultas = await db.getConsultas();
-        const cleanRem = remitente.toLowerCase().trim();
-        const cleanAlt = (body.altRemitente || '').toLowerCase().trim();
-        const tienePendiente = consultas.some((c: any) => {
-          const cRem = (c.remitente || '').toLowerCase().trim();
-          const cAlt = (c.datos?.altRemitente || '').toLowerCase().trim();
-          return (cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt)) && c.estado === 'pendiente';
-        });
-
-        if (tienePendiente) {
-          // Race condition con D1 - silenciar
-          return c.json({ remitente, respuesta: '', estadoActual: 'esperando_atencion_humana', enHorario: true, timestamp: new Date().toISOString() }, 200);
-        }
-
-        // Chat eliminado sin finalizar - dejar que el engine resetee a inicio
-        await db.saveSesion(remitente, 'inicio');
-        sesionPre.estado = 'inicio';
-      }
-
+      // Intentar siempre agregar el mensaje del paciente a una consulta pendiente si ya existe
       const adjuntado = await db.appendPacienteMensajeAConsulta(
         remitente,
         mensaje,
@@ -815,15 +769,29 @@ app.post('/webhook', async (c) => {
           pushName: body.pushName
         }).catch(() => {});
 
-        const silentResult = {
+        await db.saveSesion(remitente, 'esperando_atencion_humana');
+        return c.json({
           remitente,
           respuesta: '',
           estadoActual: 'esperando_atencion_humana',
           enHorario: true,
           timestamp: new Date().toISOString()
-        };
-        await db.saveSesion(remitente, 'esperando_atencion_humana');
-        return c.json(silentResult, 200);
+        }, 200);
+      }
+
+      if (sesionPre.estado === 'esperando_atencion_humana') {
+        const consultas = await db.getConsultas();
+        const cleanRem = remitente.toLowerCase().trim();
+        const cleanAlt = (body.altRemitente || '').toLowerCase().trim();
+        const tienePendiente = consultas.some((c: any) => {
+          const cRem = (c.remitente || '').toLowerCase().trim();
+          const cAlt = (c.datos?.altRemitente || '').toLowerCase().trim();
+          return (cRem === cleanRem || cRem === cleanAlt || (cleanAlt && cAlt === cleanAlt)) && c.estado === 'pendiente';
+        });
+
+        if (tienePendiente) {
+          return c.json({ remitente, respuesta: '', estadoActual: 'esperando_atencion_humana', enHorario: true, timestamp: new Date().toISOString() }, 200);
+        }
       }
     }
 
