@@ -3856,7 +3856,7 @@
           if (vipMatch) {
             if (!processedVipMsgIds.has(msgKey)) {
               processedVipMsgIds.add(msgKey);
-              if (previousConsultaIds.size > 0) {
+              if (previousConsultaIds.has(c.id)) {
                 hasNewVip = true;
 
                 if ('Notification' in window && Notification.permission === 'granted') {
@@ -3880,7 +3880,7 @@
             // Mensaje de paciente estándar
             if (!processedNormalMsgIds.has(msgKey)) {
               processedNormalMsgIds.add(msgKey);
-              if (previousConsultaIds.size > 0) {
+              if (previousConsultaIds.has(c.id)) {
                 hasNewNormal = true;
 
                 if ('Notification' in window && Notification.permission === 'granted') {
