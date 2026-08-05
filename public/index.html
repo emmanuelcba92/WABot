@@ -1229,30 +1229,21 @@
       <div id="subSettingsClinic" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: none; flex-direction: column; gap: 20px;">
         <div>
           <h3 style="font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px;">🏥 Configuración de la Clínica</h3>
-          <p style="font-size: 0.86rem; color: var(--muted);">Configura el nombre, la dirección y las coordenadas GPS de la clínica. Estos datos se usan automáticamente al enviar la ubicación a los pacientes.</p>
+          <p style="font-size: 0.86rem; color: var(--muted);">Configura el nombre, la dirección y el enlace directo de Google Maps. Estos datos se usan al enviar la ubicación a los pacientes.</p>
         </div>
 
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
           <div>
             <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Nombre de la Clínica</label>
-            <input type="text" id="clinicNombre" placeholder="ej: Clínica Médica COAT" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+            <input type="text" id="clinicNombre" placeholder="ej: Clínica Privada COAT" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
           </div>
           <div>
             <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Dirección (texto libre)</label>
-            <input type="text" id="clinicDireccion" placeholder="ej: Av. Vélez Sarsfield 468, Córdoba" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+            <input type="text" id="clinicDireccion" placeholder="ej: Justo José de Urquiza 401, X5000 Córdoba" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
           </div>
-          <div style="display: flex; gap: 12px;">
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Latitud GPS</label>
-              <input type="number" step="any" id="clinicLat" placeholder="-31.416667" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
-            </div>
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Longitud GPS</label>
-              <input type="number" step="any" id="clinicLng" placeholder="-64.183333" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
-            </div>
-          </div>
-          <div style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #94a3b8;">
-            💡 <strong style="color: #38bdf8;">¿Cómo obtener coordenadas?</strong> Buscá la clínica en <a href="https://maps.google.com" target="_blank" style="color: #38bdf8;">Google Maps</a>, hacé clic derecho en el mapa → "¿Qué hay aquí?" y copiá los números (ej: <code>-31.416, -64.183</code>).
+          <div>
+            <label style="display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; font-weight: 600;">Enlace de Google Maps / GPS</label>
+            <input type="text" id="clinicMapsUrl" placeholder="ej: https://maps.app.goo.gl/q4ih6CRg3vH6e66C9" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: #fff; font-size: 0.88rem; outline: none; box-sizing: border-box;">
           </div>
           <div id="clinicPreview" style="font-size: 0.83rem; color: #64748b; font-style: italic;"></div>
           <button class="btn" onclick="saveClinicConfig()" style="align-self: flex-start; padding: 10px 22px;">
@@ -3249,12 +3240,10 @@
         const cfg = await res.json();
         const n = document.getElementById('clinicNombre');
         const d = document.getElementById('clinicDireccion');
-        const la = document.getElementById('clinicLat');
-        const lo = document.getElementById('clinicLng');
+        const m = document.getElementById('clinicMapsUrl');
         if (n) n.value = cfg.nombre || '';
         if (d) d.value = cfg.direccion || '';
-        if (la) la.value = cfg.lat || '';
-        if (lo) lo.value = cfg.lng || '';
+        if (m) m.value = cfg.mapsUrl || '';
         updateClinicPreview(cfg);
       } catch (e) {}
     }
@@ -3262,12 +3251,9 @@
     function updateClinicPreview(cfg) {
       const el = document.getElementById('clinicPreview');
       if (!el) return;
-      const nombre = cfg.nombre || 'Clínica COAT';
-      const dir = cfg.direccion || '';
-      const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat},${cfg.lng}`;
-      if (dir) {
-        el.innerHTML = `<span style="color: #38bdf8;">📱 Vista previa del mensaje:</span><br><em style="color: #e2e8f0;">📍 *Ubicación de ${nombre}:*<br>${dir}.<br>🗺️ ${url}</em>`;
-      }
+      const dir = cfg.direccion || 'Justo José de Urquiza 401, X5000 Córdoba.';
+      const url = cfg.mapsUrl || 'https://maps.app.goo.gl/q4ih6CRg3vH6e66C9';
+      el.innerHTML = `<span style="color: #38bdf8;">📱 Vista previa del mensaje:</span><br><em style="color: #e2e8f0;">📍 ${dir}<br>🗺️ Abrir en GPS / Google Maps:<br>${url}</em>`;
     }
 
     async function saveClinicConfig() {
