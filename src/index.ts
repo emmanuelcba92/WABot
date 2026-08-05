@@ -1127,11 +1127,11 @@ app.get('/api/clinic-config', async (c) => {
       return c.json(JSON.parse(row.data));
     }
     return c.json({
-      nombre: 'Clínica Médica COAT',
-      direccion: 'Av. Vélez Sarsfield 468, Córdoba',
-      lat: -31.416667,
-      lng: -64.183333,
-      mapsUrl: 'https://maps.google.com/?q=-31.416667,-64.183333'
+      nombre: 'Clínica COAT',
+      direccion: 'Justo José de Urquiza 401, X5000 Córdoba.',
+      lat: -31.4079437,
+      lng: -64.1931327,
+      mapsUrl: 'https://maps.app.goo.gl/q4ih6CRg3vH6e66C9'
     });
   } catch (e: any) {
     return c.json({ error: 'Error al obtener configuración de la clínica' }, 500);

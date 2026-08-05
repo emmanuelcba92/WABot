@@ -3082,15 +3082,14 @@
     // ─── ENVÍO DE UBICACIÓN DESDE CONFIGURACIÓN ───
     function sendLocationGps(idConsulta, remitente) {
       authFetch('/api/clinic-config').then(r => r.json()).then(cfg => {
-        const nombre = cfg.nombre || 'Clínica COAT';
-        const dir = cfg.direccion || 'Av. Vélez Sarsfield 468, Córdoba';
-        const url = cfg.mapsUrl || `https://maps.google.com/?q=${cfg.lat || -31.416667},${cfg.lng || -64.183333}`;
-        const text = `📍 *Ubicación de ${nombre}:*\n${dir}.\n🗺️ Abrir en GPS / Google Maps: ${url}`;
+        const dir = cfg.direccion || 'Justo José de Urquiza 401, X5000 Córdoba.';
+        const url = cfg.mapsUrl || 'https://maps.app.goo.gl/q4ih6CRg3vH6e66C9';
+        const text = `📍 ${dir}\n🗺️ Abrir en GPS / Google Maps:\n${url}`;
         const textarea = document.getElementById(`replyText_${idConsulta}`);
         if (textarea) textarea.value = text;
         responderViaApi(idConsulta, remitente);
       }).catch(() => {
-        const text = "📍 *Ubicación de la Clínica COAT:*\nAv. Vélez Sarsfield 468, Córdoba.\n🗺️ Abrir en GPS / Google Maps: https://maps.google.com/?q=-31.416667,-64.183333";
+        const text = "📍 Justo José de Urquiza 401, X5000 Córdoba.\n🗺️ Abrir en GPS / Google Maps:\nhttps://maps.app.goo.gl/q4ih6CRg3vH6e66C9";
         const textarea = document.getElementById(`replyText_${idConsulta}`);
         if (textarea) textarea.value = text;
         responderViaApi(idConsulta, remitente);
