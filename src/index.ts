@@ -1760,6 +1760,14 @@ async function runCleanup(env: any, daysOverride?: number): Promise<{ deleted: n
       if (count > 0) details.push(`${count} sesiones antiguas`);
     }
 
+    // 3. Limpiar registros de auditoría antiguos (>60 días)
+    try {
+      const resultAudit = await env.DB.prepare("DELETE FROM audit_logs WHERE createdAt < ?").bind(cutoffDate).run();
+      const countAudit = resultAudit.meta?.changes || 0;
+      totalDeleted += countAudit;
+      if (countAudit > 0) details.push(`${countAudit} registros de auditoría antiguos`);
+    } catch (eAudit) {}
+
     // Guardar estado de la limpieza
     const status = {
       lastRun: new Date().toISOString(),
