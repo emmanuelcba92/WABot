@@ -100,7 +100,9 @@ export class D1Service {
     pdfBase64OrTexto?: string,
     pdfNombreOrImg?: string,
     altRemitenteParam?: string,
-    pushNameParam?: string
+    pushNameParam?: string,
+    audioBase64Param?: string,
+    audioUrlParam?: string
   ): Promise<boolean> {
     let texto: string | undefined = undefined;
     let imagenBase64: string | undefined = undefined;
@@ -108,14 +110,18 @@ export class D1Service {
     let pdfNombre: string | undefined = undefined;
     let altRemitente: string | undefined = undefined;
     let pushName: string | undefined = undefined;
+    let audioBase64: string | undefined = undefined;
+    let audioUrl: string | undefined = undefined;
 
-    if (altRemitenteParam !== undefined || pushNameParam !== undefined || pdfNombreOrImg !== undefined) {
+    if (altRemitenteParam !== undefined || pushNameParam !== undefined || pdfNombreOrImg !== undefined || audioBase64Param !== undefined) {
       texto = textoOrAlt;
       imagenBase64 = imagenBase64OrPush;
       pdfBase64 = pdfBase64OrTexto;
       pdfNombre = pdfNombreOrImg;
       altRemitente = altRemitenteParam;
       pushName = pushNameParam;
+      audioBase64 = audioBase64Param;
+      audioUrl = audioUrlParam;
     } else {
       altRemitente = textoOrAlt;
       pushName = imagenBase64OrPush;
@@ -143,6 +149,8 @@ export class D1Service {
       imagenBase64: imagenBase64 || null,
       pdfBase64: pdfBase64 || null,
       pdfNombre: pdfNombre || null,
+      audioBase64: audioBase64 || null,
+      audioUrl: audioUrl || null,
       timestamp: new Date().toISOString()
     });
 

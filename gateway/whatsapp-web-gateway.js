@@ -474,11 +474,36 @@ const lastIncomingKeysMap = new Map();
         let imagenNombre = null;
         let pdfBase64 = null;
         let pdfNombre = null;
+        let audioBase64 = null;
 
         // Detectar si el paciente envió una foto
         const isImage = !!msg.message.imageMessage;
         // Detectar si el paciente envió un documento PDF
         const isDocument = !!msg.message.documentMessage || !!msg.message.documentWithCaptionMessage;
+        // Detectar si el paciente envió un audio o nota de voz
+        const isAudio = !!msg.message.audioMessage || !!msg.message.pttMessage;
+
+        if (isAudio) {
+          try {
+            console.log(`🎙️ [Desencriptando Audio] Capturando nota de voz de ${remitente} (${pushName || 'sin nombre'})...`);
+            const audioBuffer = await downloadMediaMessage(
+              msg,
+              'buffer',
+              {},
+              {
+                logger: pino({ level: 'silent' }),
+                reuploadRequest: sock.updateMediaMessage
+              }
+            );
+
+            if (audioBuffer && audioBuffer.length > 200) {
+              const audioMime = msg.message.audioMessage?.mimetype || 'audio/ogg';
+              audioBase64 = `data:${audioMime};base64,${audioBuffer.toString('base64')}`;
+            }
+          } catch (audErr) {
+            console.error('⚠️ Error al desencriptar audio:', audErr);
+          }
+        }
 
         if (isImage) {
           try {
@@ -540,7 +565,7 @@ const lastIncomingKeysMap = new Map();
           }
         }
 
-        console.log(`📩 Mensaje recibido de ${pushName || remitente} (${remitente}): "${mensajeTexto || (imagenBase64 ? '📷 [Foto]' : (pdfBase64 ? '📄 [PDF]' : ''))}"`);
+        console.log(`📩 Mensaje recibido de ${pushName || remitente} (${remitente}): "${mensajeTexto || (imagenBase64 ? '📷 [Foto]' : (pdfBase64 ? '📄 [PDF]' : (audioBase64 ? '🎙️ [Nota de voz]' : '')))}"`);
 
         const webhookPayload = {
           remitente,
@@ -550,7 +575,8 @@ const lastIncomingKeysMap = new Map();
           imagenBase64,
           imagenNombre,
           pdfBase64,
-          pdfNombre
+          pdfNombre,
+          audioBase64
         };
 
         const res = await fetchWithRetry(WORKER_WEBHOOK_URL, {
@@ -731,23 +757,30 @@ const lastIncomingKeysMap = new Map();
     return true;
   }
 
+  const sendingMsgIds = new Set();
+
   // ─── PROCESAMIENTO DE MENSAJES SSE (necesita acceso a sendOutgoingMessage) ───
   async function processSsePendingMessage(msg) {
     try {
-      // DEDUPLICADOR
+      // DEDUPLICADOR PERSISTENTE Y EN VUELO
       const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
-      if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
-        console.warn(`⚠️ [SSE DEDUPE] Omitiendo mensaje ya enviado: ${msgDedupeKey}`);
+      if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id)) || sendingMsgIds.has(msgDedupeKey) || (msg.id && sendingMsgIds.has(msg.id))) {
+        console.warn(`⚠️ [SSE DEDUPE] Omitiendo mensaje en proceso o ya enviado: ${msgDedupeKey}`);
         return;
       }
 
-      // Reusar la lógica de envío del polling
-      const sendResult = await sendOutgoingMessage(msg);
+      sendingMsgIds.add(msgDedupeKey);
+      if (msg.id) sendingMsgIds.add(msg.id);
 
-      // SOLO marcar como enviado si el envío fue exitoso
-      if (sendResult !== false) {
-        markMsgAsSent(msgDedupeKey);
-        if (msg.id) markMsgAsSent(msg.id);
+      try {
+        const sendResult = await sendOutgoingMessage(msg);
+        if (sendResult !== false) {
+          markMsgAsSent(msgDedupeKey);
+          if (msg.id) markMsgAsSent(msg.id);
+        }
+      } finally {
+        sendingMsgIds.delete(msgDedupeKey);
+        if (msg.id) sendingMsgIds.delete(msg.id);
       }
 
       // ACK al worker
@@ -785,17 +818,25 @@ const lastIncomingKeysMap = new Map();
       if (messages.length > 0) {
         for (const msg of messages) {
           try {
-            // DEDUPLICADOR PERSISTENTE EN DISCO (GATEWAY)
+            // DEDUPLICADOR PERSISTENTE EN DISCO Y EN VUELO (GATEWAY)
             const msgDedupeKey = msg.id || `${msg.remitente}_${msg.text}_${msg.pdfNombre || ''}`;
-            if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id))) {
+            if (persistentSentIds.has(msgDedupeKey) || (msg.id && persistentSentIds.has(msg.id)) || sendingMsgIds.has(msgDedupeKey) || (msg.id && sendingMsgIds.has(msg.id))) {
               continue;
             }
 
-            console.log(`🔄 [POLLING] Procesando mensaje pendiente: ${msgDedupeKey}`);
-            const sendResult = await sendOutgoingMessage(msg);
-            if (sendResult !== false) {
-              markMsgAsSent(msgDedupeKey);
-              if (msg.id) markMsgAsSent(msg.id);
+            sendingMsgIds.add(msgDedupeKey);
+            if (msg.id) sendingMsgIds.add(msg.id);
+
+            try {
+              console.log(`🔄 [POLLING] Procesando mensaje pendiente: ${msgDedupeKey}`);
+              const sendResult = await sendOutgoingMessage(msg);
+              if (sendResult !== false) {
+                markMsgAsSent(msgDedupeKey);
+                if (msg.id) markMsgAsSent(msg.id);
+              }
+            } finally {
+              sendingMsgIds.delete(msgDedupeKey);
+              if (msg.id) sendingMsgIds.delete(msg.id);
             }
           } catch (sendErr) {
             console.error(`❌ Error procesando mensaje saliente:`, sendErr?.message || sendErr);

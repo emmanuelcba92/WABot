@@ -15,7 +15,10 @@
 		"ALERT_EMAIL": "emmanuel.ag92@gmail.com",
 		"TELEGRAM_BOT_TOKEN": "8894208204:AAEFlXSM4vhcJTcYqiJ2k1tWO3HyCxljhNU",
 		"TELEGRAM_CHAT_ID": "-5112025915",
-		"GOOGLE_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbx7lhzrgNxv0WSfqWk5wNmXYyActW6bUYqIAKr-oLoG6Nw7WqhEXuynybbpO-Qt1Liq/exec"
+		"GOOGLE_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbx7lhzrgNxv0WSfqWk5wNmXYyActW6bUYqIAKr-oLoG6Nw7WqhEXuynybbpO-Qt1Liq/exec",
+		"META_PHONE_NUMBER_ID": "1242506592277479",
+		"META_ACCESS_TOKEN": "EAAOtH0xOpF0BSK8sV40JKwW0ojWrWiIl6knx2qF1Q6aWAXXzXZAL1XZCR8nxDGpYGIRQDrI3LQd4wiAtZCZBnPtZBZBGo5ZCtKUWe794FoNb1PZCGVakDq9sb9ZCOUdk2JtYQiqqZBhUD0edZBoh4tYmys2ZBWi6ej60zrTUdyHyPlxgFDVfF3gLZBNPdmZBHZABTXWBIFMXXa3VacgPSM93RUcWOamnGGehM53FZA3HtANPUhiVFcxmZBowx60g7pLYZBzPFcvY2mXgrNEcPPfVnvCVb9HWaEKEqdLhuZAzqLftAZDZD",
+		"META_VERIFY_TOKEN": "coat_meta_token_2026"
 	},
 	"triggers": {
 		"crons": [
@@ -36,6 +39,9 @@
 				"class_name": "SseBroker"
 			}
 		]
+	},
+	"ai": {
+		"binding": "AI"
 	},
 	"migrations": [
 		{

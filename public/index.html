@@ -869,6 +869,13 @@
         </div>
       </div>
 
+      <div id="subFilterPendientesBar" style="display: flex; gap: 8px; margin-top: 10px; align-items: center; background: rgba(15, 23, 42, 0.7); padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; color: #a78bfa; font-weight: 700; display: flex; align-items: center; gap: 4px;">🎯 Filtrar Pendientes:</span>
+        <button class="sub-filter-chip active" id="subFilterPorContestar" onclick="setPendingSubFilter('por_contestar', this)" style="font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; background: rgba(52, 211, 153, 0.25); color: #34d399; border: 1px solid #34d399; font-weight: 700; cursor: pointer;">🟢 Por Contestar (<span id="cntPorContestar">0</span>)</button>
+        <button class="sub-filter-chip" id="subFilterEsperandoPaciente" onclick="setPendingSubFilter('esperando_paciente', this)" style="font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: pointer;">⏳ Esperando Paciente (<span id="cntEsperandoPaciente">0</span>)</button>
+        <button class="sub-filter-chip" id="subFilterTodosPendientes" onclick="setPendingSubFilter('todos', this)" style="font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: pointer;">📋 Todos los Pendientes (<span id="cntTodosPendientes">0</span>)</button>
+      </div>
+
       <!-- VISTA 1: GRID DE TARJETAS (ORIGINAL) -->
       <div class="consultas-grid" id="consultasGrid" style="margin-top: 16px;">
         <div style="color: var(--muted); grid-column: 1 / -1; padding: 40px; text-align: center;">Cargando solicitudes...</div>
@@ -979,10 +986,15 @@
             <h2 style="font-size: 1.3rem; font-weight: 700; color: #a78bfa;">📜 Registro de Auditoría del Sistema</h2>
             <p style="font-size: 0.85rem; color: var(--muted);">Historial de acciones de secretarias y administradores (solo visible para administradores).</p>
           </div>
-          <button class="btn btn-secondary" onclick="fetchAuditLogsUI()" style="font-size: 0.85rem;">🔄 Actualizar Registro</button>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="auditSearchInput" oninput="renderAuditLogsUI()" placeholder="🔍 Buscar por número o acción..." style="background: #0f172a; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; width: 240px;">
+            <button class="btn btn-secondary" id="auditModeListBtn" onclick="setAuditViewMode('list')" style="font-size: 0.85rem; background: rgba(167, 139, 250, 0.2); color: #a78bfa; border: 1px solid #a78bfa;">📋 Lista Cronológica</button>
+            <button class="btn btn-secondary" id="auditModeGroupBtn" onclick="setAuditViewMode('grouped')" style="font-size: 0.85rem;">📱 Agrupado por Paciente</button>
+            <button class="btn btn-secondary" onclick="fetchAuditLogsUI()" style="font-size: 0.85rem;">🔄 Actualizar</button>
+          </div>
         </div>
 
-        <div style="overflow-x: auto;">
+        <div id="auditLogsContainer" style="overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
             <thead>
               <tr style="background: rgba(255,255,255,0.05); text-align: left; color: var(--muted); border-bottom: 1px solid var(--border);">
@@ -991,7 +1003,7 @@
                 <th style="padding: 12px;">Rol</th>
                 <th style="padding: 12px;">Acción</th>
                 <th style="padding: 12px;">Detalles</th>
-                <th style="padding: 12px;">Paciente</th>
+                <th style="padding: 12px;">Paciente / Teléfono</th>
               </tr>
             </thead>
             <tbody id="auditLogsTableBody">
@@ -1058,18 +1070,30 @@
           💾 Guardar Mensajes de Horario y Cierre
         </button>
 
-        <!-- NOMBRE DEL OPERADOR (dentro de Horario) -->
-        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px;">
-          <h4 style="font-size: 1rem; color: #38bdf8;">👩‍⚕️ Nombre del Operador</h4>
-          <p style="font-size: 0.84rem; color: var(--muted);">Configura si se muestra el nombre del operador al paciente en los mensajes enviados.</p>
+        <!-- NOMBRE E ÍCONO DEL OPERADOR -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px;">
+          <h4 style="font-size: 1rem; color: #38bdf8;">👤 Configuración de Operador / Secretaría</h4>
+          <p style="font-size: 0.84rem; color: var(--muted);">Configurá el nombre e ícono (emoji) que verán los pacientes en WhatsApp al responder.</p>
 
           <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
-            <button class="btn btn-secondary" id="operatorNameInternal" onclick="setOperatorNameMode(false)">🔒 Nombre Interno (Paciente ve "Secretaría")</button>
-            <button class="btn btn-secondary" id="operatorNameVisible" onclick="setOperatorNameMode(true)">👁️ Nombre Visible (Paciente ve el nombre real)</button>
+            <button class="btn btn-secondary" id="operatorNameInternal" onclick="setOperatorNameMode(false)">🔒 Oculto (Paciente ve "Secretaría")</button>
+            <button class="btn btn-secondary" id="operatorNameVisible" onclick="setOperatorNameMode(true)">👁️ Visible (Paciente ve el nombre real del operador)</button>
           </div>
 
-          <div id="operatorNameBadge" style="font-size: 0.9rem; font-weight: 700; color: #34d399;">
+          <div id="operatorNameBadge" style="font-size: 0.88rem; font-weight: 700; color: #34d399;">
             Estado Actual: Cargando...
+          </div>
+
+          <!-- SELECCIÓN DE ÍCONO DE OPERADOR -->
+          <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 0.86rem; font-weight: 700; color: #e9edef;">🎭 Ícono / Emoji del Operador:</label>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-secondary op-icon-btn" data-icon="👩‍⚕️" onclick="setOperatorIcon('👩‍⚕️')">👩‍⚕️ Femenino</button>
+              <button class="btn btn-secondary op-icon-btn" data-icon="👨‍⚕️" onclick="setOperatorIcon('👨‍⚕️')">👨‍⚕️ Masculino</button>
+              <button class="btn btn-secondary op-icon-btn" data-icon="🧑‍⚕️" onclick="setOperatorIcon('🧑‍⚕️')">🧑‍⚕️ Profesional</button>
+              <button class="btn btn-secondary op-icon-btn" data-icon="👤" onclick="setOperatorIcon('👤')">👤 Genérico</button>
+              <button class="btn btn-secondary op-icon-btn" data-icon="none" onclick="setOperatorIcon('none')">🚫 Sin Ícono (Solo Nombre)</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2531,6 +2555,8 @@
       }
     }
 
+    let currentOperatorIcon = localStorage.getItem('coat_operator_icon') || '👩‍⚕️';
+
     async function fetchBotConfig() {
       try {
         const res = await authFetch('/api/bot-config');
@@ -2539,9 +2565,52 @@
         const cfg = data.config || {};
         if (cfg.fueraDeHorario) document.getElementById('cfgFueraDeHorario').value = cfg.fueraDeHorario;
         if (cfg.confirmacionCierre) document.getElementById('cfgConfirmacionCierre').value = cfg.confirmacionCierre;
-        // Actualizar estado del nombre del operador
+        // Actualizar estado del nombre e ícono del operador
         updateOperatorNameBadge(cfg.showOperatorName || false);
+        const localIcon = localStorage.getItem('coat_operator_icon');
+        if (localIcon !== null) {
+          currentOperatorIcon = localIcon;
+        } else if (cfg.operatorIcon !== undefined) {
+          currentOperatorIcon = cfg.operatorIcon;
+        }
+        updateOperatorIconButtons(currentOperatorIcon);
       } catch (e) {}
+    }
+
+    function updateOperatorIconButtons(icon) {
+      document.querySelectorAll('.op-icon-btn').forEach(btn => {
+        const btnIcon = btn.getAttribute('data-icon');
+        if (btnIcon === icon) {
+          btn.style.borderColor = '#34d399';
+          btn.style.background = 'rgba(52, 211, 153, 0.2)';
+          btn.style.color = '#34d399';
+          btn.style.fontWeight = '700';
+        } else {
+          btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          btn.style.background = '#2a3942';
+          btn.style.color = '#e9edef';
+          btn.style.fontWeight = 'normal';
+        }
+      });
+    }
+
+    async function setOperatorIcon(icon) {
+      try {
+        localStorage.setItem('coat_operator_icon', icon);
+        currentOperatorIcon = icon;
+        updateOperatorIconButtons(icon);
+        renderConsultas(true);
+
+        authFetch('/api/bot-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operatorIcon: icon })
+        }).catch(() => {});
+
+        alert('✅ Tu preferencia de ícono se guardó correctamente en este navegador.');
+      } catch (e) {
+        alert('Error al guardar ícono de operador.');
+      }
     }
 
     function updateOperatorNameBadge(showName) {
@@ -2833,17 +2902,44 @@
       document.getElementById('modalPdfConfigGlobal').style.display = 'none';
     }
 
+    function handlePdfFileUploadLocal(idx, file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('Por favor selecciona un archivo en formato PDF.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64 = e.target.result;
+        predefinedPdfsList[idx].name = file.name;
+        predefinedPdfsList[idx].base64 = base64;
+        if (!predefinedPdfsList[idx].title || predefinedPdfsList[idx].title.includes('Nuevo Instructivo')) {
+          predefinedPdfsList[idx].title = file.name.replace(/\.pdf$/i, '');
+        }
+        renderPdfEditorModal();
+      };
+      reader.readAsDataURL(file);
+    }
+
     function renderPdfEditorModal() {
       const container = document.getElementById('pdfEditorListModal');
       if (!container) return;
       let html = '';
       predefinedPdfsList.forEach((pdf, idx) => {
+        const hasFile = pdf.base64 || pdf.url;
         html += `
           <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; gap: 10px; align-items: center;">
               <input type="text" value="${pdf.title}" onchange="updatePdfTitle(${idx}, this.value)" placeholder="Título del PDF en desplegable..." style="font-weight: 700; flex: 1;">
-              <input type="text" value="${pdf.name}" onchange="updatePdfName(${idx}, this.value)" placeholder="Nombre del archivo.pdf..." style="width: 250px;">
+              <input type="text" value="${pdf.name}" onchange="updatePdfName(${idx}, this.value)" placeholder="Nombre del archivo.pdf..." style="width: 200px;">
+              <label class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; cursor: pointer; background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                📁 Buscar PDF en la PC
+                <input type="file" accept=".pdf" style="display: none;" onchange="handlePdfFileUploadLocal(${idx}, this.files[0])">
+              </label>
               <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removePdfItemGlobal(${idx})">🗑️</button>
+            </div>
+            <div style="font-size: 0.78rem; color: ${hasFile ? '#34d399' : '#fbbf24'}; display: flex; align-items: center; gap: 6px;">
+              ${hasFile ? `✅ Documento adjunto cargado` : `⚠️ Ningún archivo local seleccionado aún. Haz clic en "Buscar PDF en la PC".`}
             </div>
           </div>
         `;
@@ -2868,8 +2964,13 @@
 
     // ─── MODAL EDITOR DE ETIQUETAS (para secretarias) ───
     function openTagEditorModal() {
-      renderTagEditorModal();
-      document.getElementById('modalTagEditor').style.display = 'flex';
+      fetchTagConfig().then(() => {
+        renderTagEditorModal();
+        document.getElementById('modalTagEditor').style.display = 'flex';
+      }).catch(() => {
+        renderTagEditorModal();
+        document.getElementById('modalTagEditor').style.display = 'flex';
+      });
     }
 
     function closeTagEditorModal() {
@@ -2883,8 +2984,8 @@
       Object.entries(tagDefinitions).forEach(([key, tag]) => {
         html += `
           <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; align-items: center; gap: 10px;">
-            <input type="color" value="${tag.color}" onchange="updateTagColorModal('${key}', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 6px; cursor: pointer; background: transparent;">
-            <input type="text" value="${tag.label}" onchange="updateTagLabelModal('${key}', this.value)" style="flex: 1; font-weight: 600; font-size: 0.9rem; background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text);">
+            <input type="color" value="${tag.color}" oninput="updateTagColorModal('${key}', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 6px; cursor: pointer; background: transparent;">
+            <input type="text" value="${tag.label}" oninput="updateTagLabelModal('${key}', this.value)" style="flex: 1; font-weight: 600; font-size: 0.9rem; background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text);">
             <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem;" onclick="removeTagModal('${key}')">🗑️</button>
           </div>
         `;
@@ -2914,18 +3015,20 @@
     async function saveTagConfigModal() {
       try {
         const res = await authFetch('/api/tag-config', {
-          method: 'PUT',
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tags: tagDefinitions })
         });
         if (res.ok) {
           alert('✅ Etiquetas guardadas correctamente');
           closeTagEditorModal();
-          renderTagFilters();
+          if (typeof renderTopTagFilters === 'function') renderTopTagFilters();
+          if (typeof renderConsultas === 'function') renderConsultas();
         } else {
           alert('Error al guardar etiquetas');
         }
       } catch (e) {
+        console.error('Error in saveTagConfigModal:', e);
         alert('Error de conexión al guardar');
       }
     }
@@ -3078,36 +3181,150 @@
     }
 
     // ─── AUDIT LOGS (REGISTRO DE AUDITORÍA - SÓLO ADMINS) ───
+    // ─── AUDIT LOGS (REGISTRO DE AUDITORÍA - SÓLO ADMINS) ───
+    let currentAuditLogs = [];
+    let auditViewMode = 'list';
+
+    function cleanPhoneDisplay(rem) {
+      if (!rem) return '-';
+      let clean = rem.replace(/@lid|@s.whatsapp.net/gi, '').trim();
+      if (clean.includes('@')) clean = clean.split('@')[0];
+      const found = (allConsultas || []).find(c => {
+        const cRem = (c.remitente || '').replace(/@lid|@s.whatsapp.net/gi, '').trim();
+        const cAlt = (c.datos?.altRemitente || '').replace(/@lid|@s.whatsapp.net/gi, '').trim();
+        return cRem.includes(clean) || (cAlt && cAlt.includes(clean)) || clean.includes(cRem);
+      });
+      if (found) {
+        const phone = found.remitente.replace(/@lid|@s.whatsapp.net/gi, '').trim();
+        const name = found.datos?.pushName;
+        return name ? `${name} (${phone})` : phone;
+      }
+      return clean;
+    }
+
+    function setAuditViewMode(mode) {
+      auditViewMode = mode;
+      const bList = document.getElementById('auditModeListBtn');
+      const bGroup = document.getElementById('auditModeGroupBtn');
+      if (mode === 'list') {
+        if (bList) { bList.style.background = 'rgba(167, 139, 250, 0.2)'; bList.style.color = '#a78bfa'; bList.style.border = '1px solid #a78bfa'; }
+        if (bGroup) { bGroup.style.background = ''; bGroup.style.color = ''; bGroup.style.border = ''; }
+      } else {
+        if (bGroup) { bGroup.style.background = 'rgba(167, 139, 250, 0.2)'; bGroup.style.color = '#a78bfa'; bGroup.style.border = '1px solid #a78bfa'; }
+        if (bList) { bList.style.background = ''; bList.style.color = ''; bList.style.border = ''; }
+      }
+      renderAuditLogsUI();
+    }
+
+    function renderAuditLogsUI() {
+      const container = document.getElementById('auditLogsContainer');
+      const searchVal = (document.getElementById('auditSearchInput')?.value || '').toLowerCase().trim();
+
+      if (!container) return;
+
+      let filtered = currentAuditLogs.filter(log => {
+        if (!searchVal) return true;
+        const targetClean = cleanPhoneDisplay(log.targetRemitente).toLowerCase();
+        const rawTarget = (log.targetRemitente || '').toLowerCase();
+        const user = (log.username || '').toLowerCase();
+        const act = (log.action || '').toLowerCase();
+        const det = (log.details || '').toLowerCase();
+        return targetClean.includes(searchVal) || rawTarget.includes(searchVal) || user.includes(searchVal) || act.includes(searchVal) || det.includes(searchVal);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="padding: 30px; text-align: center; color: var(--muted);">No se encontraron registros de auditoría.</div>`;
+        return;
+      }
+
+      if (auditViewMode === 'list') {
+        let html = `
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.05); text-align: left; color: var(--muted); border-bottom: 1px solid var(--border);">
+                <th style="padding: 12px;">Fecha / Hora</th>
+                <th style="padding: 12px;">Usuario</th>
+                <th style="padding: 12px;">Rol</th>
+                <th style="padding: 12px;">Acción</th>
+                <th style="padding: 12px;">Detalles</th>
+                <th style="padding: 12px;">Paciente / Teléfono</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        html += filtered.map(log => {
+          const fechaStr = new Date(log.timestamp || log.createdAt).toLocaleString();
+          const patientDisp = cleanPhoneDisplay(log.targetRemitente);
+          const detClean = (log.details || '-').replace(/@lid|@s.whatsapp.net/gi, '');
+          return `
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 10px; color: var(--muted); font-size: 0.8rem;">${fechaStr}</td>
+              <td style="padding: 10px; font-weight: 700; color: var(--accent);">${log.username}</td>
+              <td style="padding: 10px;"><span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: ${log.userRole === 'admin' ? 'rgba(167, 139, 250, 0.2)' : 'rgba(56, 189, 248, 0.2)'}; color: ${log.userRole === 'admin' ? '#a78bfa' : '#38bdf8'}; font-weight: 700;">${log.userRole === 'admin' ? 'Admin' : 'Secr.'}</span></td>
+              <td style="padding: 10px; font-weight: 600; color: #facc15;">${log.action}</td>
+              <td style="padding: 10px; color: #cbd5e1;">${detClean}</td>
+              <td style="padding: 10px; color: #38bdf8; font-weight: 600; font-size: 0.82rem;">${patientDisp}</td>
+            </tr>
+          `;
+        }).join('');
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+      } else {
+        // Vista Agrupada por Paciente
+        const groups = {};
+        filtered.forEach(log => {
+          const key = cleanPhoneDisplay(log.targetRemitente);
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(log);
+        });
+
+        let html = `<div style="display: flex; flex-direction: column; gap: 16px;">`;
+        Object.entries(groups).forEach(([patient, logs]) => {
+          html += `
+            <div style="background: #0f172a; border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+              <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span>📱 Paciente / Teléfono: ${patient}</span>
+                <span style="font-size: 0.78rem; color: var(--muted); font-weight: 500;">${logs.length} acciones registradas</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${logs.map(l => {
+                  const fStr = new Date(l.timestamp || l.createdAt).toLocaleString();
+                  const detClean = (l.details || '-').replace(/@lid|@s.whatsapp.net/gi, '');
+                  return `
+                    <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #a78bfa;">
+                      <div>
+                        <strong style="color: var(--accent);">${l.username}</strong>
+                        <span style="color: var(--muted); font-size: 0.75rem;">(${l.userRole})</span>:
+                        <span style="color: #facc15; font-weight: 600; margin: 0 6px;">${l.action}</span>
+                        <span style="color: #cbd5e1;">- ${detClean}</span>
+                      </div>
+                      <span style="color: var(--muted); font-size: 0.75rem; white-space: nowrap;">🕒 ${fStr}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        container.innerHTML = html;
+      }
+    }
+
     async function fetchAuditLogsUI() {
-      const tbody = document.getElementById('auditLogsTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--muted);">Cargando registros...</td></tr>';
+      const container = document.getElementById('auditLogsContainer');
+      if (!container) return;
       try {
         const res = await authFetch('/api/audit-logs');
         const data = await res.json();
         if (res.ok && data.logs) {
-          if (data.logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--muted);">No hay registros de auditoría aún.</td></tr>';
-            return;
-          }
-          tbody.innerHTML = data.logs.map(log => {
-            const fechaStr = new Date(log.timestamp || log.createdAt).toLocaleString();
-            return `
-              <tr style="border-bottom: 1px solid var(--border);">
-                <td style="padding: 10px; color: var(--muted); font-size: 0.8rem;">${fechaStr}</td>
-                <td style="padding: 10px; font-weight: 700; color: var(--accent);">${log.username}</td>
-                <td style="padding: 10px;"><span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: ${log.userRole === 'admin' ? 'rgba(167, 139, 250, 0.2)' : 'rgba(56, 189, 248, 0.2)'}; color: ${log.userRole === 'admin' ? '#a78bfa' : '#38bdf8'}; font-weight: 700;">${log.userRole === 'admin' ? 'Admin' : 'Secr.'}</span></td>
-                <td style="padding: 10px; font-weight: 600; color: #facc15;">${log.action}</td>
-                <td style="padding: 10px; color: #cbd5e1;">${log.details || '-'}</td>
-                <td style="padding: 10px; color: var(--muted); font-size: 0.8rem;">${log.targetRemitente || '-'}</td>
-              </tr>
-            `;
-          }).join('');
+          currentAuditLogs = data.logs;
+          renderAuditLogsUI();
         } else {
-          tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #ef4444;">Error al cargar auditoría.</td></tr>';
+          container.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Error al cargar auditoría.</div>';
         }
       } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #ef4444;">Error de red.</td></tr>';
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #ef4444;">Error de red.</div>';
       }
     }
 
@@ -3283,6 +3500,7 @@
         if (data.tags) {
           tagDefinitions = data.tags;
           renderTopTagFilters();
+          if (typeof renderConsultas === 'function') renderConsultas(true);
         }
       } catch (e) {}
     }
@@ -3873,10 +4091,74 @@
       if (prioBadge) prioBadge.innerText = prioritarios;
     }
 
+    let pendingSubFilter = 'por_contestar'; // 'por_contestar' | 'esperando_paciente' | 'todos'
+
+    function getConsultationLastSender(c) {
+      if (!c) return 'paciente';
+      const datos = c.datos || {};
+      const respPac = datos.respuestasPaciente || [];
+      const respSec = datos.respuestasSecretaria || [];
+
+      let lastPacTime = new Date(c.timestamp || c.createdAt).getTime();
+      let lastSecTime = 0;
+
+      respPac.forEach(r => {
+        const ts = r.timestamp ? new Date(r.timestamp).getTime() : 0;
+        if (ts > lastPacTime) lastPacTime = ts;
+      });
+
+      respSec.forEach(r => {
+        // Ignorar el mensaje automático de confirmación inicial enviado por el Bot ("¡Muchas gracias! Hemos recibido tus datos...")
+        const text = (r.texto || '').toLowerCase();
+        if (r.isAutoWelcome || r.isBotAuto || text.includes('hemos recibido tus datos') || text.includes('un operador procesará tu solicitud')) {
+          return;
+        }
+        const ts = r.timestamp ? new Date(r.timestamp).getTime() : 0;
+        if (ts > lastSecTime) lastSecTime = ts;
+      });
+
+      return (lastSecTime > lastPacTime) ? 'secretaria' : 'paciente';
+    }
+
+    function setPendingSubFilter(mode, btn) {
+      pendingSubFilter = mode;
+      document.querySelectorAll('.sub-filter-chip').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = 'var(--muted)';
+        b.style.border = '1px solid var(--border)';
+        b.style.fontWeight = 'normal';
+      });
+      if (btn) {
+        if (mode === 'por_contestar') {
+          btn.style.background = 'rgba(52, 211, 153, 0.25)';
+          btn.style.color = '#34d399';
+          btn.style.border = '1px solid #34d399';
+          btn.style.fontWeight = '700';
+        } else if (mode === 'esperando_paciente') {
+          btn.style.background = 'rgba(56, 189, 248, 0.25)';
+          btn.style.color = '#38bdf8';
+          btn.style.border = '1px solid #38bdf8';
+          btn.style.fontWeight = '700';
+        } else {
+          btn.style.background = 'rgba(167, 139, 250, 0.25)';
+          btn.style.color = '#a78bfa';
+          btn.style.border = '1px solid #a78bfa';
+          btn.style.fontWeight = '700';
+        }
+      }
+      renderConsultas(true);
+    }
+
     function setFilter(filter, btn) {
       currentFilter = filter;
       document.querySelectorAll('.filters-bar .tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+
+      const subBar = document.getElementById('subFilterPendientesBar');
+      if (subBar) {
+        subBar.style.display = (currentFilter === 'pendiente') ? 'flex' : 'none';
+      }
+
       renderConsultas(true);
     }
 
@@ -3891,6 +4173,8 @@
       searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
       renderConsultas(true);
     }
+
+    const activeTagLocks = {};
 
     async function toggleTag(cardId, tagKey) {
       const target = allConsultas.find(c => c.id === cardId);
@@ -3961,18 +4245,163 @@
       return c.remitente ? c.remitente.replace('@s.whatsapp.net', '') : '';
     }
 
-    function handleCustomFileUpload(cardId, fileInput) {
-      const file = fileInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          customPdfBase64[cardId] = e.target.result;
+    const customImageBase64 = {};
+    const audioTranscriptions = {};
+
+    async function transcribeAudioMsg(msgId, audioSrc, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Transcribiendo con IA...';
+      }
+
+      try {
+        let base64 = audioSrc;
+        if (audioSrc.startsWith('http')) {
+          const fetchRes = await fetch(audioSrc);
+          const blob = await fetchRes.blob();
+          base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        const res = await authFetch('/api/transcribe-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioBase64: base64 })
+        });
+
+        const data = await res.json();
+        if (data.success && data.text) {
+          audioTranscriptions[msgId] = data.text;
+          const box = document.getElementById(`transcriptionBox_${msgId}`);
+          if (box) {
+            box.innerHTML = `
+              <div style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 8px; padding: 8px 12px; font-size: 0.84rem; color: #e9edef; line-height: 1.4;">
+                <div style="font-size: 0.72rem; color: #c4b5fd; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                  <span>📝 Transcripción Automática (IA Whisper):</span>
+                </div>
+                "${data.text}"
+              </div>
+            `;
+          }
+        } else {
+          alert('⚠️ No se pudo transcribir el audio: ' + (data.details || data.error || 'Desconocido'));
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '📝 Transcribir Nota de Voz con IA';
+          }
+        }
+      } catch (e) {
+        alert('⚠️ Error de conexión al intentar transcribir.');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '📝 Transcribir Nota de Voz con IA';
+        }
+      }
+    }
+
+    function processAttachmentFile(cardId, file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const result = e.target.result;
+        if (file.type.startsWith('image/')) {
+          customImageBase64[cardId] = result;
+          renderAttachmentPills(cardId);
+        } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          customPdfBase64[cardId] = result;
           customPdfNames[cardId] = file.name;
           selectedPdfs[cardId] = 'custom';
-          alert(`📎 Archivo "${file.name}" listo para enviar por WhatsApp.`);
-        };
-        reader.readAsDataURL(file);
+          renderAttachmentPills(cardId);
+        } else {
+          alert('Por favor adjuntá imágenes (PNG/JPG) o documentos PDF.');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleCustomFileUpload(cardId, fileInput) {
+      const file = fileInput ? fileInput.files[0] : null;
+      if (file) {
+        processAttachmentFile(cardId, file);
       }
+    }
+
+    function handleReplyPaste(cardId, e) {
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData || !clipboardData.items) return;
+      const items = clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            processAttachmentFile(cardId, file);
+            break;
+          }
+        }
+      }
+    }
+
+    function handleReplyDrop(cardId, e) {
+      e.preventDefault();
+      const textarea = document.getElementById(`replyText_${cardId}`);
+      if (textarea) textarea.style.borderColor = 'rgba(255,255,255,0.1)';
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        for (let i = 0; i < dt.files.length; i++) {
+          processAttachmentFile(cardId, dt.files[i]);
+        }
+      }
+    }
+
+    function clearCustomAttachment(cardId, type) {
+      if (type === 'image') {
+        delete customImageBase64[cardId];
+      } else if (type === 'pdf') {
+        delete customPdfBase64[cardId];
+        delete customPdfNames[cardId];
+        delete selectedPdfs[cardId];
+      }
+      renderAttachmentPills(cardId);
+    }
+
+    function renderAttachmentPills(cardId) {
+      const container = document.getElementById(`attachmentPreviewPill_${cardId}`);
+      if (!container) return;
+
+      const hasPdf = !!customPdfBase64[cardId];
+      const pdfName = customPdfNames[cardId] || 'Documento.pdf';
+      const hasImg = !!customImageBase64[cardId];
+
+      if (!hasPdf && !hasImg) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+      }
+
+      let html = '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">';
+      if (hasImg) {
+        html += `
+          <div style="background: rgba(52, 211, 153, 0.2); border: 1px solid #34d399; color: #34d399; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+            <span>📷 Captura / Imagen lista para enviar por WhatsApp</span>
+            <button onclick="clearCustomAttachment('${cardId}', 'image')" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: 700; font-size: 0.85rem;">✕</button>
+          </div>
+        `;
+      }
+      if (hasPdf) {
+        html += `
+          <div style="background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+            <span>📄 PDF: ${pdfName}</span>
+            <button onclick="clearCustomAttachment('${cardId}', 'pdf')" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: 700; font-size: 0.85rem;">✕</button>
+          </div>
+        `;
+      }
+      html += '</div>';
+      container.innerHTML = html;
+      container.style.display = 'block';
     }
 
     function formatTextForWhatsApp(text, datos) {
@@ -4057,7 +4486,7 @@
         currentOperatorName = newName.trim();
         localStorage.setItem('wabot_operator_name', currentOperatorName);
         if (selectedChatId) {
-          fetch(`/api/consultas/${selectedChatId}/gestion`, {
+          authFetch(`/api/consultas/${selectedChatId}/gestion`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ operador: currentOperatorName })
@@ -4069,7 +4498,7 @@
     function selectChat(id) {
       if (selectedChatId && selectedChatId !== id) {
         const prevId = selectedChatId;
-        fetch(`/api/consultas/${prevId}/gestion`, {
+        authFetch(`/api/consultas/${prevId}/gestion`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ release: true })
@@ -4078,7 +4507,7 @@
 
       selectedChatId = id;
 
-      fetch(`/api/consultas/${id}/gestion`, {
+      authFetch(`/api/consultas/${id}/gestion`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operador: currentOperatorName })
@@ -4086,6 +4515,17 @@
 
       renderConsultas(true);
     }
+
+    // Ping constante cada 30s para mantener el indicador "En gestión por..." activo mientras el operador tenga el chat seleccionado
+    setInterval(() => {
+      if (selectedChatId && currentOperatorName) {
+        authFetch(`/api/consultas/${selectedChatId}/gestion`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operador: currentOperatorName })
+        }).catch(() => {});
+      }
+    }, 30000);
 
     window.addEventListener('beforeunload', () => {
       if (selectedChatId) {
@@ -4110,10 +4550,33 @@
         }
       });
 
+      // Actualizar contadores de sub-filtros para Pendientes
+      const pendingConsultas = allConsultas.filter(c => (c.estado || 'pendiente') === 'pendiente');
+      let cntPorContestarVal = 0;
+      let cntEsperandoPacienteVal = 0;
+      pendingConsultas.forEach(c => {
+        const sender = getConsultationLastSender(c);
+        if (sender === 'paciente') cntPorContestarVal++;
+        else cntEsperandoPacienteVal++;
+      });
+      const elPorContestar = document.getElementById('cntPorContestar');
+      const elEsperandoPaciente = document.getElementById('cntEsperandoPaciente');
+      const elTodosPendientes = document.getElementById('cntTodosPendientes');
+      if (elPorContestar) elPorContestar.innerText = cntPorContestarVal;
+      if (elEsperandoPaciente) elEsperandoPaciente.innerText = cntEsperandoPacienteVal;
+      if (elTodosPendientes) elTodosPendientes.innerText = pendingConsultas.length;
+
       let filtered = [...allConsultas];
 
       if (currentFilter === 'prioritarios') {
         filtered = filtered.filter(c => vipContactsList.some(v => isVipMatch(c, v)));
+      } else if (currentFilter === 'pendiente') {
+        filtered = filtered.filter(c => (c.estado || 'pendiente') === 'pendiente');
+        if (pendingSubFilter === 'por_contestar') {
+          filtered = filtered.filter(c => getConsultationLastSender(c) === 'paciente' || (c.id === selectedChatId && getConsultationLastSender(c) === 'secretaria'));
+        } else if (pendingSubFilter === 'esperando_paciente') {
+          filtered = filtered.filter(c => getConsultationLastSender(c) === 'secretaria' && c.id !== selectedChatId);
+        }
       } else if (currentFilter !== 'todos') {
         filtered = filtered.filter(c => (c.estado || 'pendiente') === currentFilter);
       }
@@ -4152,10 +4615,15 @@
         if (activeA && !activeB) return -1;
         if (!activeA && activeB) return 1;
 
-        // 4. Cronológico más reciente primero
-        const timeA = new Date(a.timestamp || a.createdAt).getTime();
-        const timeB = new Date(b.timestamp || b.createdAt).getTime();
-        return timeB - timeA;
+        // 4. Cronológico más reciente (del último mensaje intercambiado) primero
+        const getLatestTs = (item) => {
+          let ts = new Date(item.timestamp || item.createdAt).getTime();
+          const d = item.datos || {};
+          (d.respuestasPaciente || []).forEach(r => { if (r.timestamp) { const t = new Date(r.timestamp).getTime(); if (t > ts) ts = t; } });
+          (d.respuestasSecretaria || []).forEach(r => { if (r.timestamp) { const t = new Date(r.timestamp).getTime(); if (t > ts) ts = t; } });
+          return ts;
+        };
+        return getLatestTs(b) - getLatestTs(a);
       });
 
       // RENDER VISTA 1: GRID DE TARJETAS
@@ -4385,8 +4853,29 @@
             const isSel = selectedChatId === c.id;
             const phoneNum = getPhoneDisplay(c);
             const patientName = vipMatch ? `${vipMatch.name} ⭐` : (datos.pushName ? `${datos.pushName} (${phoneNum})` : phoneNum);
-            const lastMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje)';
-            const fechaStr = new Date(c.timestamp || c.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            let lastMsg = datos.contenidoMensaje || datos.mensajeRaw || '(Sin mensaje)';
+            let lastTimeMs = new Date(c.timestamp || c.createdAt).getTime();
+            const respPac = datos.respuestasPaciente || [];
+            const respSec = datos.respuestasSecretaria || [];
+            const allSubMsgs = [];
+            respPac.forEach(r => { if (r.texto) allSubMsgs.push({ text: r.texto, ts: r.timestamp ? new Date(r.timestamp).getTime() : 0 }); });
+            respSec.forEach(r => { if (r.texto) allSubMsgs.push({ text: r.texto, ts: r.timestamp ? new Date(r.timestamp).getTime() : 0 }); });
+            if (allSubMsgs.length > 0) {
+              allSubMsgs.sort((a, b) => a.ts - b.ts);
+              const newestSub = allSubMsgs[allSubMsgs.length - 1];
+              if (newestSub && newestSub.text) {
+                lastMsg = newestSub.text;
+              }
+              if (newestSub && newestSub.ts > 0) {
+                lastTimeMs = newestSub.ts;
+              }
+            }
+            const fechaObj = new Date(lastTimeMs);
+            const hoyStr = new Date().toLocaleDateString();
+            const fechaMsgStr = fechaObj.toLocaleDateString();
+            const fechaStr = (hoyStr === fechaMsgStr)
+              ? fechaObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+              : (fechaObj.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' + fechaObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
 
             const enGestion = datos.enGestionPor;
             const enGestionAt = datos.enGestionAt || 0;
@@ -4411,8 +4900,6 @@
                 <div style="font-size: 0.78rem; color: var(--muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
                   ${lastMsg}
                 </div>
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; align-items: center;">
-                  ${managedBadge}
                   <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px;">
                     ${c.opcion || 'Consulta'}
                   </span>
@@ -4453,13 +4940,20 @@
           const baseTime = new Date(c.timestamp || c.createdAt).getTime();
 
           respuestasSecretaria.forEach((r, idx) => {
-            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 1) * 1000);
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + idx * 1000);
+            const iconPrefix = (currentOperatorIcon && currentOperatorIcon !== 'none') ? `${currentOperatorIcon} ` : '';
             allStreamMsgs.push({
-              id: r.id || `sec_${idx}`,
+              id: r.id || `sec_${ts}_${idx}`,
               type: 'sec',
-              senderName: '👩‍⚕️ Secretaría',
-              text: r.texto,
+              senderName: `${iconPrefix}${r.usuario || r.operatorName || 'Secretaría'}`,
+              text: formatTextForWhatsApp(r.texto, null),
               timestamp: ts,
+              pdfBase64: r.pdfBase64,
+              pdfNombre: r.pdfNombre,
+              imagenBase64: r.imagenBase64,
+              audioBase64: r.audioBase64 || r.audioUrl,
+              audioUrl: r.audioUrl,
+              transcription: r.transcription || r.transcripcionTexto,
               status: r.status || 'sent',
               deleted: r.deleted || false,
               edited: r.edited || false,
@@ -4470,7 +4964,9 @@
 
           respuestasPaciente.forEach((r, idx) => {
             const ts = r.timestamp ? new Date(r.timestamp).getTime() : (baseTime + (idx + 2) * 1000);
+            const msgId = r.id || `pac_${ts}_${idx}`;
             allStreamMsgs.push({
+              id: msgId,
               type: 'pac',
               senderName: '🟢 Paciente',
               text: formatTextForWhatsApp(r.texto, null),
@@ -4478,6 +4974,9 @@
               pdfBase64: r.pdfBase64,
               pdfNombre: r.pdfNombre,
               imagenBase64: r.imagenBase64,
+              audioBase64: r.audioBase64 || r.audioUrl,
+              audioUrl: r.audioUrl,
+              transcription: r.transcription || r.transcripcionTexto,
               cssClass: 'chat-bubble-patient',
               headerColor: '#00e699'
             });
@@ -4595,6 +5094,30 @@
 
                   ${m.text ? `<div style="white-space: pre-wrap; word-break: break-word; line-height: 1.45; font-size: 0.88rem;">${renderWhatsAppFormattedText(m.text)}</div>` : ''}
 
+                  ${(m.audioBase64 || m.audioUrl) ? `
+                    <div style="margin-top: 6px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.1); padding: 10px; border-radius: 10px;">
+                      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <span style="font-size: 1.1rem;">🎙️</span>
+                        <audio controls src="${m.audioBase64 || m.audioUrl}" style="flex: 1; height: 36px; outline: none;"></audio>
+                      </div>
+                      
+                      <div id="transcriptionBox_${m.id}" style="margin-top: 6px;">
+                        ${(audioTranscriptions[m.id] || m.transcription) ? `
+                          <div style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 8px; padding: 8px 12px; font-size: 0.84rem; color: #e9edef; line-height: 1.4;">
+                            <div style="font-size: 0.72rem; color: #c4b5fd; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                              <span>📝 Transcripción Automática (IA Whisper):</span>
+                            </div>
+                            "${audioTranscriptions[m.id] || m.transcription}"
+                          </div>
+                        ` : `
+                          <button class="chip-btn" onclick="transcribeAudioMsg('${m.id}', '${(m.audioBase64 || m.audioUrl).replace(/'/g, "\\'")}', this)" style="background: rgba(167, 139, 250, 0.2); color: #c4b5fd; border: 1px solid rgba(167, 139, 250, 0.4); font-weight: 700; font-size: 0.78rem; padding: 6px 12px;">
+                            📝 Transcribir Nota de Voz con IA
+                          </button>
+                        `}
+                      </div>
+                    </div>
+                  ` : ''}
+
                   ${m.imagenBase64 ? `
                     <div style="margin-top: 6px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 8px;">
                       <div class="card-img-container" onclick="openLightbox('${m.imagenBase64}')" title="Haz clic para ver foto en HD">
@@ -4649,8 +5172,17 @@
                 </button>
               </div>
 
+              <div id="attachmentPreviewPill_${c.id}"></div>
               <div style="display: flex; gap: 12px; align-items: flex-end;">
-                <textarea id="replyText_${c.id}" placeholder="Escribe tu respuesta a ${datos.pushName || c.remitente} y presiona Enter..." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); responderViaApi('${c.id}', '${c.remitente}'); }" style="flex: 1; background: #2a3942; border: 1px solid rgba(255,255,255,0.1); color: #e9edef; padding: 12px; border-radius: 10px; min-height: 70px; font-size: 0.92rem; outline: none;">${draftValue}</textarea>
+                <textarea id="replyText_${c.id}"
+                  placeholder="Escribe tu respuesta a ${datos.pushName || c.remitente}... (Ctrl+V para pegar capturas o arrastrá archivos PDF/fotos aquí)"
+                  onpaste="handleReplyPaste('${c.id}', event)"
+                  ondragover="event.preventDefault(); this.style.borderColor='#38bdf8';"
+                  ondragleave="this.style.borderColor='rgba(255,255,255,0.1)';"
+                  ondrop="handleReplyDrop('${c.id}', event)"
+                  onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); responderViaApi('${c.id}', '${c.remitente}'); }"
+                  style="flex: 1; background: #2a3942; border: 1px solid rgba(255,255,255,0.1); color: #e9edef; padding: 12px; border-radius: 10px; min-height: 70px; font-size: 0.92rem; outline: none;"
+                >${draftValue}</textarea>
                 <button class="btn" style="padding: 14px 24px; font-size: 1rem; height: 70px;" onclick="responderViaApi('${c.id}', '${c.remitente}')">
                   📤 Enviar WhatsApp
                 </button>
@@ -4684,9 +5216,8 @@
             enGestionPor: c.datos?.enGestionPor
           });
 
-          const isTypingInTextarea = document.activeElement &&
-                                     document.activeElement.id === `replyText_${c.id}` &&
-                                     document.activeElement.value.trim().length > 0;
+          const wasFocused = document.activeElement && document.activeElement.id === `replyText_${c.id}`;
+          const isTypingInTextarea = wasFocused && document.activeElement.value.trim().length > 0;
 
           const chatChanged = (lastRenderedChatId !== c.id) || (lastRenderedChatJson !== chatJson);
 
@@ -4695,9 +5226,19 @@
             lastRenderedChatJson = chatJson;
             containerChatMain.innerHTML = mainHtml;
 
+            renderAttachmentPills(c.id);
+
             const streamBox = document.getElementById(`chatStreamBox_${c.id}`);
             if (streamBox) {
               streamBox.scrollTop = streamBox.scrollHeight;
+            }
+
+            if (wasFocused) {
+              const ta = document.getElementById(`replyText_${c.id}`);
+              if (ta) {
+                ta.focus();
+                ta.setSelectionRange(ta.value.length, ta.value.length);
+              }
             }
           }
         }
@@ -4716,22 +5257,48 @@
       const pdfKey = selectedPdfs[idConsulta] || '';
       let pdfBase64ToSend = customPdfBase64[idConsulta] || null;
       let pdfNombreToSend = customPdfNames[idConsulta] || null;
+      let imagenBase64ToSend = customImageBase64[idConsulta] || null;
 
       if (!pdfBase64ToSend && pdfKey) {
         const found = predefinedPdfsList.find(p => p.id === pdfKey);
         if (found) {
-          pdfNombreToSend = found.name;
+          pdfNombreToSend = found.name || found.title || 'documento.pdf';
+          pdfBase64ToSend = found.base64 || found.url || null;
         }
       }
 
-      if (!respuestaText && !pdfKey && !pdfBase64ToSend) {
-        alert('Por favor escribe un mensaje o selecciona un documento PDF para enviar.');
+      if (!respuestaText && !pdfKey && !pdfBase64ToSend && !imagenBase64ToSend) {
+        alert('Por favor escribe un mensaje o adjunta una imagen/PDF para enviar.');
         return;
       }
 
       isSendingResponse[idConsulta] = true;
       if (textarea) textarea.value = '';
       delete draftResponses[idConsulta];
+
+      // MODO OPTIMISTA EN 0ms: Agregar mensaje al chat localmente sin esperar a la red
+      const target = allConsultas.find(c => c.id === idConsulta);
+      if (target) {
+        if (!target.datos) target.datos = {};
+        if (!target.datos.respuestasSecretaria) target.datos.respuestasSecretaria = [];
+
+        let labelReg = respuestaText;
+        if (pdfNombreToSend) labelReg += ` [📎 Adjunto PDF: ${pdfNombreToSend}]`;
+        if (imagenBase64ToSend) labelReg += ` [📷 Imagen Adjunta]`;
+
+        target.datos.respuestasSecretaria.push({
+          id: `sec_opt_${Date.now()}`,
+          texto: labelReg.trim(),
+          timestamp: new Date().toISOString(),
+          status: 'sent',
+          source: 'web'
+        });
+
+        renderConsultas(true);
+        if (textarea) {
+          textarea.focus();
+        }
+      }
 
       try {
         const res = await authFetch('/api/send-message', {
@@ -4744,7 +5311,9 @@
             pdfKey: pdfKey !== 'custom' ? pdfKey : undefined,
             pdfNombre: pdfNombreToSend,
             pdfBase64: pdfBase64ToSend,
-            usuario: window._currentUserName || 'Secretaría'
+            imagenBase64: imagenBase64ToSend,
+            usuario: window._currentUserName || 'Secretaría',
+            operatorIcon: currentOperatorIcon
           })
         });
 
@@ -4753,6 +5322,7 @@
           delete selectedPdfs[idConsulta];
           delete customPdfBase64[idConsulta];
           delete customPdfNames[idConsulta];
+          delete customImageBase64[idConsulta];
 
           await fetchConsultas(true);
         } else {
@@ -4787,32 +5357,41 @@
       }
 
       const rows = [
-        ['ID Consulta', 'Paciente / Teléfono', 'Tipo Solicitud', 'Estado', 'Fecha', 'Etiquetas', 'Contenido Mensaje']
+        ['ID Consulta', 'Nombre Paciente', 'Teléfono / Celular', 'Tipo Solicitud', 'Estado', 'Fecha', 'Etiquetas', 'Contenido Mensaje']
       ];
 
       allConsultas.forEach(c => {
         const datos = c.datos || {};
-        const tags = (datos.etiquetas || []).map(t => tagDefinitions[t] ? tagDefinitions[t].label : t).join('; ');
-        const msg = (datos.contenidoMensaje || datos.mensajeRaw || '').replace(/"/g, '""');
+        const tags = (datos.etiquetas || []).map(t => tagDefinitions[t] ? tagDefinitions[t].label : t).join(', ');
+        const msg = (datos.contenidoMensaje || datos.mensajeRaw || '').replace(/"/g, '""').replace(/\n/g, ' ');
+        
+        let cleanPhone = (c.remitente || '').replace(/@lid|@s.whatsapp.net/gi, '').trim();
+        if (cleanPhone.includes('@')) cleanPhone = cleanPhone.split('@')[0];
+        
+        const pName = (datos.pushName || 'Paciente').replace(/"/g, '""');
+
         rows.push([
-          c.id,
-          c.remitente,
-          c.opcion || 'Consulta',
-          c.estado || 'pendiente',
-          new Date(c.timestamp || c.createdAt).toLocaleString(),
-          tags,
+          `"${c.id}"`,
+          `"${pName}"`,
+          `"${cleanPhone}"`,
+          `"${c.opcion || 'Consulta'}"`,
+          `"${c.estado || 'pendiente'}"`,
+          `"${new Date(c.timestamp || c.createdAt).toLocaleString()}"`,
+          `"${tags}"`,
           `"${msg}"`
         ]);
       });
 
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n');
-      const encodedUri = encodeURI(csvContent);
+      const csvContent = 'sep=;\n\uFEFF' + rows.map(e => e.join(';')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
+      link.setAttribute('href', url);
       link.setAttribute('download', `Solicitudes_Clinica_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
     function openLightbox(src) {

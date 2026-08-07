@@ -962,6 +962,8 @@ export class FirestoreService {
     } else {
       FirestoreService.pendingOutgoingMemory.push(item);
     }
+
+    return item;
   }
 
   public async popPendingOutgoing(): Promise<PendingOutgoingMsg[]> {

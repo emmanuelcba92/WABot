@@ -6,6 +6,7 @@ import { MESSAGES } from './templates/messages';
 import { DEFAULT_MENU_TREE } from './services/firestoreService';
 import { DBFactory, DBProviderType } from './services/dbFactory';
 import { AuthService } from './services/authService';
+import { MetaWhatsappService } from './services/metaWhatsappService';
 export { SseBroker } from './durable/sse-broker';
 
 type AuthEnv = Env & {
@@ -34,6 +35,8 @@ const PUBLIC_API_ROUTES = [
   '/api/sse-status',
   '/api/message-sent',
   '/api/message-receipt',
+  '/api/webhook/meta',
+  '/webhook/meta',
 ];
 
 async function authMiddleware(c: any, next: any) {
@@ -560,13 +563,43 @@ app.post('/api/pdf-config/backup-template', async (c) => {
   }
 });
 
+app.post('/api/transcribe-audio', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { audioBase64 } = body;
+    if (!audioBase64) {
+      return c.json({ error: 'Falta el archivo de audio base64' }, 400);
+    }
+
+    const base64Data = audioBase64.includes(',') ? audioBase64.split(',')[1] : audioBase64;
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    if (c.env.AI) {
+      const response = await c.env.AI.run('@cf/openai/whisper', {
+        audio: Array.from(bytes)
+      });
+      return c.json({ success: true, text: response.text || '(Audio sin voz detectable)' });
+    } else {
+      return c.json({ error: 'Binding Workers AI no configurado' }, 500);
+    }
+  } catch (e: any) {
+    console.error('Error in transcribe-audio:', e);
+    return c.json({ error: 'Error al transcribir audio con IA', details: e?.message || String(e) }, 500);
+  }
+});
+
 app.get('/api/tag-config', async (c) => {
   const db = DBFactory.createService(c.env);
   const tags = await db.getTagConfig();
   return c.json({ tags });
 });
 
-app.post('/api/tag-config', async (c) => {
+const handleSaveTagConfig = async (c: any) => {
   try {
     const body = await c.req.json();
     const tags = body.tags || {};
@@ -576,7 +609,10 @@ app.post('/api/tag-config', async (c) => {
   } catch (e: any) {
     return c.json({ error: 'Error al guardar etiquetas', details: e?.message }, 500);
   }
-});
+};
+
+app.post('/api/tag-config', handleSaveTagConfig);
+app.put('/api/tag-config', handleSaveTagConfig);
 
 app.get('/api/schedule-config', async (c) => {
   const db = DBFactory.createService(c.env);
@@ -627,7 +663,9 @@ app.get('/api/bot-config', async (c) => {
       plantillaA1: config.plantillaA1 || MESSAGES.PLANTILLA_A1_ORL,
       plantillaA2: config.plantillaA2 || MESSAGES.PLANTILLA_A2_ESTUDIOS,
       plantillaB: config.plantillaB || MESSAGES.PLANTILLA_OPCION_B,
-      confirmacionCierre: config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO
+      confirmacionCierre: config.confirmacionCierre || MESSAGES.CONFIRMACION_CHAT_FINALIZADO,
+      showOperatorName: config.showOperatorName !== undefined ? config.showOperatorName : false,
+      operatorIcon: config.operatorIcon !== undefined ? config.operatorIcon : '👩‍⚕️'
     }
   });
 });
@@ -636,8 +674,10 @@ app.post('/api/bot-config', async (c) => {
   try {
     const body = await c.req.json();
     const db = DBFactory.createService(c.env);
-    await db.saveBotConfig(body);
-    return c.json({ success: true, config: body });
+    const existing = await db.getBotConfig();
+    const updated = { ...existing, ...body };
+    await db.saveBotConfig(updated);
+    return c.json({ success: true, config: updated });
   } catch (e: any) {
     return c.json({ error: 'Error al guardar mensajes de bot-config', details: e?.message }, 500);
   }
@@ -719,7 +759,9 @@ app.post('/webhook', async (c) => {
       imagenBase64: body.imagenBase64,
       imagenNombre: body.imagenNombre,
       pdfBase64: body.pdfBase64,
-      pdfNombre: body.pdfNombre
+      pdfNombre: body.pdfNombre,
+      audioBase64: body.audioBase64,
+      audioUrl: body.audioUrl
     };
 
     // Notificar al web app INMEDIATAMENTE que llegó un mensaje del paciente (push via DO)
@@ -727,9 +769,11 @@ app.post('/webhook', async (c) => {
     broadcastToWebApp(c.env, {
       type: 'new_message',
       remitente,
-      text: mensaje || '(Imagen/Documento)',
+      text: mensaje || (body.audioBase64 || body.audioUrl ? '🎙️ [Nota de voz]' : '(Archivo adjunto)'),
       sender: 'paciente',
-      pushName: body.pushName
+      pushName: body.pushName,
+      audioBase64: body.audioBase64,
+      audioUrl: body.audioUrl
     }).catch(() => {});
 
     // Log session state BEFORE processing
@@ -740,7 +784,7 @@ app.post('/webhook', async (c) => {
     await db.agregarMensajeHistorial(remitente, {
       id: `msg_${Date.now()}_pac`,
       sender: 'paciente',
-      text: mensaje || '(Imagen/Documento adjunto)',
+      text: mensaje || (body.audioBase64 || body.audioUrl ? '🎙️ [Nota de voz]' : '(Archivo adjunto)'),
       timestamp: new Date().toISOString(),
       imageUrl: body.imagenBase64 ? 'imagen_adjunta' : undefined
     }, body.altRemitente);
@@ -748,7 +792,7 @@ app.post('/webhook', async (c) => {
     const msgCleanLower = mensaje.toLowerCase().trim();
     const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu';
 
-    if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64)) {
+    if (!esResetExplicito && (mensaje.length > 0 || body.imagenBase64 || body.pdfBase64 || body.audioBase64 || body.audioUrl)) {
       // Intentar siempre agregar el mensaje del paciente a una consulta pendiente si ya existe
       const adjuntado = await db.appendPacienteMensajeAConsulta(
         remitente,
@@ -757,7 +801,9 @@ app.post('/webhook', async (c) => {
         body.pdfBase64,
         body.pdfNombre,
         body.altRemitente,
-        body.pushName
+        body.pushName,
+        body.audioBase64,
+        body.audioUrl
       );
 
       if (adjuntado) {
@@ -828,6 +874,153 @@ app.post('/webhook', async (c) => {
   }
 });
 
+// ─── META CLOUD API WEBHOOK VERIFICATION (GET) ───
+const handleMetaVerify = (c: any) => {
+  const mode = c.req.query('hub.mode');
+  const token = c.req.query('hub.verify_token');
+  const challenge = c.req.query('hub.challenge');
+
+  const expectedToken = c.env.META_VERIFY_TOKEN || 'coat_meta_token_2026';
+
+  console.log(`🔍 [META WEBHOOK VERIFY] mode=${mode} token=${token} challenge=${challenge}`);
+
+  if (mode === 'subscribe' && token === expectedToken) {
+    console.log('✅ [META WEBHOOK VERIFY] Verificación exitosa de Meta Webhook');
+    return c.text(challenge || '', 200);
+  }
+
+  console.warn('❌ [META WEBHOOK VERIFY] Token de verificación no coincide');
+  return c.text('Forbidden', 403);
+};
+
+app.get('/api/webhook/meta', handleMetaVerify);
+app.get('/webhook/meta', handleMetaVerify);
+
+// ─── META CLOUD API RECEIVE MESSAGES (POST) ───
+const handleMetaMessage = async (c: any) => {
+  try {
+    const body = await c.req.json();
+    console.log('📥 [META WEBHOOK INCOMING] Payload:', JSON.stringify(body, null, 2));
+
+    if (body.object === 'whatsapp_business_account') {
+      for (const entry of body.entry || []) {
+        for (const change of entry.changes || []) {
+          const value = change.value;
+          if (value && value.messages && value.messages.length > 0) {
+            const message = value.messages[0];
+            const from = message.from; // Número de teléfono del usuario
+            const contact = value.contacts?.[0];
+            const pushName = contact?.profile?.name || 'Usuario Meta';
+
+            let textoMensaje = '';
+            if (message.type === 'text') {
+              textoMensaje = message.text?.body || '';
+            } else if (message.type === 'interactive') {
+              textoMensaje = message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || message.interactive?.button_reply?.title || '';
+            }
+
+            console.log(`💬 [META MESSAGE DETECTED] De: "${from}" PushName: "${pushName}" Tipo: "${message.type}" Texto: "${textoMensaje}"`);
+
+            if (from && textoMensaje) {
+              const payload: WebhookPayload = {
+                remitente: from,
+                pushName,
+                mensaje: textoMensaje
+              };
+
+              // Broadcast instantáneo al WebApp
+              broadcastToWebApp(c.env, {
+                type: 'new_message',
+                remitente: from,
+                text: textoMensaje,
+                sender: 'paciente',
+                pushName
+              }).catch(() => {});
+
+              const db = DBFactory.createService(c.env);
+
+              // Guardar mensaje entrante del paciente en el historial
+              await db.agregarMensajeHistorial(from, {
+                id: message.id || `msg_${Date.now()}_meta`,
+                sender: 'paciente',
+                text: textoMensaje,
+                timestamp: new Date().toISOString()
+              });
+
+              const msgCleanLower = textoMensaje.toLowerCase().trim();
+              const esResetExplicito = msgCleanLower === 'reset' || msgCleanLower === 'cancelar' || msgCleanLower === 'menu' || msgCleanLower === 'hola';
+
+              if (!esResetExplicito) {
+                const adjuntado = await db.appendPacienteMensajeAConsulta(from, textoMensaje, undefined, undefined, undefined, undefined, pushName);
+                if (adjuntado) {
+                  console.log(`📌 [META] Mensaje de ${from} adjuntado a consulta activa.`);
+                  await db.saveSesion(from, 'esperando_atencion_humana');
+                  return c.json({ status: 'ok', handled: 'consulta_adjuntada' }, 200);
+                }
+              }
+
+              // Procesar con el motor de estados
+              console.log(`🤖 [META] Ejecutando StateEngine.processMessage para ${from}...`);
+              const result = await StateEngine.processMessage(payload, c.env);
+              console.log(`🤖 [META ENGINE RESULT] Estado: ${result.estadoActual}, Respuesta: "${result.respuesta}", Buttons: ${JSON.stringify(result.interactive?.buttons || [])}`);
+
+              // Guardar respuesta del bot en el historial
+              await db.agregarMensajeHistorial(from, {
+                id: `msg_${Date.now()}_bot`,
+                sender: 'bot',
+                text: result.respuesta,
+                timestamp: new Date().toISOString(),
+                interactive: result.interactive
+              });
+
+              // Guardar sesión actualizada
+              const sesionActual = await db.getSesion(from);
+              await db.saveSesion(from, sesionActual.estado, sesionActual.datosTemporales);
+
+              // Notificar al WebApp la respuesta del bot
+              broadcastToWebApp(c.env, {
+                type: 'new_message',
+                remitente: from,
+                text: result.respuesta || '',
+                sender: 'bot',
+                estado: result.estadoActual
+              }).catch(() => {});
+
+              // Responder a través de Meta Cloud API
+              if (result.respuesta) {
+                let sent = false;
+                if (result.interactive && result.interactive.buttons && result.interactive.buttons.length > 0) {
+                  console.log(`📤 [META] Intentando enviar botones interactivos a ${from}...`);
+                  sent = await MetaWhatsappService.sendInteractiveButtons(
+                    c.env,
+                    from,
+                    result.respuesta,
+                    result.interactive.buttons,
+                    result.interactive.header,
+                    result.interactive.footer
+                  );
+                } else {
+                  console.log(`📤 [META] Intentando enviar texto plano a ${from}...`);
+                  sent = await MetaWhatsappService.sendTextMessage(c.env, from, result.respuesta);
+                }
+                console.log(`📤 [META SEND RESULT] Éxito: ${sent}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return c.json({ status: 'ok' }, 200);
+  } catch (err: any) {
+    console.error('❌ Error procesando /api/webhook/meta:', err);
+    return c.json({ error: 'Error interno en webhook de Meta', details: err?.message }, 500);
+  }
+};
+
+app.post('/api/webhook/meta', handleMetaMessage);
+app.post('/webhook/meta', handleMetaMessage);
+
 app.get('/api/session/:remitente', async (c) => {
   const remitente = c.req.param('remitente');
   const db = DBFactory.createService(c.env);
@@ -871,6 +1064,7 @@ app.patch('/api/consultas/:id/etiquetas', async (c) => {
   const ok = await db.actualizarEtiquetasConsulta(id, etiquetas);
 
   if (ok) {
+    invalidateConsultasCache();
     return c.json({ success: true, id, etiquetas });
   } else {
     return c.json({ error: 'No se pudo actualizar las etiquetas de la consulta' }, 500);
@@ -1293,10 +1487,10 @@ app.post('/api/forward-telemedicina', async (c) => {
 app.post('/api/send-message', async (c) => {
   try {
     const body = await c.req.json();
-    const { remitente, respuesta, idConsulta, pdfUrl, pdfNombre, pdfBase64, usuario } = body;
+    const { remitente, respuesta, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, usuario, operatorIcon: reqOperatorIcon } = body;
 
-    if (!remitente || (!respuesta && !pdfUrl && !pdfBase64)) {
-      return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF)' }, 400);
+    if (!remitente || (!respuesta && !pdfUrl && !pdfBase64 && !imagenBase64)) {
+      return c.json({ error: 'Faltan parámetros (remitente o respuesta/PDF/Imagen)' }, 400);
     }
 
     // Single shared msgId that threads through ALL storage so edit/delete/receipts can find the entry
@@ -1304,17 +1498,21 @@ app.post('/api/send-message', async (c) => {
 
     const db = DBFactory.createService(c.env);
 
-    // Obtener config para ver si mostrar nombre del operador
+    // Obtener config para ver si mostrar nombre del operador e ícono
     const botConfig = await db.getBotConfig();
     const showOperatorName = botConfig.showOperatorName || false;
+    const rawIcon = reqOperatorIcon !== undefined ? reqOperatorIcon : (botConfig.operatorIcon !== undefined ? botConfig.operatorIcon : '👩‍⚕️');
+    const iconPrefix = (rawIcon && rawIcon !== 'none' && rawIcon !== 'sin_icono') ? `${rawIcon} ` : '';
     const nombreOperador = showOperatorName ? (usuario || 'Secretaría') : 'Secretaría';
 
     if (idConsulta) {
-      const textoReg = `${respuesta || ''} ${pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : ''}`.trim();
+      const tagPdf = pdfNombre ? `[📎 Adjunto PDF: ${pdfNombre}]` : '';
+      const tagImg = imagenBase64 ? `[📷 Imagen Adjunta]` : '';
+      const textoReg = `${respuesta || ''} ${tagPdf} ${tagImg}`.trim();
       await db.registrarRespuestaSecretaria(idConsulta, textoReg, msgId, usuario);
     }
 
-    const textoFinal = respuesta ? `👩‍⚕️ *[${nombreOperador}]* ${respuesta}` : `👩‍⚕️ *[${nombreOperador}]* Te enviamos el documento adjunto con las indicaciones.`;
+    let textoFinal = respuesta ? `${iconPrefix}*[${nombreOperador}]* ${respuesta}` : `${iconPrefix}*[${nombreOperador}]* Te enviamos el archivo adjunto.`;
 
     await db.agregarMensajeHistorial(remitente, {
       id: msgId,
@@ -1334,7 +1532,7 @@ app.post('/api/send-message', async (c) => {
       }
     }
 
-    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, undefined, altRemitenteForSend, false, 'send', msgId, undefined, c.env);
+    await addPendingAndNotify(db, remitente, textoFinal, idConsulta, pdfUrl, pdfNombre, pdfBase64, imagenBase64, altRemitenteForSend, false, 'send', msgId, undefined, c.env);
 
     const readCfg = await (db as any).getWhatsappReadConfig?.();
     if (readCfg?.markReadOnReply) {

@@ -17,8 +17,12 @@ export interface Env {
   RESEND_API_KEY?: string;
   GOOGLE_SCRIPT_URL?: string;
   ALERT_EMAIL?: string;
+  META_PHONE_NUMBER_ID?: string;
+  META_ACCESS_TOKEN?: string;
+  META_VERIFY_TOKEN?: string;
   ASSETS?: Fetcher;
   SSE_BROKER: DurableObjectNamespace<SseBroker>;
+  AI?: any;
 }
 
 export interface AppUser {
@@ -97,6 +101,8 @@ export interface WebhookPayload {
   imagenNombre?: string;
   pdfBase64?: string;
   pdfNombre?: string;
+  audioBase64?: string;
+  audioUrl?: string;
 }
 
 export interface DoctorItem {
